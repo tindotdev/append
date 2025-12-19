@@ -1,0 +1,26 @@
+{
+  "name": "append",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "dev:api": "pnpm --filter @append/api dev",
+    "dev:web": "pnpm --filter @append/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "db:generate": "pnpm --filter @append/api db:generate",
+    "db:migrate": "pnpm --filter @append/api db:migrate",
+    "db:migrate:local": "pnpm --filter @append/api db:migrate:local"
+  },
+  "license": "MIT",
+  "packageManager": "pnpm@10.26.1",
+  "volta": {
+    "node": "24.12.0"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}
