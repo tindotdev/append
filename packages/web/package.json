@@ -1,5 +1,5 @@
 {
-  "name": "web",
+  "name": "append-web",
   "private": true,
   "type": "module",
   "scripts": {
