@@ -2,6 +2,13 @@
 
 `append` is the concept that builds on top of eng-log.
 
+## Deployment (Cloudflare)
+
+- API (Workers): `pnpm deploy:api`
+- Web (SPA): deploy `packages/web` to Cloudflare Pages (ADR `docs/adr/0004-spa-hono-workers.md`)
+  - Git-based Pages build: build output is `packages/web/dist`
+  - CLI upload: `pnpm --filter append-web build` then `wrangler pages deploy packages/web/dist --project-name append-web`
+
 ## Status
 
 Planning docs live in `docs/`:

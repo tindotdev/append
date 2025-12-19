@@ -21,3 +21,8 @@ Ship a usable “off-load the brain” flow end-to-end, with canonical storage i
 - Re-running accept-all (retry) creates zero duplicates.
 - Edits are version-checked (409 on conflict).
 - Export output is deterministic and stable across refreshes.
+
+## Deployment notes
+
+- API lives in `packages/api` and deploys to Cloudflare Workers via `pnpm deploy:api`.
+- Web lives in `packages/web` and is intended to deploy to Cloudflare Pages (build output: `packages/web/dist`).
