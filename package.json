@@ -4,15 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --parallel -r dev",
-    "dev:api": "pnpm --filter @append/api dev",
-    "dev:web": "pnpm --filter @append/web dev",
-    "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint",
-    "db:generate": "pnpm --filter @append/api db:generate",
-    "db:migrate": "pnpm --filter @append/api db:migrate",
-    "db:migrate:local": "pnpm --filter @append/api db:migrate:local"
+    "dev": "pnpm -r --parallel dev",
+    "dev:api": "pnpm --filter append-api run dev",
+    "dev:web": "pnpm --filter append-web run dev",
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm -r --if-present lint",
+    "deploy:api": "pnpm --filter append-api run deploy"
   },
   "license": "MIT",
   "packageManager": "pnpm@10.26.1",
