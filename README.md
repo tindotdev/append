@@ -9,6 +9,10 @@
   - Git-based Pages build: build output is `packages/web/dist`
   - CLI upload: `pnpm --filter append-web build` then `wrangler pages deploy packages/web/dist --project-name append-web`
 
+## Secrets management
+
+- secrets are managed by `doppler` and can be accessed using cli
+
 ## Status
 
 Planning docs live in `docs/`:
