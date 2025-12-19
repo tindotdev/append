@@ -7,6 +7,14 @@
 - First runnable slice: `docs/vertical-slice.md`
 - Risks: `docs/risk-register.md`
 - ADR index: `docs/adr/README.md`
+- Documentation policy: `docs/README.md`
+
+## Documentation is a contract (keep it current)
+
+- `AGENTS.md` and everything under `docs/` must stay up-to-date with the actual system.
+- Temporary working docs are allowed only for in-flight work:
+  - `HANDOFF.md`, `ISSUE.md`, `TASK.md`, `DEBUG_{problem}.md`
+- If a temporary doc becomes useful long-term, move it to `docs/archive/` (and keep it accurate).
 
 ## Locked decisions (current)
 
