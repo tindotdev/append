@@ -11,7 +11,41 @@
 
 ## Secrets management
 
-- secrets are managed by `doppler` and can be accessed using cli
+- Secrets are managed by `doppler` and can be accessed using the CLI.
+
+### Doppler usage guide
+
+Fetch the latest secrets for your project/config with `doppler run`, which injects them as environment variables for your command or script.
+
+#### Single command
+
+```bash
+doppler run -- your-command-here
+```
+
+#### Multiple commands
+
+```bash
+doppler run --command="./configure && ./process-jobs; ./cleanup"
+```
+
+```js
+const secret = process.env["SECRET_NAME"]
+```
+
+To run one-off commands using a secret in Doppler, please make sure to escape the secret or use single quotes. You will need to do this to guard against shell parsing the variable before the run command executes.
+
+#### Escaped
+
+```bash
+doppler run --command="echo \$SECRET_NAME"
+```
+
+#### Single quotes
+
+```bash
+doppler run --command='echo $SECRET_NAME'
+```
 
 ## Status
 
