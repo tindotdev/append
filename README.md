@@ -2,6 +2,16 @@
 
 `append` is the concept that builds on top of eng-log.
 
+## Status
+
+Planning docs live in `docs/`:
+
+- `docs/design.md`
+- `docs/build-plan.md`
+- `docs/vertical-slice.md`
+- `docs/risk-register.md`
+- `docs/adr/README.md`
+
 ## Usecases
 
 ### Case1: Off-load the brain
