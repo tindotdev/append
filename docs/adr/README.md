@@ -14,3 +14,4 @@ Rules:
 - `0002-term-sense-duplicates.md` — Duplicate handling via `Term` + `TermSense` (allowed-but-flagged)
 - `0003-bucket-feed-primary-sense.md` — Bucket feed shows primary sense by default (expand for more; review mode)
 - `0004-spa-hono-workers.md` — SPA (React + TanStack Router) + Hono on Workers (no SSR)
+- `0005-web-auth-gating-protected-layout.md` — Web auth gating via protected layout route
