@@ -7,12 +7,25 @@
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"test": "vitest",
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+		"auth:generate": "pnpm dlx @better-auth/cli generate --config ./src/lib/auth/index.ts --output ./src/db/auth.schema.ts -y",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate:local": "wrangler d1 migrations apply DB --local",
+		"db:migrate:prod": "wrangler d1 migrations apply DB --remote",
+		"db:studio": "drizzle-kit studio"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.8.19",
+		"@cloudflare/workers-types": "^4.20251219.0",
+		"drizzle-kit": "^0.31.8",
 		"typescript": "^5.5.2",
 		"vitest": "~3.2.0",
 		"wrangler": "^4.56.0"
+	},
+	"dependencies": {
+		"better-auth": "^1.4.7",
+		"better-auth-cloudflare": "^0.2.9",
+		"drizzle-orm": "^0.45.1",
+		"hono": "^4.11.1"
 	}
 }

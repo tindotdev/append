@@ -11,41 +11,23 @@
 
 ## Secrets management
 
-- Secrets are managed by `doppler` and can be accessed using the CLI.
+Secrets are managed via Cloudflare's native tooling:
 
-### Doppler usage guide
+- **Local dev**: `.dev.vars` in `packages/api/` (gitignored)
+- **Production**: `wrangler secret put <NAME>` (stored in Cloudflare)
 
-Fetch the latest secrets for your project/config with `doppler run`, which injects them as environment variables for your command or script.
-
-#### Single command
-
-```bash
-doppler run -- your-command-here
-```
-
-#### Multiple commands
+Required secrets for auth:
 
 ```bash
-doppler run --command="./configure && ./process-jobs; ./cleanup"
+cd packages/api
+pnpm wrangler secret put GOOGLE_CLIENT_ID
+pnpm wrangler secret put GOOGLE_CLIENT_SECRET
+pnpm wrangler secret put BETTER_AUTH_SECRET
+pnpm wrangler secret put BETTER_AUTH_URL      # https://api.append.tindev.dev
+pnpm wrangler secret put ALLOWED_SUB          # or ALLOWED_EMAIL for bootstrap
 ```
 
-```js
-const secret = process.env["SECRET_NAME"]
-```
-
-To run one-off commands using a secret in Doppler, please make sure to escape the secret or use single quotes. You will need to do this to guard against shell parsing the variable before the run command executes.
-
-#### Escaped
-
-```bash
-doppler run --command="echo \$SECRET_NAME"
-```
-
-#### Single quotes
-
-```bash
-doppler run --command='echo $SECRET_NAME'
-```
+See `docs/runbook.md` for detailed auth setup.
 
 ## Status
 

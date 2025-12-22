@@ -7,14 +7,17 @@
 	"name": "append-api",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-12-19",
+	"compatibility_flags": ["nodejs_compat"],
 	"observability": {
-		"enabled": true
-	}
+		"enabled": true,
+	},
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
 	 */
-	// "placement": {  "mode": "smart" }
+	"placement": {
+		"mode": "smart",
+	},
 	/**
 	 * Bindings
 	 * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
@@ -27,7 +30,12 @@
 	 * Note: Use secrets to store sensitive data.
 	 * https://developers.cloudflare.com/workers/configuration/secrets/
 	 */
-	// "vars": {  "MY_VARIABLE": "production_value" }
+	// Secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET) are set via:
+	// - Local: .dev.vars file (git-ignored)
+	// - Production: `wrangler secret put <NAME>` or Doppler integration
+	"vars": {
+		"BETTER_AUTH_URL": "https://api.append.tindev.dev",
+	},
 	/**
 	 * Static Assets
 	 * https://developers.cloudflare.com/workers/static-assets/binding/
@@ -38,4 +46,12 @@
 	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
 	 */
 	// "services": [  {   "binding": "MY_SERVICE",   "service": "my-service"  } ]
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "append-db",
+			"database_id": "db763705-f8d3-4d94-bda9-305ac66a7b3a",
+			"migrations_dir": "drizzle",
+		},
+	],
 }

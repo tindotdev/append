@@ -3,13 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --port 3000",
+    "dev": "vite --port 5173",
     "build": "vite build && tsc",
     "preview": "vite preview",
     "test": "vitest run"
   },
   "dependencies": {
     "@tanstack/react-router": "^1.132.0",
+    "better-auth": "^1.4.7",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

@@ -23,10 +23,10 @@ Google OAuth can provide a stable account identifier (`sub`) and (sometimes) a r
 
 - Simple, strong access control without building multi-user auth/roles.
 - Requires initial setup of allowed `sub` (or email) via env/config.
+- **Fail closed** in runtime if neither `ALLOWED_SUB` nor `ALLOWED_EMAIL` is configured.
 - If Google account is changed (new account), allowlist must be updated.
 
 ## Alternatives considered
 
 - Cloudflare Access (no in-app auth): simpler, but user explicitly wants in-app sign-in.
 - Multi-user auth/teams: unnecessary complexity for personal use.
-
