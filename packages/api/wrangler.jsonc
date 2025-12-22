@@ -54,4 +54,29 @@
 			"migrations_dir": "drizzle",
 		},
 	],
+	/**
+	 * Test environment (§5.2)
+	 * - Enables email/password auth for testing
+	 * - Uses localhost-only URL guard for safety
+	 */
+	"env": {
+		"test": {
+			"vars": {
+				"ENABLE_TEST_EMAIL_PASSWORD_AUTH": "1",
+				"BETTER_AUTH_URL": "http://localhost:8787",
+				"BETTER_AUTH_SECRET": "test-secret-min-32-chars-for-cookie-signing",
+				"ALLOWED_EMAIL": "test-a@example.com",
+				"GOOGLE_CLIENT_ID": "test-google-client-id",
+				"GOOGLE_CLIENT_SECRET": "test-google-client-secret"
+			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "append-db",
+					"database_id": "db763705-f8d3-4d94-bda9-305ac66a7b3a",
+					"migrations_dir": "drizzle"
+				}
+			]
+		}
+	}
 }

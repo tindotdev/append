@@ -1,0 +1,122 @@
+import { useNavigate } from "@tanstack/react-router";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { ApiRequestError, createBatch } from "../lib/api";
+
+function parseTerms(input: string): string[] {
+  return input
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+export function BatchNewPage() {
+  const navigate = useNavigate();
+  const [terms, setTerms] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Track clientRequestId: generate once per submit attempt, regenerate on edit after failure
+  const clientRequestIdRef = useRef<string | null>(null);
+  const hasFailedRef = useRef(false);
+
+  const parsedTerms = useMemo(() => parseTerms(terms), [terms]);
+  const termCount = parsedTerms.length;
+
+  const handleTermsChange = useCallback((value: string) => {
+    setTerms(value);
+    // If user edits after a failure, clear the clientRequestId so we generate a new one
+    if (hasFailedRef.current) {
+      clientRequestIdRef.current = null;
+      hasFailedRef.current = false;
+    }
+    setError(null);
+  }, []);
+
+  const handleSubmit = useCallback(async () => {
+    if (termCount < 20 || termCount > 200) {
+      setError("Please enter between 20 and 200 terms (one per line).");
+      return;
+    }
+
+    // Generate clientRequestId if we don't have one
+    if (!clientRequestIdRef.current) {
+      clientRequestIdRef.current = crypto.randomUUID();
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await createBatch({
+        terms,
+        clientRequestId: clientRequestIdRef.current,
+      });
+
+      // Success - navigate to the batch page
+      navigate({ to: "/batch/$batchId", params: { batchId: response.id } });
+    } catch (err) {
+      hasFailedRef.current = true;
+
+      if (err instanceof ApiRequestError) {
+        if (err.code === "IDEMPOTENCY_CONFLICT") {
+          setError("Request conflict. Please modify your input and try again.");
+        } else if (err.code === "UNAUTHORIZED") {
+          setError("Your session has expired. Please sign in again.");
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("An unexpected error occurred. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [terms, termCount, navigate]);
+
+  const isValidCount = termCount >= 20 && termCount <= 200;
+
+  return (
+    <div className="max-w-2xl">
+      <h2 className="text-xl font-semibold">Capture New Batch</h2>
+      <p className="mt-2 text-zinc-400">
+        Enter your terms, one per line. Brain dump welcome — duplicates and rough ideas are fine.
+      </p>
+
+      <div className="mt-6">
+        <textarea
+          value={terms}
+          onChange={(e) => handleTermsChange(e.target.value)}
+          placeholder="Enter terms here, one per line..."
+          className="w-full h-64 bg-zinc-900 border border-zinc-700 rounded-lg p-4 text-white placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 resize-none font-mono text-sm"
+          disabled={isSubmitting}
+        />
+
+        <div className="mt-2 flex items-center justify-between">
+          <span className={`text-sm ${isValidCount ? "text-zinc-400" : "text-amber-500"}`}>
+            {termCount} term{termCount !== 1 ? "s" : ""}
+            {termCount > 0 && !isValidCount && (
+              <span className="ml-1">
+                ({termCount < 20 ? `need ${20 - termCount} more` : `${termCount - 200} over limit`})
+              </span>
+            )}
+          </span>
+          <span className="text-sm text-zinc-500">20–200 terms required</span>
+        </div>
+
+        {error && (
+          <div className="mt-4 p-3 bg-red-900/30 border border-red-800 rounded-lg text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={handleSubmit}
+          disabled={isSubmitting || !isValidCount}
+          className="mt-4 w-full rounded-lg bg-white px-4 py-2.5 text-black font-medium hover:bg-zinc-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isSubmitting ? "Submitting..." : "Submit Batch"}
+        </button>
+      </div>
+    </div>
+  );
+}
