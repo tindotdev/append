@@ -96,6 +96,20 @@ pnpm --filter append-web run build
 pnpm --filter append-web exec wrangler pages deploy packages/web/dist --project-name "$CF_PAGES_PROJECT"
 ```
 
+## Release tags (semver)
+
+We use annotated git tags as milestones (e.g. completing a vertical slice). Tags are created manually; CI does not auto-tag.
+
+Process:
+
+1. Ensure `main` is green and up to date.
+2. Create an annotated tag on the slice commit:
+   - `git tag -a vX.Y.Z <sha> -m "Short release message"`
+3. Push the tag:
+   - `git push origin vX.Y.Z`
+4. Create a GitHub Release (optional, recommended for notes):
+   - `gh release create vX.Y.Z --generate-notes`
+
 ## Migrations
 
 - Better Auth schema changes:
