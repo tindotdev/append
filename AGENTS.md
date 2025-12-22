@@ -13,7 +13,7 @@
 
 - `AGENTS.md` and everything under `docs/` must stay up-to-date with the actual system.
 - Temporary working docs are allowed only for in-flight work:
-  - `HANDOFF.md`, `ISSUE.md`, `TASK.md`, `DEBUG_{problem}.md`
+  - `HANDOFF.md`, `ISSUE.md`, `TASK.md`, `DEBUG_{problem}.md`, `SUMMARY_{task}.md`
 - If a temporary doc becomes useful long-term, move it to `docs/archive/` (and keep it accurate).
 
 ## Locked decisions (current)
