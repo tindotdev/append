@@ -128,6 +128,7 @@
 - D1 (canonical store)
 - LLM provider (suggestions + later “feedback” grading)
 - Google OAuth (SSO)
+  - Fail closed if neither `ALLOWED_SUB` nor `ALLOWED_EMAIL` is configured (ADR 0001)
 
 ### Import/export
 

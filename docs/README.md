@@ -6,6 +6,7 @@ Documentation in this repo is a contract.
 
 - `AGENTS.md`
 - Everything under `docs/` (design, build plan, ADRs, risks, etc.)
+- `docs/runbook.md`
 
 If the code changes behavior, update docs in the same change (or immediately after).
 
@@ -21,4 +22,3 @@ Temporary working docs are allowed for in-flight work:
 ## Archiving
 
 If a temporary doc becomes useful for future reference, move it to `docs/archive/` and ensure it is accurate.
-
