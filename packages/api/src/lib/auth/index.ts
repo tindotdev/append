@@ -38,6 +38,11 @@ function isUserAllowed(env: Env, userEmail: string, accountId?: string): boolean
 	return false;
 }
 
+function isEmailAllowed(env: Env, userEmail: string): boolean {
+	if (!env.ALLOWED_EMAIL) return false;
+	return userEmail.toLowerCase() === env.ALLOWED_EMAIL.toLowerCase();
+}
+
 function assertAllowlistConfigured(env: Env): void {
 	if (!env.ALLOWED_SUB && !env.ALLOWED_EMAIL) {
 		throw new APIError("FORBIDDEN", {
@@ -109,12 +114,33 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 							before: async (account) => {
 								assertAllowlistConfigured(env);
 
-								if (env.ALLOWED_SUB && account.providerId === "google") {
+								// Google: enforce sub allowlist if configured (ADR 0001 primary rule)
+								if (account.providerId === "google" && env.ALLOWED_SUB) {
 									if (!account.accountId || account.accountId !== env.ALLOWED_SUB) {
 										throw new APIError("FORBIDDEN", {
 											message: "Access denied: not on allowlist",
 										});
 									}
+									return;
+								}
+
+								// Non-Google providers: sub allowlist does not apply.
+								// Require ALLOWED_EMAIL match (fail closed if missing).
+								if (!env.ALLOWED_EMAIL) {
+									throw new APIError("FORBIDDEN", {
+										message: "Access denied: email allowlist required",
+									});
+								}
+
+								const userRow = await db.query.user.findFirst({
+									columns: { email: true },
+									where: (u, { eq }) => eq(u.id, account.userId),
+								});
+
+								if (!userRow?.email || !isEmailAllowed(env, userRow.email)) {
+									throw new APIError("FORBIDDEN", {
+										message: "Access denied: not on allowlist",
+									});
 								}
 							},
 						},
