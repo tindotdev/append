@@ -7,7 +7,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
 ## Slice definition
 
 1. [x] **Google SSO login** — ADR 0001 (allowlist: sub-first, email fallback).
-2. [ ] **Paste 20–200 terms into "New batch"** (20–200 non-empty lines after trimming)
+2. [x] **Paste 20–200 terms into "New batch"** (20–200 non-empty lines after trimming)
    - Domain schema: `bucket`, `term`, `term_sense`, `batch`, `candidate`.
    - `POST /api/batch` parses newline-separated input (trim lines, drop empties), creates batch + candidates.
    - Candidate order preserves the post-trim input order; duplicates remain distinct candidates.
@@ -30,7 +30,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
 
 ## Current focus
 
-**Step 2: Domain schema + batch input**
+**Step 3: Worker API generates suggestions**
 
 ## Done criteria
 
