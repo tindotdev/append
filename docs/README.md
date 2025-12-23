@@ -18,6 +18,8 @@ Temporary working docs are allowed for in-flight work:
 - `ISSUE.md` (current issue being investigated/fixed)
 - `TASK.md` (current task focus)
 - `DEBUG_{problem}.md` (debug log for an unresolved bug)
+- `PLAN_{task}.md` (implementation plan for a specific task)
+- `SUMMARY_{task}.md` (session summary for handoff)
 
 ## Archiving
 

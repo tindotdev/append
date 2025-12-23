@@ -5,6 +5,7 @@
 - Design snapshot: `docs/design.md`
 - Build plan: `docs/build-plan.md`
 - First runnable slice: `docs/vertical-slice.md`
+- Testing strategy: `docs/testing.md`
 - Risks: `docs/risk-register.md`
 - ADR index: `docs/adr/README.md`
 - Documentation policy: `docs/README.md`

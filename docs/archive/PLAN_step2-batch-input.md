@@ -1,6 +1,24 @@
 # Plan: Vertical Slice — Step 2 (Domain schema + batch input)
 
-Primary goal: continue the current `docs/vertical-slice.md` focus (“Step 2: Domain schema + batch input”) with an implementation plan that is unambiguous and aligned with `docs/design.md`.
+**Status**: ✅ Complete (merged 2025-12-23, commit `82bc919`)
+
+Primary goal: continue the current `docs/vertical-slice.md` focus ("Step 2: Domain schema + batch input") with an implementation plan that is unambiguous and aligned with `docs/design.md`.
+
+---
+
+## Completion Summary
+
+All scope items implemented and tested:
+
+- [x] D1 schema: `batch`, `candidate`, `term`, `term_sense`, `idempotency_key`
+- [x] API: `POST /api/batch` (idempotent), `GET /api/batch/:id` (owner-only)
+- [x] Web: `/batch/new`, `/batch/:id`, protected layout route
+- [x] Tests: 20 passing (auth, idempotency, ownership, validation)
+- [x] Production deployed and validated
+
+See `docs/vertical-slice.md` for current state.
+
+---
 
 ## Scope (Step 2 only)
 
