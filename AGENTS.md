@@ -13,7 +13,7 @@
 
 - `AGENTS.md` and everything under `docs/` must stay up-to-date with the actual system.
 - Temporary working docs are allowed only for in-flight work:
-  - `HANDOFF.md`, `ISSUE.md`, `TASK.md`, `DEBUG_{problem}.md`, `SUMMARY_{task}.md`
+  - `HANDOFF.md`, `ISSUE.md`, `TASK.md`, `DEBUG_{problem}.md`, `SUMMARY_{task}.md`, `PLAN_{task}.md`
 - If a temporary doc becomes useful long-term, move it to `docs/archive/` (and keep it accurate).
 
 ## Locked decisions (current)
@@ -22,6 +22,7 @@
 - ADR 0002: Duplicate handling via `Term` + append-only `TermSense` (allowed-but-flagged)
 - ADR 0003: Bucket feed shows primary sense by default (expand; “Needs review” view)
 - ADR 0004: SPA (React + TanStack Router) + Hono on Workers (no SSR)
+- ADR 0005: Web auth gating via protected layout route
 
 ## Working mode
 

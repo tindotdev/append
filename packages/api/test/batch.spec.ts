@@ -1,48 +1,37 @@
-import {
-	env,
-	createExecutionContext,
-	waitOnExecutionContext,
-	SELF,
-} from "cloudflare:test";
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
-import { drizzle } from "drizzle-orm/d1";
-import { eq } from "drizzle-orm";
-import worker from "../src/index";
-import { schema, batch, candidate, idempotencyKey, user } from "../src/db";
-import { applyMigrations } from "./setup";
+import { env, SELF } from 'cloudflare:test';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { drizzle } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
+import { schema, batch, candidate, idempotencyKey, user } from '../src/db';
+import { applyMigrations } from './setup';
 
 // =============================================================================
 // Test utilities
 // =============================================================================
 
-const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
-
 /**
  * Sign up and sign in a test user, returning the session cookie.
  */
-async function getAuthCookie(
-	email: string = "test-a@example.com",
-	password: string = "test-password-123"
-): Promise<string> {
+async function getAuthCookie(email: string = 'test-a@example.com', password: string = 'test-password-123'): Promise<string> {
 	// Sign up (idempotent - ignore if already exists)
-	const signUpRes = await SELF.fetch("https://example.com/auth/sign-up/email", {
-		method: "POST",
-		headers: { "content-type": "application/json" },
-		body: JSON.stringify({ email, password, name: "Test User" }),
+	const signUpRes = await SELF.fetch('https://example.com/auth/sign-up/email', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ email, password, name: 'Test User' }),
 	});
 
 	// Only throw for non-"already exists" errors
 	if (!signUpRes.ok) {
 		const body = await signUpRes.text();
-		if (!body.includes("already exists") && !body.includes("USER_ALREADY_EXISTS")) {
+		if (!body.includes('already exists') && !body.includes('USER_ALREADY_EXISTS')) {
 			throw new Error(`Sign-up failed: ${body}`);
 		}
 	}
 
 	// Sign in
-	const signInRes = await SELF.fetch("https://example.com/auth/sign-in/email", {
-		method: "POST",
-		headers: { "content-type": "application/json" },
+	const signInRes = await SELF.fetch('https://example.com/auth/sign-in/email', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify({ email, password }),
 	});
 
@@ -51,9 +40,9 @@ async function getAuthCookie(
 		throw new Error(`Sign-in failed: ${body}`);
 	}
 
-	const setCookie = signInRes.headers.get("set-cookie");
+	const setCookie = signInRes.headers.get('set-cookie');
 	if (!setCookie) {
-		throw new Error("No set-cookie header from sign-in");
+		throw new Error('No set-cookie header from sign-in');
 	}
 
 	return setCookie;
@@ -63,7 +52,7 @@ async function getAuthCookie(
  * Generate N lines of test terms.
  */
 function generateTerms(count: number): string {
-	return Array.from({ length: count }, (_, i) => `term-${i + 1}`).join("\n");
+	return Array.from({ length: count }, (_, i) => `term-${i + 1}`).join('\n');
 }
 
 /**
@@ -84,7 +73,7 @@ beforeAll(async () => {
 	// Apply migrations to test database (§5.1)
 	await applyMigrations();
 
-	db = drizzle(env.DB, { schema });
+	db = drizzle(env.DB, { schema }) as any;
 	authCookie = await getAuthCookie();
 });
 
@@ -99,11 +88,11 @@ afterEach(async () => {
 // POST /api/batch tests
 // =============================================================================
 
-describe("POST /api/batch", () => {
-	it("returns 401 when unauthenticated", async () => {
-		const res = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
-			headers: { "content-type": "application/json" },
+describe('POST /api/batch', () => {
+	it('returns 401 when unauthenticated', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				terms: generateTerms(25),
 				clientRequestId: generateUUID(),
@@ -111,68 +100,68 @@ describe("POST /api/batch", () => {
 		});
 
 		expect(res.status).toBe(401);
-		const body = await res.json();
-		expect(body.error.code).toBe("UNAUTHORIZED");
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('UNAUTHORIZED');
 	});
 
-	it("returns 400 for missing clientRequestId", async () => {
-		const res = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+	it('returns 400 for missing clientRequestId', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({ terms: generateTerms(25) }),
 		});
 
 		expect(res.status).toBe(400);
-		const body = await res.json();
-		expect(body.error.code).toBe("VALIDATION_ERROR");
-		expect(body.error.message).toContain("clientRequestId");
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+		expect(body.error.message).toContain('clientRequestId');
 	});
 
-	it("returns 400 for invalid clientRequestId (not UUID)", async () => {
-		const res = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+	it('returns 400 for invalid clientRequestId (not UUID)', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({
 				terms: generateTerms(25),
-				clientRequestId: "not-a-uuid",
+				clientRequestId: 'not-a-uuid',
 			}),
 		});
 
 		expect(res.status).toBe(400);
-		const body = await res.json();
-		expect(body.error.code).toBe("VALIDATION_ERROR");
-		expect(body.error.message).toContain("UUID");
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+		expect(body.error.message).toContain('UUID');
 	});
 
-	it("returns 400 for empty terms", async () => {
-		const res = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+	it('returns 400 for empty terms', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({
-				terms: "",
+				terms: '',
 				clientRequestId: generateUUID(),
 			}),
 		});
 
 		expect(res.status).toBe(400);
-		const body = await res.json();
-		expect(body.error.code).toBe("VALIDATION_ERROR");
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
 	});
 
-	it("returns 400 for fewer than 20 terms", async () => {
-		const res = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+	it('returns 400 for fewer than 20 terms', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({
@@ -182,16 +171,16 @@ describe("POST /api/batch", () => {
 		});
 
 		expect(res.status).toBe(400);
-		const body = await res.json();
-		expect(body.error.code).toBe("VALIDATION_ERROR");
-		expect(body.error.message).toContain("20");
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+		expect(body.error.message).toContain('20');
 	});
 
-	it("returns 400 for more than 200 terms", async () => {
-		const res = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+	it('returns 400 for more than 200 terms', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({
@@ -201,21 +190,19 @@ describe("POST /api/batch", () => {
 		});
 
 		expect(res.status).toBe(400);
-		const body = await res.json();
-		expect(body.error.code).toBe("VALIDATION_ERROR");
-		expect(body.error.message).toContain("200");
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+		expect(body.error.message).toContain('200');
 	});
 
-	it("returns 400 for term line exceeding max length", async () => {
-		const longTerm = "a".repeat(201);
-		const terms = [longTerm, ...Array.from({ length: 24 }, (_, i) => `term-${i}`)].join(
-			"\n"
-		);
+	it('returns 400 for term line exceeding max length', async () => {
+		const longTerm = 'a'.repeat(201);
+		const terms = [longTerm, ...Array.from({ length: 24 }, (_, i) => `term-${i}`)].join('\n');
 
-		const res = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({
@@ -225,19 +212,19 @@ describe("POST /api/batch", () => {
 		});
 
 		expect(res.status).toBe(400);
-		const body = await res.json();
-		expect(body.error.code).toBe("VALIDATION_ERROR");
-		expect(body.error.message).toContain("200 characters");
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+		expect(body.error.message).toContain('200 characters');
 	});
 
-	it("returns 413 for payload too large", async () => {
+	it('returns 413 for payload too large', async () => {
 		// Create a payload > 64 KiB
-		const largePayload = "x".repeat(65 * 1024);
+		const largePayload = 'x'.repeat(65 * 1024);
 
-		const res = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({
@@ -247,83 +234,83 @@ describe("POST /api/batch", () => {
 		});
 
 		expect(res.status).toBe(413);
-		const body = await res.json();
-		expect(body.error.code).toBe("PAYLOAD_TOO_LARGE");
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('PAYLOAD_TOO_LARGE');
 	});
 
-	it("creates batch + candidates with 201 status", async () => {
+	it('creates batch + candidates with 201 status', async () => {
 		const terms = generateTerms(25);
 		const clientRequestId = generateUUID();
 
-		const res = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({ terms, clientRequestId }),
 		});
 
 		expect(res.status).toBe(201);
-		const body = await res.json();
+		const body = (await res.json()) as any;
 		expect(body.id).toBeDefined();
 		expect(body.candidateCount).toBe(25);
 
 		// Verify batch in database
-		const batchRow = await db.query.batch.findFirst({
+		const batchRow = await (db.query as any).batch.findFirst({
 			where: eq(batch.id, body.id),
 		});
 		expect(batchRow).toBeDefined();
-		expect(batchRow?.status).toBe("captured");
+		expect(batchRow?.status).toBe('captured');
 
 		// Verify candidates in database
-		const candidates = await db.query.candidate.findMany({
+		const candidates = await (db.query as any).candidate.findMany({
 			where: eq(candidate.batchId, body.id),
 		});
 		expect(candidates.length).toBe(25);
 	});
 
-	it("replays with same clientRequestId + same terms (200)", async () => {
+	it('replays with same clientRequestId + same terms (200)', async () => {
 		const terms = generateTerms(25);
 		const clientRequestId = generateUUID();
 
 		// First request - creates
-		const res1 = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+		const res1 = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({ terms, clientRequestId }),
 		});
 
 		expect(res1.status).toBe(201);
-		const body1 = await res1.json();
+		const body1 = (await res1.json()) as any;
 
 		// Second request - replays
-		const res2 = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+		const res2 = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({ terms, clientRequestId }),
 		});
 
 		expect(res2.status).toBe(200);
-		const body2 = await res2.json();
+		const body2 = (await res2.json()) as any;
 		expect(body2.id).toBe(body1.id);
 		expect(body2.candidateCount).toBe(body1.candidateCount);
 	});
 
-	it("returns 409 for same clientRequestId + different terms", async () => {
+	it('returns 409 for same clientRequestId + different terms', async () => {
 		const clientRequestId = generateUUID();
 
 		// First request
-		const res1 = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+		const res1 = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({
@@ -335,10 +322,10 @@ describe("POST /api/batch", () => {
 		expect(res1.status).toBe(201);
 
 		// Second request with different terms
-		const res2 = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+		const res2 = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({
@@ -349,21 +336,21 @@ describe("POST /api/batch", () => {
 
 		expect(res2.status).toBe(409);
 		const body = await res2.json();
-		expect(body.error.code).toBe("IDEMPOTENCY_CONFLICT");
+		expect(body.error.code).toBe('IDEMPOTENCY_CONFLICT');
 	});
 
-	it("normalizes terms correctly", async () => {
+	it('normalizes terms correctly', async () => {
 		const terms = [
-			"  Hello   World  ", // Should normalize to "hello world"
-			"UPPERCASE",         // Should normalize to "uppercase"
-			"  multiple   spaces  ", // Should normalize to "multiple spaces"
+			'  Hello   World  ', // Should normalize to "hello world"
+			'UPPERCASE', // Should normalize to "uppercase"
+			'  multiple   spaces  ', // Should normalize to "multiple spaces"
 			...Array.from({ length: 22 }, (_, i) => `term-${i}`),
-		].join("\n");
+		].join('\n');
 
-		const res = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({
@@ -373,36 +360,33 @@ describe("POST /api/batch", () => {
 		});
 
 		expect(res.status).toBe(201);
-		const body = await res.json();
+		const body = (await res.json()) as any;
 
 		// Verify normalization in database
-		const candidates = await db.query.candidate.findMany({
+		const candidates = await (db.query as any).candidate.findMany({
 			where: eq(candidate.batchId, body.id),
-			orderBy: (candidate, { asc }) => [asc(candidate.position)],
+			orderBy: (candidate: any, { asc }: any) => [asc(candidate.position)],
 		});
 
-		expect(candidates[0].term).toBe("Hello   World");
-		expect(candidates[0].normalizedTerm).toBe("hello world");
+		expect(candidates[0].term).toBe('Hello   World');
+		expect(candidates[0].normalizedTerm).toBe('hello world');
 
-		expect(candidates[1].term).toBe("UPPERCASE");
-		expect(candidates[1].normalizedTerm).toBe("uppercase");
+		expect(candidates[1].term).toBe('UPPERCASE');
+		expect(candidates[1].normalizedTerm).toBe('uppercase');
 
-		expect(candidates[2].term).toBe("multiple   spaces");
-		expect(candidates[2].normalizedTerm).toBe("multiple spaces");
+		expect(candidates[2].term).toBe('multiple   spaces');
+		expect(candidates[2].normalizedTerm).toBe('multiple spaces');
 	});
 
-	it("preserves duplicates as distinct candidates", async () => {
-		const terms = [
-			"duplicate-term",
-			"duplicate-term",
-			"duplicate-term",
-			...Array.from({ length: 22 }, (_, i) => `unique-term-${i}`),
-		].join("\n");
+	it('preserves duplicates as distinct candidates', async () => {
+		const terms = ['duplicate-term', 'duplicate-term', 'duplicate-term', ...Array.from({ length: 22 }, (_, i) => `unique-term-${i}`)].join(
+			'\n',
+		);
 
-		const res = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({
@@ -412,14 +396,14 @@ describe("POST /api/batch", () => {
 		});
 
 		expect(res.status).toBe(201);
-		const body = await res.json();
+		const body = (await res.json()) as any;
 		expect(body.candidateCount).toBe(25);
 
 		// Verify all duplicates are preserved
-		const candidates = await db.query.candidate.findMany({
+		const candidates = await (db.query as any).candidate.findMany({
 			where: eq(candidate.batchId, body.id),
 		});
-		const duplicates = candidates.filter((c) => c.term === "duplicate-term");
+		const duplicates = candidates.filter((c: any) => c.term === 'duplicate-term');
 		expect(duplicates.length).toBe(3);
 	});
 });
@@ -428,28 +412,25 @@ describe("POST /api/batch", () => {
 // GET /api/batch/:id tests
 // =============================================================================
 
-describe("GET /api/batch/:id", () => {
-	it("returns 401 when unauthenticated", async () => {
-		const res = await SELF.fetch("https://example.com/api/batch/some-id");
+describe('GET /api/batch/:id', () => {
+	it('returns 401 when unauthenticated', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch/some-id');
 		expect(res.status).toBe(401);
-		const body = await res.json();
-		expect(body.error.code).toBe("UNAUTHORIZED");
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('UNAUTHORIZED');
 	});
 
-	it("returns 404 for non-existent batch", async () => {
-		const res = await SELF.fetch(
-			`https://example.com/api/batch/${generateUUID()}`,
-			{
-				headers: { cookie: authCookie },
-			}
-		);
+	it('returns 404 for non-existent batch', async () => {
+		const res = await SELF.fetch(`https://example.com/api/batch/${generateUUID()}`, {
+			headers: { cookie: authCookie },
+		});
 
 		expect(res.status).toBe(404);
-		const body = await res.json();
-		expect(body.error.code).toBe("NOT_FOUND");
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('NOT_FOUND');
 	});
 
-	it("returns 403 for non-owner", async () => {
+	it('returns 403 for non-owner', async () => {
 		// Seed a "foreign" user + batch + candidate directly via Drizzle (§5.1)
 		// This bypasses the allowlist check since we're writing directly to DB
 		const foreignUserId = generateUUID();
@@ -460,8 +441,8 @@ describe("GET /api/batch/:id", () => {
 		// Create foreign user
 		await db.insert(user).values({
 			id: foreignUserId,
-			name: "Foreign User",
-			email: "foreign@example.com",
+			name: 'Foreign User',
+			email: 'foreign@example.com',
 			emailVerified: false,
 			createdAt: now,
 			updatedAt: now,
@@ -471,7 +452,7 @@ describe("GET /api/batch/:id", () => {
 		await db.insert(batch).values({
 			id: foreignBatchId,
 			userId: foreignUserId,
-			status: "captured",
+			status: 'captured',
 			createdAt: now,
 			updatedAt: now,
 		});
@@ -481,9 +462,9 @@ describe("GET /api/batch/:id", () => {
 			id: foreignCandidateId,
 			batchId: foreignBatchId,
 			position: 0,
-			term: "foreign-term",
-			normalizedTerm: "foreign-term",
-			status: "captured",
+			term: 'foreign-term',
+			normalizedTerm: 'foreign-term',
+			status: 'captured',
 			createdAt: now,
 			updatedAt: now,
 		});
@@ -494,8 +475,8 @@ describe("GET /api/batch/:id", () => {
 		});
 
 		expect(res.status).toBe(403);
-		const body = await res.json();
-		expect(body.error.code).toBe("FORBIDDEN");
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('FORBIDDEN');
 
 		// Clean up foreign user data
 		await db.delete(candidate).where(eq(candidate.id, foreignCandidateId));
@@ -503,12 +484,12 @@ describe("GET /api/batch/:id", () => {
 		await db.delete(user).where(eq(user.id, foreignUserId));
 	});
 
-	it("returns 200 with batch details for owner", async () => {
+	it('returns 200 with batch details for owner', async () => {
 		// Create a batch
-		const createRes = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({
@@ -518,7 +499,7 @@ describe("GET /api/batch/:id", () => {
 		});
 
 		expect(createRes.status).toBe(201);
-		const { id: batchId } = await createRes.json();
+		const { id: batchId } = (await createRes.json()) as any;
 
 		// Get the batch
 		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}`, {
@@ -526,14 +507,14 @@ describe("GET /api/batch/:id", () => {
 		});
 
 		expect(res.status).toBe(200);
-		const body = await res.json();
+		const body = (await res.json()) as any;
 
 		expect(body.id).toBe(batchId);
-		expect(body.status).toBe("captured");
+		expect(body.status).toBe('captured');
 		expect(body.candidateCount).toBe(25);
 		expect(body.candidates).toHaveLength(25);
-		expect(body.createdAt).toBeTypeOf("number");
-		expect(body.updatedAt).toBeTypeOf("number");
+		expect(body.createdAt).toBeTypeOf('number');
+		expect(body.updatedAt).toBeTypeOf('number');
 
 		// Verify candidates are ordered by position
 		for (let i = 0; i < body.candidates.length; i++) {
@@ -547,10 +528,10 @@ describe("GET /api/batch/:id", () => {
 // OPTIONS preflight tests
 // =============================================================================
 
-describe("OPTIONS preflight", () => {
-	it("returns 204 without auth for /api/* routes", async () => {
-		const res = await SELF.fetch("https://example.com/api/batch", {
-			method: "OPTIONS",
+describe('OPTIONS preflight', () => {
+	it('returns 204 without auth for /api/* routes', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			method: 'OPTIONS',
 		});
 
 		expect(res.status).toBe(204);
