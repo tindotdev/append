@@ -37,11 +37,12 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
 });
 
 // Public: Sign-in route
+// Note: beforeLoad handles navigation-time redirects; SignInPage handles
+// reactive redirects when auth state changes after mount
 const signInRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sign-in",
   beforeLoad: ({ context }) => {
-    // Already authenticated? Redirect to batch/new
     if (!context.auth.isPending && context.auth.isAuthenticated) {
       throw redirect({ to: "/batch/new" });
     }
@@ -50,16 +51,14 @@ const signInRoute = createRoute({
 });
 
 // Protected layout route (pathless) with beforeLoad auth check
+// Note: beforeLoad handles navigation-time redirects; ProtectedLayout handles
+// reactive redirects when auth state changes after mount
 const protectedRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "protected",
-  beforeLoad: ({ context, location }) => {
-    // Definitive "not authenticated" redirect
+  beforeLoad: ({ context }) => {
     if (!context.auth.isPending && !context.auth.isAuthenticated) {
-      throw redirect({
-        to: "/sign-in",
-        search: { redirect: location.href },
-      });
+      throw redirect({ to: "/sign-in" });
     }
   },
   component: ProtectedLayout,
