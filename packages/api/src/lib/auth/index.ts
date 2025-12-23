@@ -3,6 +3,7 @@ import { betterAuth } from "better-auth";
 import { withCloudflare } from "better-auth-cloudflare";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
+import { eq } from "drizzle-orm";
 import { APIError } from "better-auth/api";
 import { schema } from "../../db";
 
@@ -15,7 +16,17 @@ type Env = {
 	// Allowlist (ADR 0001)
 	ALLOWED_SUB?: string;
 	ALLOWED_EMAIL?: string;
+	// Test-only: enable email/password auth (§5.2)
+	ENABLE_TEST_EMAIL_PASSWORD_AUTH?: string;
 };
+
+/**
+ * Check if email matches the allowlist (case-insensitive).
+ */
+function isEmailAllowed(env: Env, email: string): boolean {
+	if (!env.ALLOWED_EMAIL) return false;
+	return email.toLowerCase() === env.ALLOWED_EMAIL.toLowerCase();
+}
 
 /**
  * Check if a user is allowed based on ADR 0001:
@@ -46,10 +57,24 @@ function assertAllowlistConfigured(env: Env): void {
 	}
 }
 
+/**
+ * Check if email/password auth should be enabled.
+ * Only allowed in test environment with localhost URL.
+ */
+function isEmailPasswordAuthEnabled(env?: Env): boolean {
+	if (!env) return false;
+	if (env.ENABLE_TEST_EMAIL_PASSWORD_AUTH !== "1") return false;
+	if (!env.BETTER_AUTH_URL?.startsWith("http://localhost")) return false;
+	return true;
+}
+
 // Single auth configuration that handles both CLI and runtime scenarios
 function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 	// Use actual DB for runtime, empty object for CLI
 	const db = env ? drizzle(env.DB, { schema }) : ({} as any);
+
+	// Email/password auth is only enabled in test environment (§5.2)
+	const emailPasswordEnabled = isEmailPasswordAuthEnabled(env);
 
 	return betterAuth({
 		...withCloudflare(
@@ -74,6 +99,14 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 						clientSecret: env?.GOOGLE_CLIENT_SECRET || "",
 					},
 				},
+				// Email/password auth for test environment only (§5.2)
+				...(emailPasswordEnabled
+					? {
+							emailAndPassword: {
+								enabled: true,
+							},
+						}
+					: {}),
 			}
 		),
 		// Allowlist enforcement (ADR 0001)
@@ -115,6 +148,26 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 											message: "Access denied: not on allowlist",
 										});
 									}
+									return;
+								}
+
+								// Non-Google providers: sub allowlist does not apply.
+								// Require ALLOWED_EMAIL match (fail closed if missing).
+								if (!env.ALLOWED_EMAIL) {
+									throw new APIError("FORBIDDEN", {
+										message: "Access denied: email allowlist required",
+									});
+								}
+
+								const userRow = await db.query.user.findFirst({
+									columns: { email: true },
+									where: eq(schema.user.id, account.userId),
+								});
+
+								if (!userRow?.email || !isEmailAllowed(env, userRow.email)) {
+									throw new APIError("FORBIDDEN", {
+										message: "Access denied: not on allowlist",
+									});
 								}
 							},
 						},
