@@ -29,6 +29,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Run API tests
+        run: pnpm --filter append-api test
+
+      - name: Typecheck
+        run: pnpm typecheck
+
       - name: Apply D1 migrations
         working-directory: packages/api
         run: pnpm exec wrangler d1 migrations apply append-db --remote --config wrangler.jsonc
@@ -43,4 +49,5 @@ jobs:
 
       - name: Deploy web to Pages
         working-directory: packages/web
-        run: pnpm exec wrangler pages deploy dist --project-name "$CF_PAGES_PROJECT" --branch "$GITHUB_REF_NAME"
+        # Omit --branch to deploy to Production (custom domains require Production deployment)
+        run: pnpm exec wrangler pages deploy dist --project-name "$CF_PAGES_PROJECT"
