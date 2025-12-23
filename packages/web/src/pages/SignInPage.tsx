@@ -1,11 +1,21 @@
-import { useRouteContext } from "@tanstack/react-router";
-import { signIn } from "../lib/auth";
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { signIn, useSession } from "../lib/auth";
 
 export function SignInPage() {
-  const { auth } = useRouteContext({ from: "/sign-in" });
+  // Use useSession directly for reactive auth state
+  const { data: session, isPending } = useSession();
+  const navigate = useNavigate();
 
-  // Show loading while auth is pending (beforeLoad handles redirect if authenticated)
-  if (auth.isPending) {
+  // Redirect to batch/new when authenticated
+  useEffect(() => {
+    if (!isPending && session) {
+      navigate({ to: "/batch/new" });
+    }
+  }, [isPending, session, navigate]);
+
+  // Show loading while auth is pending
+  if (isPending) {
     return (
       <div className="min-h-screen p-8">
         <p className="text-zinc-400">Loading...</p>
