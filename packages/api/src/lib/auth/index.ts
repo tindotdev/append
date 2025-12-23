@@ -3,7 +3,6 @@ import { betterAuth } from "better-auth";
 import { withCloudflare } from "better-auth-cloudflare";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
-import { eq } from "drizzle-orm";
 import { APIError } from "better-auth/api";
 import { schema } from "../../db";
 
@@ -142,7 +141,8 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 							before: async (account) => {
 								assertAllowlistConfigured(env);
 
-								if (env.ALLOWED_SUB && account.providerId === "google") {
+								// Google: enforce sub allowlist if configured (ADR 0001 primary rule)
+								if (account.providerId === "google" && env.ALLOWED_SUB) {
 									if (!account.accountId || account.accountId !== env.ALLOWED_SUB) {
 										throw new APIError("FORBIDDEN", {
 											message: "Access denied: not on allowlist",
@@ -161,7 +161,7 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 
 								const userRow = await db.query.user.findFirst({
 									columns: { email: true },
-									where: eq(schema.user.id, account.userId),
+									where: (u, { eq }) => eq(u.id, account.userId),
 								});
 
 								if (!userRow?.email || !isEmailAllowed(env, userRow.email)) {

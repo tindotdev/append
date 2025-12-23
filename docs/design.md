@@ -5,6 +5,7 @@
 - Canonical store: `append` (do not write to the ENG-LOG GitHub repo).
 - App architecture: SPA (React + TanStack Router) + Hono on Cloudflare Workers (ADR: `docs/adr/0004-spa-hono-workers.md`).
 - Auth/access: Google SSO allowlist (ADR: `docs/adr/0001-google-allowlist-auth.md`).
+- Web auth gating: protected layout route (ADR: `docs/adr/0005-web-auth-gating-protected-layout.md`).
 - Duplicates: `Term` + append-only `TermSense` (“allowed-but-flagged”) (ADR: `docs/adr/0002-term-sense-duplicates.md`).
 - Bucket feed UX: primary sense by default, expandable, “Needs review” view (ADR: `docs/adr/0003-bucket-feed-primary-sense.md`).
 - UX north-star: “fast capture → AI suggests → you accept → it becomes an append-only log entry”.
@@ -17,7 +18,7 @@
 - **Capture batch**: a group of Term (input) captured together.
 - **Candidate**: a Term (input) inside a batch with optional suggestions/edits, not yet accepted.
 - **Suggestion**: AI-proposed one-liner + bucket for a Candidate.
-- **Bucket**: one of `foundations | backend | frontend | dx-tooling | deep-concepts`.
+- **Bucket**: one of `foundations | backend | frontend | dx-tooling | deep-concepts` (stable slug values used in DB + API + URLs).
 - **Term (entity)**: the canonical concept keyed by the normalized term (`canonical`).
 - **Sense**: an append-only meaning/usage note for a Term (entity) (one-liner, analogy, etc).
 - **Export**: rendering Terms/Senses back into ENG-LOG-compatible markdown files (convenience, not source of truth).
@@ -55,6 +56,7 @@
 ### Commands (writes)
 
 - `CaptureTerms(termList, client_request_id)` → creates batch + candidates (idempotent)
+  - preserves input order (post-trim) and allows duplicates as distinct candidates (no dedupe at capture time)
 - `GenerateSuggestions(batch_id)` → generates suggestions (retry-safe; partial allowed)
 - `EditCandidate(candidate_id, patch, expected_version)` → optimistic locking
 - `AcceptCandidate(candidate_id, client_request_id)` → creates/attaches a Sense (idempotent)
