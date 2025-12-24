@@ -48,10 +48,10 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
      - Storage + retry + cache: `docs/adr/0007-step-3-suggestions-on-candidate-plus-cache.md`
    - Provider/model (explicit):
      - OpenAI model: `gpt-5-mini`
-     - Routing: Worker → Cloudflare AI Gateway → OpenAI (non-streaming)
+     - Routing: Worker → Cloudflare AI Gateway (Unified Billing) → OpenAI (non-streaming)
      - Required Worker config:
        - AI binding: `AI` (binding name in wrangler.jsonc)
-       - Secret: `OPENAI_API_KEY`
+       - Secret: `CF_AIG_TOKEN` (Cloudflare API token for Unified Billing)
        - Var: `AI_GATEWAY_ID` (the AI binding automatically injects account ID)
    - Endpoint (explicit contract):
      - `POST /api/batch/:id/suggest`

@@ -23,7 +23,7 @@ Constraints and goals:
 Configuration contract:
 
 - Worker AI binding: `AI` (configured in `wrangler.jsonc`)
-- Worker secret: `OPENAI_API_KEY`
+- Worker secret: `CF_AIG_TOKEN` (Cloudflare API token for AI Gateway Unified Billing)
 - Worker var: `AI_GATEWAY_ID`
 - AI Gateway URL generation:
   - The AI binding provides the method: `env.AI.gateway(AI_GATEWAY_ID).getUrl("openai")`
@@ -31,11 +31,12 @@ Configuration contract:
   - Account ID is automatically injected by the AI binding (no manual `CF_ACCOUNT_ID` var needed)
   - Step 3 appends `/v1/chat/completions` to call the OpenAI chat completions endpoint
 
-AI Gateway authentication mode (explicit):
+AI Gateway authentication mode (Unified Billing):
 
-- The gateway is configured as **unauthenticated** for this app.
-- Requests include the OpenAI key in the normal provider header:
-  - `Authorization: Bearer ${OPENAI_API_KEY}`
+- Uses **Cloudflare AI Gateway Unified Billing** — no OpenAI API key required.
+- Requests are billed through Cloudflare credits (pre-loaded in Cloudflare dashboard).
+- Requests include the Cloudflare token in the AI Gateway auth header:
+  - `cf-aig-authorization: Bearer ${CF_AIG_TOKEN}`
 
 Operational posture for Step 3:
 

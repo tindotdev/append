@@ -18,7 +18,7 @@ import {
 	generateStubSuggestion,
 	generateOpenAISuggestion,
 	type SuggestionProvider,
-	type OpenAIConfig,
+	type AIGatewayConfig,
 	SUGGESTION_MODEL,
 	PROMPT_VERSION,
 	MAX_SUGGESTION_ATTEMPTS,
@@ -45,7 +45,7 @@ const IDEMPOTENCY_SCOPE = "capture_terms";
 type Bindings = {
 	DB: D1Database;
 	SUGGESTIONS_PROVIDER?: string;
-	OPENAI_API_KEY?: string;
+	CF_AIG_TOKEN?: string;
 	AI_GATEWAY_ID?: string;
 	AI: Ai;
 };
@@ -497,12 +497,12 @@ batchRoutes.post("/:id/suggest", async (c) => {
 	}
 
 	if (provider === "openai") {
-		if (!c.env.OPENAI_API_KEY || !c.env.AI_GATEWAY_ID) {
+		if (!c.env.CF_AIG_TOKEN || !c.env.AI_GATEWAY_ID) {
 			return apiError(
 				c,
 				500,
 				"CONFIGURATION_ERROR",
-				"OpenAI provider requires OPENAI_API_KEY and AI_GATEWAY_ID"
+				"OpenAI provider requires CF_AIG_TOKEN and AI_GATEWAY_ID"
 			);
 		}
 	}
@@ -775,8 +775,8 @@ async function processCandidate(
 			// Get gateway URL using AI binding
 			const gatewayBaseUrl = await env.AI.gateway(env.AI_GATEWAY_ID!).getUrl("openai");
 
-			const config: OpenAIConfig = {
-				apiKey: env.OPENAI_API_KEY!,
+			const config: AIGatewayConfig = {
+				cfToken: env.CF_AIG_TOKEN!,
 				gatewayBaseUrl,
 			};
 

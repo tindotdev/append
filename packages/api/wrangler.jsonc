@@ -37,7 +37,7 @@
 	 * Note: Use secrets to store sensitive data.
 	 * https://developers.cloudflare.com/workers/configuration/secrets/
 	 */
-	// Secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET, OPENAI_API_KEY) are set via:
+	// Secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET, CF_AIG_TOKEN) are set via:
 	// - Local: .dev.vars file (git-ignored)
 	// - Production: `wrangler secret put <NAME>` or Doppler integration
 	"vars": {
