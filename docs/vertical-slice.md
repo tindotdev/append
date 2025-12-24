@@ -7,26 +7,265 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
 ## Slice definition
 
 1. [x] **Google SSO login** — ADR 0001 (allowlist: sub-first, email fallback).
+   - Auth system: Better Auth running in the Worker (`/auth/*` routes).
+   - Required Worker config (explicit):
+     - Secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BETTER_AUTH_SECRET`
+     - Vars: `BETTER_AUTH_URL`
+     - Allowlist: at least one of `ALLOWED_SUB` or `ALLOWED_EMAIL` must be configured; otherwise auth fails closed (ADR 0001).
+   - API auth gate (explicit):
+     - All `/api/*` routes require a valid session cookie; otherwise `401 UNAUTHORIZED`.
+   - API error contract (explicit):
+     - All `/api/*` error responses are JSON of:
+       - `{ "error": { "code": string, "message": string }, "details"?: object }`
+     - `details` is optional structured metadata; the presence/shape of `details` is specified per endpoint below when used.
+     - Any `/api/*` endpoint may also return `500 INTERNAL_ERROR` with no `details` (unexpected server error).
+   - Timestamp contract (explicit):
+     - All timestamps returned by `/api/*` are numbers in Unix epoch milliseconds (UTC).
 2. [x] **Paste 20–200 terms into "New batch"** (20–200 non-empty lines after trimming)
-   - Domain schema: `bucket`, `term`, `term_sense`, `batch`, `candidate`.
-   - `POST /api/batch` parses newline-separated input (trim lines, drop empties), creates batch + candidates.
+   - Domain schema (tables): `user`, `batch`, `candidate`, `term`, `term_sense`, `idempotency_key`, `suggestion_cache`.
+   - Domain schema (enums): `bucket` is the stable slug set `foundations | backend | frontend | dx-tooling | deep-concepts`.
+   - `POST /api/batch` (explicit contract):
+     - Request body JSON:
+       - `terms`: string (newline-separated)
+       - `clientRequestId`: UUID v4 (required; idempotency key)
+     - Validation:
+       - max request body size: 64 KiB
+       - parse terms: split on `\r?\n` → trim each line → drop empty lines
+       - candidate count must be 20–200 (inclusive)
+       - each term max length: 200 characters
+     - Response:
+       - `201` with `{ id, candidateCount }` on first create
+       - `200` with the same `{ id, candidateCount }` on idempotent replay (same `clientRequestId` + same normalized terms payload)
+       - `409 IDEMPOTENCY_CONFLICT` if the same `clientRequestId` is reused with different terms
+     - Side effects:
+       - creates a `batch` with `status='captured'`
+       - creates `candidate` rows with `status='captured'` ordered by input position (post-trim)
    - Candidate order preserves the post-trim input order; duplicates remain distinct candidates.
    - UI: `/batch/new` with textarea → submit → redirect to review (routes live under the protected layout; ADR 0005).
 3. [ ] **Worker API generates suggestions** (bucket + one-liner)
-   - `POST /api/batch/:id/suggest` calls LLM for each candidate.
-   - Writes `suggested_bucket` + `suggested_text` to the candidate record(s).
+   - ADRs (locked decisions):
+     - Provider/model/routing: `docs/adr/0006-openai-gpt-5-mini-via-ai-gateway.md`
+     - Storage + retry + cache: `docs/adr/0007-step-3-suggestions-on-candidate-plus-cache.md`
+   - Provider/model (explicit):
+     - OpenAI model: `gpt-5-mini`
+     - Routing: Worker → Cloudflare AI Gateway → OpenAI (non-streaming)
+     - Required Worker config:
+       - AI binding: `AI` (binding name in wrangler.jsonc)
+       - Secret: `OPENAI_API_KEY`
+       - Var: `AI_GATEWAY_ID` (the AI binding automatically injects account ID)
+   - Endpoint (explicit contract):
+     - `POST /api/batch/:id/suggest`
+     - Auth: required; owner-only (403 if not owner; 404 if batch missing)
+     - Request body: none
+     - Query params:
+       - `limit` (optional): integer, default `50`, min `1`, max `200`
+       - `regenerate` (optional): `1` enables regenerate; default is fill-missing
+     - Response `200` JSON:
+       - `batchId`: string
+       - `mode`: `fill-missing | regenerate`
+       - `limit`: number
+       - `candidateCount`: number
+       - `eligibleCount`: number
+       - `results`: object with number fields:
+         - `suggested`, `cached`, `skippedAlreadySuggested`, `skippedInProgress`, `errors`
+     - Behavior (explicit, retry-safe):
+       - Default mode fills missing suggestions and retries error candidates up to an attempts cap; it does **not** call the LLM for candidates that already have suggestions.
+       - Regenerate mode re-suggests candidates (overwriting `suggested_*`) and bypasses the cache.
+       - Writes the latest suggestion fields to the candidate record(s): `suggested_bucket`, `suggested_text` (plus suggestion metadata per ADR 0007).
+       - `suggested_text` is validated as: trimmed, single-line, max 500 chars (ADR 0007).
+       - Never touches `chosen_*` fields and does not increment `candidate.version`.
+       - Updates lifecycle state:
+         - After any suggestion attempt, set `candidate.status = 'suggested'` (even if the attempt ends in `error`).
+         - After a suggest run, set `batch.status = 'suggested'` (even if partial errors exist).
+       - Cost control (explicit): per-user, per-normalized-term cache (D1) is consulted in fill-missing mode.
 4. [ ] **UI review list**
-   - `/batch/:id` shows candidates with editable bucket + text fields.
-   - "Accept all" button.
-   - Per-item accept (optional stretch).
+   - Route: `/batch/:id` (authenticated; lives under protected layout; ADR 0005).
+   - Read model (explicit):
+     - `GET /api/batch/:id` response `200` JSON:
+       - `id`: string
+       - `status`: `captured | suggested | accepted`
+       - `createdAt`: number (epoch ms)
+       - `updatedAt`: number (epoch ms)
+       - `candidateCount`: number
+       - `candidates`: ordered by `position ASC`, each candidate object includes exactly:
+         - `id`: string
+         - `position`: number
+         - `term`: string
+         - `normalizedTerm`: string
+         - `status`: `captured | suggested | accepted`
+         - `chosenBucket`: bucket slug or null
+         - `chosenText`: string or null
+         - `suggestedBucket`: bucket slug or null
+         - `suggestedText`: string or null
+         - `suggestionStatus`: `in_progress | done | error` or null
+         - `suggestionError`: string or null
+         - `suggestionAttempts`: number
+         - `version`: number
+         - `materializedTermId`: string or null
+         - `materializedTermSenseId`: string or null
+         - `createdAt`: number (epoch ms)
+         - `updatedAt`: number (epoch ms)
+     - Error responses:
+       - `401 UNAUTHORIZED`
+       - `403 FORBIDDEN`
+       - `404 NOT_FOUND`
+   - UI behavior (explicit, no hidden rules):
+     - For each candidate, the UI renders:
+       - Suggested bucket/text (read-only display).
+       - Editable “final” bucket/text inputs bound to `chosenBucket`/`chosenText`.
+     - If `chosenBucket`/`chosenText` are null, the UI initializes the input values from `suggestedBucket`/`suggestedText` but does not persist anything until the user edits/saves.
+     - Allowed buckets are exactly: `foundations | backend | frontend | dx-tooling | deep-concepts`.
+     - Each row has explicit actions (no auto-save):
+       - `Save`: persists the current chosen values via `PUT /api/candidate/:id`.
+       - `Clear overrides`: sets both chosen fields to null (reverting the UI to suggestions) and persists via `PUT /api/candidate/:id`.
+   - Write model (explicit):
+     - `PUT /api/candidate/:id`
+     - Auth: required; owner-only (403 if candidate’s batch is not owned by user; 404 if candidate missing)
+     - Request body JSON:
+       - `expectedVersion`: integer (required)
+       - `chosenBucket`: bucket slug or `null`
+       - `chosenText`: string or `null`
+     - Validation:
+       - Request is a partial update:
+         - If a key is omitted, that field is not changed.
+         - If a key is present with `null`, that field is cleared (no override).
+       - `chosenBucket` must be one of the bucket slugs or null.
+       - `chosenText` if present:
+         - trimmed
+         - must be non-empty after trimming (otherwise 400)
+         - must be 1 line (no `\n`)
+         - max 500 chars
+       - At least one of `chosenBucket` or `chosenText` must be present in the request body (otherwise 400).
+       - Setting both fields to null is allowed and clears overrides.
+     - Conflict (explicit):
+       - If `expectedVersion` does not match current `candidate.version`, return `409 VERSION_CONFLICT` with error:
+         - `error.code = 'VERSION_CONFLICT'`
+         - `details = { \"currentVersion\": number }`
+     - Success `200` returns the updated candidate and increments `candidate.version` by 1.
+       - Response body JSON is:
+         - `{ \"candidate\": <Candidate> }` where `<Candidate>` is the exact candidate object shape used in `GET /api/batch/:id` (`candidates[]` entries).
+     - Error responses:
+       - `400 VALIDATION_ERROR`
+       - `401 UNAUTHORIZED`
+       - `403 FORBIDDEN`
+       - `404 NOT_FOUND`
+       - `409 VERSION_CONFLICT`
+   - Accept UI (explicit):
+     - The slice implements **Accept all only**.
+     - Per-item accept is **out of scope** for this vertical slice.
 5. [ ] **Accept-all materializes rows**
-   - `POST /api/batch/:id/accept` creates `term` + `term_sense` (idempotent).
-   - Marks batch `status = 'accepted'`.
+   - Endpoint (explicit contract):
+     - `POST /api/batch/:id/accept`
+     - Auth: required; owner-only (403 if not owner; 404 if batch missing)
+     - Request body JSON:
+       - `clientRequestId`: UUID v4 (required; for idempotency + safe retry)
+   - Preconditions (explicit, fail fast):
+     - If any candidate has `suggestionStatus = 'in_progress'`, return `409 BATCH_NOT_READY` with:
+       - `error.code = 'BATCH_NOT_READY'`
+       - `details = { \"reason\": \"SUGGESTIONS_IN_PROGRESS\", \"inProgressCandidateIds\": string[] }`
+     - For each candidate, compute “effective” fields:
+       - `effectiveBucket = chosenBucket ?? suggestedBucket`
+       - `effectiveText = chosenText ?? suggestedText`
+     - If any candidate is missing either effective field, return `409 BATCH_NOT_READY` with:
+       - `error.code = 'BATCH_NOT_READY'`
+       - `details = { \"reason\": \"MISSING_EFFECTIVE_FIELDS\", \"missingCandidateIds\": string[] }`
+   - Storage effects (explicit, idempotent):
+     - ADR (locked decision): accept-all idempotency is enforced via per-candidate materialization pointers (`docs/adr/0008-accept-all-idempotency-via-candidate-materialization-pointers.md`).
+     - For each candidate (in `position` order), if it has not yet been materialized:
+       - Compute `canonical = normalize(candidate.term)` (same normalize as Step 2 API).
+         - `normalize(term)` is: trim → lowercase → collapse internal whitespace to a single space.
+        - Upsert `term` by `(user_id, canonical)`:
+          - If new term: set `display_term = candidate.term` and set `primary_sense_id` to the new sense id created below.
+          - If existing term: do not change `display_term` or `primary_sense_id`.
+        - Insert `term_sense` with:
+          - `term_id` = term.id
+          - `bucket` = effectiveBucket
+          - `text` = effectiveText (trimmed, single-line, max 500 chars)
+          - `source` = `batch`
+          - `flagged_reason` = `bucket_conflict` iff:
+            - term has a `primary_sense_id`, and
+            - the bucket of that primary sense (lookup `term_sense.id = term.primary_sense_id`) != effectiveBucket
+            - otherwise null
+       - Mark candidate as materialized by writing:
+         - `candidate.status = 'accepted'`
+         - `candidate.materialized_term_id = term.id`
+         - `candidate.materialized_term_sense_id = term_sense.id`
+         - `candidate.version` is not modified by accept-all.
+     - Mark batch as accepted:
+       - `batch.status = 'accepted'`
+   - Idempotency rules (explicit):
+     - Re-running accept-all with the same `clientRequestId` is a replay and returns the same summary (no duplicates).
+     - Re-running accept-all with a different `clientRequestId` is also safe because materialized candidates are skipped using `candidate.materialized_term_sense_id` (no duplicates).
+   - Response `200` JSON (explicit):
+     - `batchId`: string
+     - `status`: `accepted`
+     - `candidateCount`: number
+     - `acceptedCount`: number
+     - `skippedAlreadyAcceptedCount`: number
+     - `termCreatedCount`: number
+     - `termSenseCreatedCount`: number
+     - `flaggedCount`: number
+   - Error responses:
+     - `400 VALIDATION_ERROR` (invalid UUID / invalid body)
+     - `401 UNAUTHORIZED`
+     - `403 FORBIDDEN`
+     - `404 NOT_FOUND`
+     - `409 BATCH_NOT_READY` (in-progress suggestions or missing effective fields)
 6. [ ] **Bucket feed page**
-   - `/bucket/:slug` lists terms with primary sense.
-   - Shows newly appended entries.
+   - Route: `/bucket/:slug` (authenticated; lives under protected layout; ADR 0005).
+   - Buckets are the fixed slugs: `foundations | backend | frontend | dx-tooling | deep-concepts`.
+   - API (explicit):
+     - `GET /api/bucket/:slug`
+     - `:slug` must be one of `foundations | backend | frontend | dx-tooling | deep-concepts`; otherwise 404.
+     - Query params:
+       - `limit` (optional): integer, default `50`, min `1`, max `200`
+       - `cursor` (optional): base64url-encoded UTF-8 JSON (no padding) of `{ "createdAt": number, "termId": string }` from the last item of the previous page, where `createdAt` is the item’s `primarySense.createdAt`
+     - Response `200` JSON:
+       - `bucket`: bucket slug
+       - `items`: array
+       - `nextCursor`: string or null
+       - Each `items[]` entry includes:
+         - `termId`: string
+         - `displayTerm`: string
+         - `canonical`: string
+         - `primarySense`: `{ \"id\": string, \"bucket\": bucket slug, \"text\": string, \"createdAt\": number }`
+   - Ordering (explicit, deterministic):
+     - Items are ordered by `primarySense.createdAt DESC`, then `termId DESC` as a tiebreaker.
+     - `nextCursor` is derived from the last returned item’s `{ createdAt, termId }` using the same base64url encoding.
+   - Display (explicit):
+     - “Calm by default”: show primary sense text only (no “Needs review” view in this slice).
+   - Error responses:
+     - `400 VALIDATION_ERROR` (invalid `limit` or invalid/unparseable `cursor`)
+     - `401 UNAUTHORIZED`
+     - `404 NOT_FOUND` (invalid bucket slug)
 7. [ ] **Export page**
-   - `/export` downloads 5 markdown files in ENG-LOG format.
+   - Route: `/export` (authenticated; lives under protected layout; ADR 0005).
+   - Export format is markdown, one file per bucket, using the primary sense for each term.
+   - API (explicit):
+     - `GET /api/export/:bucket`
+     - `:bucket` must be one of `foundations | backend | frontend | dx-tooling | deep-concepts`; otherwise 404.
+     - Response headers:
+       - `content-type: text/markdown; charset=utf-8`
+       - `content-disposition: attachment; filename=\"{bucket}.md\"`
+   - Response body (explicit):
+     - Export includes only terms that have a `primary_sense_id` and whose **primary sense bucket** equals `:bucket`.
+     - First line: `# {Bucket Title}` with this exact mapping:
+         - `foundations` → `Foundations`
+         - `backend` → `Backend`
+         - `frontend` → `Frontend`
+         - `dx-tooling` → `DX Tooling`
+         - `deep-concepts` → `Deep Concepts`
+       - Blank line
+       - Then one bullet per exported item: `- {displayTerm}: {primarySenseText}` where `{primarySenseText}` is the stored `term_sense.text` for the term’s primary sense.
+       - File ends with a trailing newline (`\n`).
+   - Ordering (explicit, deterministic):
+     - Export order is `primarySense.createdAt ASC`, then `termId ASC` as a tiebreaker.
+   - Download behavior (explicit):
+     - The UI triggers 5 downloads by calling the export endpoint once per bucket in this fixed order:
+       - `foundations`, `backend`, `frontend`, `dx-tooling`, `deep-concepts`
+   - Error responses:
+     - `401 UNAUTHORIZED`
+     - `404 NOT_FOUND` (invalid bucket slug)
 
 ## Current focus
 
@@ -35,6 +274,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
 ## Done criteria
 
 - Re-running accept-all (retry) creates zero duplicates.
+- Re-running suggest (default mode) does not call the LLM for already-suggested candidates and never overwrites user-chosen fields.
 - Edits are version-checked (409 on conflict).
 - Export output is deterministic and stable across refreshes.
 

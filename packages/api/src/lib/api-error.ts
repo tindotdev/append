@@ -12,7 +12,11 @@ export type ApiErrorCode =
 	| "UNAUTHORIZED"
 	| "FORBIDDEN"
 	| "NOT_FOUND"
+	| "VERSION_CONFLICT"
+	| "BATCH_NOT_READY"
 	| "IDEMPOTENCY_CONFLICT"
+	| "SERVICE_UNAVAILABLE"
+	| "CONFIGURATION_ERROR"
 	| "INTERNAL_ERROR";
 
 /**
@@ -24,6 +28,11 @@ export interface ApiErrorResponse {
 		code: ApiErrorCode;
 		message: string;
 	};
+	/**
+	 * Optional structured metadata for clients.
+	 * Use sparingly; error responses must always include `error.code` + `error.message`.
+	 */
+	details?: Record<string, unknown>;
 }
 
 /**
@@ -34,7 +43,8 @@ export function apiError<T extends Record<string, unknown>>(
 	c: Context<T>,
 	status: ContentfulStatusCode,
 	code: ApiErrorCode,
-	message: string
+	message: string,
+	details?: Record<string, unknown>
 ) {
-	return c.json<ApiErrorResponse>({ error: { code, message } }, status);
+	return c.json<ApiErrorResponse>({ error: { code, message }, details }, status);
 }

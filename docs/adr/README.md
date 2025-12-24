@@ -15,3 +15,6 @@ Rules:
 - `0003-bucket-feed-primary-sense.md` — Bucket feed shows primary sense by default (expand for more; review mode)
 - `0004-spa-hono-workers.md` — SPA (React + TanStack Router) + Hono on Workers (no SSR)
 - `0005-web-auth-gating-protected-layout.md` — Web auth gating via protected layout route
+- `0006-openai-gpt-5-mini-via-ai-gateway.md` — OpenAI `gpt-5-mini` via Cloudflare AI Gateway
+- `0007-step-3-suggestions-on-candidate-plus-cache.md` — Step 3 suggestions stored on `candidate` + per-term cache
+- `0008-accept-all-idempotency-via-candidate-materialization-pointers.md` — Accept-all idempotency via candidate materialization pointers
