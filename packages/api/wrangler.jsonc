@@ -30,11 +30,15 @@
 	 * Note: Use secrets to store sensitive data.
 	 * https://developers.cloudflare.com/workers/configuration/secrets/
 	 */
-	// Secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET) are set via:
+	// Secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET, OPENAI_API_KEY) are set via:
 	// - Local: .dev.vars file (git-ignored)
 	// - Production: `wrangler secret put <NAME>` or Doppler integration
 	"vars": {
 		"BETTER_AUTH_URL": "https://api.append.tindev.dev",
+		// AI Gateway configuration for OpenAI routing (Step 3)
+		// CF_ACCOUNT_ID and AI_GATEWAY_ID should be set in .dev.vars for local dev
+		// and via wrangler vars:set for production
+		"SUGGESTIONS_PROVIDER": "openai",
 	},
 	/**
 	 * Static Assets
@@ -67,7 +71,8 @@
 				"BETTER_AUTH_SECRET": "test-secret-min-32-chars-for-cookie-signing",
 				"ALLOWED_EMAIL": "test-a@example.com",
 				"GOOGLE_CLIENT_ID": "test-google-client-id",
-				"GOOGLE_CLIENT_SECRET": "test-google-client-secret"
+				"GOOGLE_CLIENT_SECRET": "test-google-client-secret",
+				"SUGGESTIONS_PROVIDER": "stub"
 			},
 			"d1_databases": [
 				{
