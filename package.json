@@ -15,7 +15,7 @@
     "deploy:api": "pnpm --filter append-api run deploy"
   },
   "license": "MIT",
-  "packageManager": "pnpm@10.26.1",
+  "packageManager": "pnpm@10.26.2",
   "volta": {
     "node": "24.12.0"
   },
