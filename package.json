@@ -31,7 +31,7 @@
       }
     },
     "overrides": {
-      "vitest": "~3.2.0",
+      "vitest": "~4.0.0",
       "@vitest/runner": "~3.2.0",
       "@vitest/snapshot": "~3.2.0"
     }
