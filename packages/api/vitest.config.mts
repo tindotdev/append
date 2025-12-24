@@ -19,6 +19,7 @@ export default defineWorkersConfig({
 						GOOGLE_CLIENT_ID: 'test-google-client-id',
 						GOOGLE_CLIENT_SECRET: 'test-google-client-secret',
 						SUGGESTIONS_PROVIDER: 'stub',
+						// AI binding not needed for tests since we use stub provider
 					},
 				},
 			},

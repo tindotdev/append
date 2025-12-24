@@ -25,6 +25,13 @@
 	 * https://developers.cloudflare.com/workers/runtime-apis/bindings/
 	 */
 	/**
+	 * AI Gateway Binding (Step 3 - Suggestions)
+	 * https://developers.cloudflare.com/ai-gateway/integrations/worker-binding-methods/
+	 */
+	"ai": {
+		"binding": "AI"
+	},
+	/**
 	 * Environment Variables
 	 * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
 	 * Note: Use secrets to store sensitive data.
@@ -36,9 +43,10 @@
 	"vars": {
 		"BETTER_AUTH_URL": "https://api.append.tindev.dev",
 		// AI Gateway configuration for OpenAI routing (Step 3)
-		// CF_ACCOUNT_ID and AI_GATEWAY_ID should be set in .dev.vars for local dev
-		// and via wrangler vars:set for production
+		// AI_GATEWAY_ID should be set in .dev.vars for local dev and via wrangler vars:set for production
+		// The AI binding provides automatic account ID injection
 		"SUGGESTIONS_PROVIDER": "openai",
+		"AI_GATEWAY_ID": "append-gateway"
 	},
 	/**
 	 * Static Assets
@@ -65,6 +73,9 @@
 	 */
 	"env": {
 		"test": {
+			"ai": {
+				"binding": "AI"
+			},
 			"vars": {
 				"ENABLE_TEST_EMAIL_PASSWORD_AUTH": "1",
 				"BETTER_AUTH_URL": "http://localhost:8787",
@@ -72,7 +83,8 @@
 				"ALLOWED_EMAIL": "test-a@example.com",
 				"GOOGLE_CLIENT_ID": "test-google-client-id",
 				"GOOGLE_CLIENT_SECRET": "test-google-client-secret",
-				"SUGGESTIONS_PROVIDER": "stub"
+				"SUGGESTIONS_PROVIDER": "stub",
+				"AI_GATEWAY_ID": "test-gateway"
 			},
 			"d1_databases": [
 				{

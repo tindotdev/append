@@ -772,10 +772,12 @@ async function processCandidate(
 		const timeoutId = setTimeout(() => controller.abort(), SUGGESTION_TIMEOUT_MS);
 
 		try {
+			// Get gateway URL using AI binding
+			const gatewayBaseUrl = await env.AI.gateway(env.AI_GATEWAY_ID!).getUrl("openai");
+
 			const config: OpenAIConfig = {
 				apiKey: env.OPENAI_API_KEY!,
-				cfAccountId: env.CF_ACCOUNT_ID!,
-				aiGatewayId: env.AI_GATEWAY_ID!,
+				gatewayBaseUrl,
 			};
 
 			const outcome = await generateOpenAISuggestion(
