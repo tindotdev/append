@@ -50,8 +50,9 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
      - OpenAI model: `gpt-5-mini`
      - Routing: Worker → Cloudflare AI Gateway → OpenAI (non-streaming)
      - Required Worker config:
+       - AI binding: `AI` (binding name in wrangler.jsonc)
        - Secret: `OPENAI_API_KEY`
-       - Vars: `CF_ACCOUNT_ID`, `AI_GATEWAY_ID`
+       - Var: `AI_GATEWAY_ID` (the AI binding automatically injects account ID)
    - Endpoint (explicit contract):
      - `POST /api/batch/:id/suggest`
      - Auth: required; owner-only (403 if not owner; 404 if batch missing)

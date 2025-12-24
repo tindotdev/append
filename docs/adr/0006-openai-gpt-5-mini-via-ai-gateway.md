@@ -22,12 +22,14 @@ Constraints and goals:
 
 Configuration contract:
 
+- Worker AI binding: `AI` (configured in `wrangler.jsonc`)
 - Worker secret: `OPENAI_API_KEY`
-- Worker vars: `CF_ACCOUNT_ID`, `AI_GATEWAY_ID`
-- AI Gateway OpenAI base URL:
-  - `https://gateway.ai.cloudflare.com/v1/{CF_ACCOUNT_ID}/{AI_GATEWAY_ID}/openai`
-  - Step 3 uses the AI Gateway OpenAI Responses endpoint:
-    - `https://gateway.ai.cloudflare.com/v1/{CF_ACCOUNT_ID}/{AI_GATEWAY_ID}/openai/responses`
+- Worker var: `AI_GATEWAY_ID`
+- AI Gateway URL generation:
+  - The AI binding provides the method: `env.AI.gateway(AI_GATEWAY_ID).getUrl("openai")`
+  - This returns the base URL: `https://gateway.ai.cloudflare.com/v1/{ACCOUNT_ID}/{AI_GATEWAY_ID}/openai`
+  - Account ID is automatically injected by the AI binding (no manual `CF_ACCOUNT_ID` var needed)
+  - Step 3 appends `/v1/chat/completions` to call the OpenAI chat completions endpoint
 
 AI Gateway authentication mode (explicit):
 
