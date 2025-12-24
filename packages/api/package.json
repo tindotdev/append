@@ -19,7 +19,7 @@
 		"@cloudflare/workers-types": "^4.20251219.0",
 		"drizzle-kit": "^0.31.8",
 		"typescript": "^5.5.2",
-		"vitest": "~4.0.0",
+		"vitest": "~3.2.4",
 		"wrangler": "^4.56.0"
 	},
 	"dependencies": {
