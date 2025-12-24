@@ -54,8 +54,7 @@ export type SuggestionOutcome =
 
 export interface OpenAIConfig {
 	apiKey: string;
-	cfAccountId: string;
-	aiGatewayId: string;
+	gatewayBaseUrl: string;
 }
 
 // =============================================================================
@@ -181,8 +180,7 @@ export async function generateOpenAISuggestion(
 	config: OpenAIConfig,
 	signal?: AbortSignal
 ): Promise<SuggestionOutcome> {
-	const baseUrl = `https://gateway.ai.cloudflare.com/v1/${config.cfAccountId}/${config.aiGatewayId}/openai`;
-	const url = `${baseUrl}/v1/chat/completions`;
+	const url = `${config.gatewayBaseUrl}/v1/chat/completions`;
 
 	const requestBody = {
 		model: SUGGESTION_MODEL,
