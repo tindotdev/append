@@ -46,7 +46,6 @@ type Bindings = {
 	DB: D1Database;
 	SUGGESTIONS_PROVIDER?: string;
 	OPENAI_API_KEY?: string;
-	CF_ACCOUNT_ID?: string;
 	AI_GATEWAY_ID?: string;
 	AI: Ai;
 };
@@ -498,12 +497,12 @@ batchRoutes.post("/:id/suggest", async (c) => {
 	}
 
 	if (provider === "openai") {
-		if (!c.env.OPENAI_API_KEY || !c.env.CF_ACCOUNT_ID || !c.env.AI_GATEWAY_ID) {
+		if (!c.env.OPENAI_API_KEY || !c.env.AI_GATEWAY_ID) {
 			return apiError(
 				c,
 				500,
 				"CONFIGURATION_ERROR",
-				"OpenAI provider requires OPENAI_API_KEY, CF_ACCOUNT_ID, and AI_GATEWAY_ID"
+				"OpenAI provider requires OPENAI_API_KEY and AI_GATEWAY_ID"
 			);
 		}
 	}
