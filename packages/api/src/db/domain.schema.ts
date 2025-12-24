@@ -28,6 +28,10 @@ export const BUCKET = [
 ] as const;
 export type Bucket = (typeof BUCKET)[number];
 
+/** Suggestion generation status */
+export const SUGGESTION_STATUS = ["in_progress", "done", "error"] as const;
+export type SuggestionStatus = (typeof SUGGESTION_STATUS)[number];
+
 /** Term sense source */
 export const TERM_SENSE_SOURCE = ["manual", "batch", "import"] as const;
 export type TermSenseSource = (typeof TERM_SENSE_SOURCE)[number];
@@ -96,6 +100,22 @@ export const candidate = sqliteTable(
 		chosenBucket: text("chosen_bucket").$type<Bucket>(),
 		chosenText: text("chosen_text"),
 		version: integer("version").default(1).notNull(),
+		// Step 3: Suggestion fields
+		suggestedBucket: text("suggested_bucket").$type<Bucket>(),
+		suggestedText: text("suggested_text"),
+		suggestionStatus: text("suggestion_status").$type<SuggestionStatus>(),
+		suggestionError: text("suggestion_error"),
+		suggestionAttempts: integer("suggestion_attempts").default(0).notNull(),
+		suggestionModel: text("suggestion_model").default("gpt-5-mini").notNull(),
+		suggestionPromptVersion: integer("suggestion_prompt_version")
+			.default(1)
+			.notNull(),
+		suggestionUpdatedAt: integer("suggestion_updated_at", {
+			mode: "timestamp_ms",
+		}),
+		// Step 5: Materialization pointers
+		materializedTermId: text("materialized_term_id"),
+		materializedTermSenseId: text("materialized_term_sense_id"),
 		createdAt: integer("created_at", { mode: "timestamp_ms" })
 			.default(sql`(cast(unixepoch('subsec') * 1000 as integer))`)
 			.notNull(),
@@ -110,6 +130,11 @@ export const candidate = sqliteTable(
 			table.batchId,
 			table.position
 		),
+		index("candidate_suggestion_lookup_idx").on(
+			table.batchId,
+			table.suggestionStatus,
+			table.suggestionAttempts
+		),
 		check(
 			"candidate_status_check",
 			sql`${table.status} IN ('captured', 'suggested', 'accepted')`
@@ -117,6 +142,14 @@ export const candidate = sqliteTable(
 		check(
 			"candidate_chosen_bucket_check",
 			sql`${table.chosenBucket} IS NULL OR ${table.chosenBucket} IN ('foundations', 'backend', 'frontend', 'dx-tooling', 'deep-concepts')`
+		),
+		check(
+			"candidate_suggested_bucket_check",
+			sql`${table.suggestedBucket} IS NULL OR ${table.suggestedBucket} IN ('foundations', 'backend', 'frontend', 'dx-tooling', 'deep-concepts')`
+		),
+		check(
+			"candidate_suggestion_status_check",
+			sql`${table.suggestionStatus} IS NULL OR ${table.suggestionStatus} IN ('in_progress', 'done', 'error')`
 		),
 	]
 );
@@ -199,4 +232,42 @@ export const idempotencyKey = sqliteTable(
 		expiresAt: integer("expires_at", { mode: "timestamp_ms" }), // nullable; expiry not enforced in Step 2
 	},
 	(table) => [primaryKey({ columns: [table.userId, table.scope, table.key] })]
+);
+
+/**
+ * SuggestionCache: per-user, per-normalized-term cache for AI suggestions.
+ * Used to avoid redundant LLM calls for the same term.
+ */
+export const suggestionCache = sqliteTable(
+	"suggestion_cache",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		normalizedTerm: text("normalized_term").notNull(),
+		model: text("model").notNull(),
+		promptVersion: integer("prompt_version").notNull(),
+		suggestedBucket: text("suggested_bucket").notNull().$type<Bucket>(),
+		suggestedText: text("suggested_text").notNull(),
+		createdAt: integer("created_at", { mode: "timestamp_ms" })
+			.default(sql`(cast(unixepoch('subsec') * 1000 as integer))`)
+			.notNull(),
+		updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+			.default(sql`(cast(unixepoch('subsec') * 1000 as integer))`)
+			.$onUpdate(() => new Date())
+			.notNull(),
+	},
+	(table) => [
+		uniqueIndex("suggestion_cache_user_term_model_version_unique").on(
+			table.userId,
+			table.normalizedTerm,
+			table.model,
+			table.promptVersion
+		),
+		check(
+			"suggestion_cache_bucket_check",
+			sql`${table.suggestedBucket} IN ('foundations', 'backend', 'frontend', 'dx-tooling', 'deep-concepts')`
+		),
+	]
 );

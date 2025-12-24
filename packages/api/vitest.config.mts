@@ -18,6 +18,7 @@ export default defineWorkersConfig({
 						ALLOWED_EMAIL: 'test-a@example.com',
 						GOOGLE_CLIENT_ID: 'test-google-client-id',
 						GOOGLE_CLIENT_SECRET: 'test-google-client-secret',
+						SUGGESTIONS_PROVIDER: 'stub',
 					},
 				},
 			},
