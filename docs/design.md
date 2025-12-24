@@ -9,6 +9,8 @@
 - Duplicates: `Term` + append-only `TermSense` (“allowed-but-flagged”) (ADR: `docs/adr/0002-term-sense-duplicates.md`).
 - Bucket feed UX: primary sense by default, expandable, “Needs review” view (ADR: `docs/adr/0003-bucket-feed-primary-sense.md`).
 - UX north-star: “fast capture → AI suggests → you accept → it becomes an append-only log entry”.
+- LLM provider/model: OpenAI `gpt-5-mini` via Cloudflare AI Gateway (ADR: `docs/adr/0006-openai-gpt-5-mini-via-ai-gateway.md`).
+- Step 3 suggestion storage: latest suggestion fields live on `Candidate` + per-term cache (ADR: `docs/adr/0007-step-3-suggestions-on-candidate-plus-cache.md`).
 
 ## Phase 1 — Domain (storage-agnostic)
 
@@ -17,7 +19,7 @@
 - **Term (input)**: a word/phrase you want to learn (what you paste/type).
 - **Capture batch**: a group of Term (input) captured together.
 - **Candidate**: a Term (input) inside a batch with optional suggestions/edits, not yet accepted.
-- **Suggestion**: AI-proposed one-liner + bucket for a Candidate.
+- **Suggestion**: AI-proposed one-liner + bucket for a Candidate (stored on `Candidate` for Step 3; ADR 0007).
 - **Bucket**: one of `foundations | backend | frontend | dx-tooling | deep-concepts` (stable slug values used in DB + API + URLs).
 - **Term (entity)**: the canonical concept keyed by the normalized term (`canonical`).
 - **Sense**: an append-only meaning/usage note for a Term (entity) (one-liner, analogy, etc).
@@ -86,8 +88,8 @@
 
 - `User` (Google subject, email)
 - `Batch` (id, user_id, status, created_at)
-- `Candidate` (id, batch_id, term, normalized_term, status, chosen_bucket?, chosen_text?, version, created_at)
-- `Suggestion` (id, candidate_id, suggested_bucket, suggested_text, model_meta, created_at)
+- `Candidate` (id, batch_id, term, normalized_term, status, chosen_bucket?, chosen_text?, version, suggested_bucket?, suggested_text?, suggestion_status?, suggestion_error?, suggestion_attempts, suggestion_model, suggestion_prompt_version, suggestion_updated_at?, materialized_term_id?, materialized_term_sense_id?, created_at)
+- `SuggestionCache` (user_id, normalized_term, model, prompt_version, suggested_bucket, suggested_text, created_at, updated_at)
 - `Term` (id, user_id, canonical, display_term, primary_sense_id?, created_at, archived_at?)
 - `TermSense` (id, term_id, bucket, text, source, sense_label?, flagged_reason?, created_at, archived_at?)
 - `IdempotencyKey` (user_id, scope, key, result_ref, created_at, expires_at?)
@@ -98,17 +100,19 @@
 - `normalized_term` = lowercased + whitespace-collapsed for search/dedupe.
 - `bullet_line` = `- {display_term}: {text}` for markdown export (usually from primary sense or latest sense).
 
-## Phase 4 — Consistency & concurrency
+## Phase 4 — Consistency & concurrency (Cloudflare-first)
 
 - Atomicity boundary:
-  - `CaptureTerms`: batch + candidates in one transaction.
-  - `AcceptAll`: all senses for a batch in one transaction (preferred).
+  - `CaptureTerms`: batch + candidates in one atomic D1 batch write.
+  - `AcceptAll`: may partially succeed; retries are safe and resume using per-candidate materialization pointers (ADR 0008).
 - Idempotency:
   - capture/accept/import must record a result ref keyed by `(user_id, scope, client_request_id)`.
+- Accept-all idempotency:
+  - accept-all is safe to retry (even with a different request id) by recording per-candidate materialization pointers (ADR 0008).
 - Concurrency:
   - Use optimistic locking: `EditCandidate` requires `expected_version`; conflict returns 409 with latest state.
 - “No overwrites” rule:
-  - suggestions never overwrite user-chosen fields; they’re separate records.
+  - suggestions never overwrite user-chosen fields; they are stored separately from `chosen_*` fields (ADR 0007).
 
 ## Phase 5 — Storage & indexing (Cloudflare-first)
 
@@ -128,7 +132,7 @@
 - SPA UI (capture/edit/accept/search)
 - Worker API (Hono)
 - D1 (canonical store)
-- LLM provider (suggestions + later “feedback” grading)
+- LLM provider (suggestions + later “feedback” grading): OpenAI `gpt-5-mini` via Cloudflare AI Gateway (ADR 0006)
 - Google OAuth (SSO)
   - Fail closed if neither `ALLOWED_SUB` nor `ALLOWED_EMAIL` is configured (ADR 0001)
 
