@@ -3,8 +3,9 @@ import { betterAuth } from "better-auth";
 import { withCloudflare } from "better-auth-cloudflare";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
+import { eq } from "drizzle-orm";
 import { APIError } from "better-auth/api";
-import { schema } from "../../db";
+import { schema, user } from "../../db";
 
 type Env = {
 	DB: D1Database;
@@ -161,7 +162,7 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 
 								const userRow = await db.query.user.findFirst({
 									columns: { email: true },
-									where: (u, { eq }) => eq(u.id, account.userId),
+									where: (u: typeof user) => eq(u.id, account.userId),
 								});
 
 								if (!userRow?.email || !isEmailAllowed(env, userRow.email)) {

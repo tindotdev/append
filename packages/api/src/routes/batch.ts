@@ -48,6 +48,7 @@ type Bindings = {
 	OPENAI_API_KEY?: string;
 	CF_ACCOUNT_ID?: string;
 	AI_GATEWAY_ID?: string;
+	AI: Ai;
 };
 
 type Variables = {
