@@ -52,8 +52,8 @@ export type SuggestionOutcome =
 	| { success: true; result: SuggestionResult }
 	| { success: false; error: SuggestionError };
 
-export interface OpenAIConfig {
-	apiKey: string;
+export interface AIGatewayConfig {
+	cfToken: string;
 	gatewayBaseUrl: string;
 }
 
@@ -173,11 +173,12 @@ export function generateStubSuggestion(normalizedTerm: string): SuggestionResult
 // =============================================================================
 
 /**
- * Generate suggestion using OpenAI API via Cloudflare AI Gateway.
+ * Generate suggestion using OpenAI API via Cloudflare AI Gateway (Unified Billing).
+ * Uses cf-aig-authorization header for Cloudflare token auth instead of OpenAI API key.
  */
 export async function generateOpenAISuggestion(
 	term: string,
-	config: OpenAIConfig,
+	config: AIGatewayConfig,
 	signal?: AbortSignal
 ): Promise<SuggestionOutcome> {
 	const url = `${config.gatewayBaseUrl}/v1/chat/completions`;
@@ -202,7 +203,7 @@ export async function generateOpenAISuggestion(
 		const response = await fetch(url, {
 			method: "POST",
 			headers: {
-				authorization: `Bearer ${config.apiKey}`,
+				"cf-aig-authorization": `Bearer ${config.cfToken}`,
 				"content-type": "application/json",
 			},
 			body: JSON.stringify(requestBody),
