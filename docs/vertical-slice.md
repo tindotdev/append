@@ -153,7 +153,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
    - Accept UI (explicit):
      - The slice implements **Accept all only**.
      - Per-item accept is **out of scope** for this vertical slice.
-5. [ ] **Accept-all materializes rows**
+5. [x] **Accept-all materializes rows**
    - Endpoint (explicit contract):
      - `POST /api/batch/:id/accept`
      - Auth: required; owner-only (403 if not owner; 404 if batch missing)
@@ -174,18 +174,18 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
      - For each candidate (in `position` order), if it has not yet been materialized:
        - Compute `canonical = normalize(candidate.term)` (same normalize as Step 2 API).
          - `normalize(term)` is: trim → lowercase → collapse internal whitespace to a single space.
-        - Upsert `term` by `(user_id, canonical)`:
-          - If new term: set `display_term = candidate.term` and set `primary_sense_id` to the new sense id created below.
-          - If existing term: do not change `display_term` or `primary_sense_id`.
-        - Insert `term_sense` with:
-          - `term_id` = term.id
-          - `bucket` = effectiveBucket
-          - `text` = effectiveText (trimmed, single-line, max 500 chars)
-          - `source` = `batch`
-          - `flagged_reason` = `bucket_conflict` iff:
-            - term has a `primary_sense_id`, and
-            - the bucket of that primary sense (lookup `term_sense.id = term.primary_sense_id`) != effectiveBucket
-            - otherwise null
+       - Upsert `term` by `(user_id, canonical)`:
+         - If new term: set `display_term = candidate.term` and set `primary_sense_id` to the new sense id created below.
+         - If existing term: do not change `display_term` or `primary_sense_id`.
+       - Insert `term_sense` with:
+         - `term_id` = term.id
+         - `bucket` = effectiveBucket
+         - `text` = effectiveText (trimmed, single-line, max 500 chars)
+         - `source` = `batch`
+         - `flagged_reason` = `bucket_conflict` iff:
+           - term has a `primary_sense_id`, and
+           - the bucket of that primary sense (lookup `term_sense.id = term.primary_sense_id`) != effectiveBucket
+           - otherwise null
        - Mark candidate as materialized by writing:
          - `candidate.status = 'accepted'`
          - `candidate.materialized_term_id = term.id`
@@ -211,6 +211,9 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
      - `403 FORBIDDEN`
      - `404 NOT_FOUND`
      - `409 BATCH_NOT_READY` (in-progress suggestions or missing effective fields)
+     - `409 IDEMPOTENCY_CONFLICT` (same `clientRequestId` was used for a different batch):
+       - `error.code = 'IDEMPOTENCY_CONFLICT'`
+       - `details = { \"originalBatchId\": string }`
 6. [ ] **Bucket feed page**
    - Route: `/bucket/:slug` (authenticated; lives under protected layout; ADR 0005).
    - Buckets are the fixed slugs: `foundations | backend | frontend | dx-tooling | deep-concepts`.
@@ -250,11 +253,11 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
    - Response body (explicit):
      - Export includes only terms that have a `primary_sense_id` and whose **primary sense bucket** equals `:bucket`.
      - First line: `# {Bucket Title}` with this exact mapping:
-         - `foundations` → `Foundations`
-         - `backend` → `Backend`
-         - `frontend` → `Frontend`
-         - `dx-tooling` → `DX Tooling`
-         - `deep-concepts` → `Deep Concepts`
+       - `foundations` → `Foundations`
+       - `backend` → `Backend`
+       - `frontend` → `Frontend`
+       - `dx-tooling` → `DX Tooling`
+       - `deep-concepts` → `Deep Concepts`
        - Blank line
        - Then one bullet per exported item: `- {displayTerm}: {primarySenseText}` where `{primarySenseText}` is the stored `term_sense.text` for the term’s primary sense.
        - File ends with a trailing newline (`\n`).
@@ -269,7 +272,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
 
 ## Current focus
 
-**Step 5: Accept-all materializes rows**
+**Step 6: Bucket feed page**
 
 ## Done criteria
 

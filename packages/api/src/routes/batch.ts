@@ -9,10 +9,13 @@ import {
 	candidate,
 	idempotencyKey,
 	suggestionCache,
+	term,
+	termSense,
 	normalize,
 	type BatchStatus,
 	type Bucket,
 	type SuggestionStatus,
+	type TermSenseSource,
 } from "../db";
 import {
 	generateStubSuggestion,
@@ -37,6 +40,7 @@ const MIN_TERMS = 20;
 const MAX_TERMS = 200;
 const MAX_TERM_LENGTH = 200;
 const IDEMPOTENCY_SCOPE = "capture_terms";
+const ACCEPT_ALL_SCOPE = "accept_all";
 
 // =============================================================================
 // Types
@@ -874,5 +878,568 @@ async function processCandidate(
 		results.errors++;
 	}
 }
+
+// =============================================================================
+// Base64url helpers (for idempotency result_ref encoding)
+// =============================================================================
+
+/**
+ * Encode a string to base64url (no padding).
+ */
+function toBase64Url(input: string): string {
+	const encoder = new TextEncoder();
+	const bytes = encoder.encode(input);
+	const base64 = btoa(String.fromCharCode(...bytes));
+	return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/**
+ * Decode a base64url string to a regular string.
+ */
+function fromBase64Url(input: string): string {
+	// Restore standard base64 characters
+	let base64 = input.replace(/-/g, "+").replace(/_/g, "/");
+	// Add padding if needed
+	while (base64.length % 4 !== 0) {
+		base64 += "=";
+	}
+	const binary = atob(base64);
+	const bytes = new Uint8Array(binary.length);
+	for (let i = 0; i < binary.length; i++) {
+		bytes[i] = binary.charCodeAt(i);
+	}
+	return new TextDecoder().decode(bytes);
+}
+
+// =============================================================================
+// Accept summary type
+// =============================================================================
+
+interface AcceptSummary {
+	batchId: string;
+	status: "accepted";
+	candidateCount: number;
+	acceptedCount: number;
+	skippedAlreadyAcceptedCount: number;
+	termCreatedCount: number;
+	termSenseCreatedCount: number;
+	flaggedCount: number;
+}
+
+/**
+ * POST /api/batch/:id/accept - Accept all candidates and materialize to terms/senses
+ *
+ * Request body: { clientRequestId: string (UUID v4) }
+ *
+ * Response: AcceptSummary
+ */
+batchRoutes.post("/:id/accept", async (c) => {
+	const userId = c.get("userId");
+	const batchId = c.req.param("id");
+	const db = drizzle(c.env.DB, { schema });
+
+	// -------------------------------------------------------------------------
+	// 1. Parse and validate request body
+	// -------------------------------------------------------------------------
+	let body: { clientRequestId?: unknown };
+	try {
+		body = await c.req.json();
+	} catch {
+		return apiError(c, 400, "INVALID_JSON", "Invalid JSON in request body");
+	}
+
+	const { clientRequestId } = body;
+
+	if (typeof clientRequestId !== "string" || !clientRequestId) {
+		return apiError(
+			c,
+			400,
+			"VALIDATION_ERROR",
+			"clientRequestId is required"
+		);
+	}
+
+	if (!isValidUUID(clientRequestId)) {
+		return apiError(
+			c,
+			400,
+			"VALIDATION_ERROR",
+			"clientRequestId must be a valid UUID"
+		);
+	}
+
+	// -------------------------------------------------------------------------
+	// 2. Lookup batch and verify ownership
+	// -------------------------------------------------------------------------
+	const batchRow = await db.query.batch.findFirst({
+		where: eq(batch.id, batchId),
+	});
+
+	if (!batchRow) {
+		return apiError(c, 404, "NOT_FOUND", "Batch not found");
+	}
+
+	if (batchRow.userId !== userId) {
+		return apiError(c, 403, "FORBIDDEN", "Access denied");
+	}
+
+	// -------------------------------------------------------------------------
+	// 3. Check idempotency key for replay/conflict
+	// -------------------------------------------------------------------------
+	const requestHash = await sha256Hex(`batch:${batchId}`);
+
+	const existingKey = await db.query.idempotencyKey.findFirst({
+		where: and(
+			eq(idempotencyKey.userId, userId),
+			eq(idempotencyKey.scope, ACCEPT_ALL_SCOPE),
+			eq(idempotencyKey.key, clientRequestId)
+		),
+	});
+
+	if (existingKey) {
+		if (existingKey.requestHash === requestHash) {
+			// Replay: decode and return cached summary
+			const resultRefMatch = existingKey.resultRef.match(
+				/^accept_summary:(.+)$/
+			);
+			if (!resultRefMatch) {
+				return apiError(
+					c,
+					500,
+					"INTERNAL_ERROR",
+					"Invalid idempotency result reference"
+				);
+			}
+
+			try {
+				const summaryJson = fromBase64Url(resultRefMatch[1]);
+				const cachedSummary = JSON.parse(summaryJson) as AcceptSummary;
+				return c.json(cachedSummary, 200);
+			} catch {
+				return apiError(
+					c,
+					500,
+					"INTERNAL_ERROR",
+					"Invalid idempotency result reference"
+				);
+			}
+		} else {
+			// Conflict: same clientRequestId used for different batch
+			// Extract originalBatchId from the stored result_ref
+			const resultRefMatch = existingKey.resultRef.match(
+				/^accept_summary:(.+)$/
+			);
+			let originalBatchId = "unknown";
+			if (resultRefMatch) {
+				try {
+					const summaryJson = fromBase64Url(resultRefMatch[1]);
+					const storedSummary = JSON.parse(summaryJson) as AcceptSummary;
+					originalBatchId = storedSummary.batchId;
+				} catch {
+					// If we can't decode, return 500
+					return apiError(
+						c,
+						500,
+						"INTERNAL_ERROR",
+						"Invalid idempotency result reference"
+					);
+				}
+			}
+
+			return apiError(
+				c,
+				409,
+				"IDEMPOTENCY_CONFLICT",
+				"clientRequestId was used for a different batch",
+				{ originalBatchId }
+			);
+		}
+	}
+
+	// -------------------------------------------------------------------------
+	// 4. Load all candidates for precondition checks
+	// -------------------------------------------------------------------------
+	const allCandidates = await db
+		.select({
+			id: candidate.id,
+			position: candidate.position,
+			term: candidate.term,
+			normalizedTerm: candidate.normalizedTerm,
+			chosenBucket: candidate.chosenBucket,
+			chosenText: candidate.chosenText,
+			suggestedBucket: candidate.suggestedBucket,
+			suggestedText: candidate.suggestedText,
+			suggestionStatus: candidate.suggestionStatus,
+			materializedTermId: candidate.materializedTermId,
+			materializedTermSenseId: candidate.materializedTermSenseId,
+		})
+		.from(candidate)
+		.where(eq(candidate.batchId, batchId))
+		.orderBy(asc(candidate.position));
+
+	const candidateCount = allCandidates.length;
+
+	// -------------------------------------------------------------------------
+	// 5. Precondition: check for in-progress suggestions
+	// -------------------------------------------------------------------------
+	const inProgressIds = allCandidates
+		.filter((c) => c.suggestionStatus === "in_progress")
+		.map((c) => c.id);
+
+	if (inProgressIds.length > 0) {
+		return apiError(
+			c,
+			409,
+			"BATCH_NOT_READY",
+			"Some candidates have suggestions in progress",
+			{
+				reason: "SUGGESTIONS_IN_PROGRESS",
+				inProgressCandidateIds: inProgressIds,
+			}
+		);
+	}
+
+	// -------------------------------------------------------------------------
+	// 6. Compute effective fields and check for missing
+	// -------------------------------------------------------------------------
+	type CandidateWithEffective = (typeof allCandidates)[number] & {
+		effectiveBucket: Bucket | null;
+		effectiveText: string | null;
+	};
+
+	const candidatesWithEffective: CandidateWithEffective[] = allCandidates.map(
+		(cand) => ({
+			...cand,
+			effectiveBucket: cand.chosenBucket ?? cand.suggestedBucket,
+			effectiveText: cand.chosenText ?? cand.suggestedText,
+		})
+	);
+
+	const missingIds = candidatesWithEffective
+		.filter((c) => c.effectiveBucket === null || c.effectiveText === null)
+		.map((c) => c.id);
+
+	if (missingIds.length > 0) {
+		return apiError(
+			c,
+			409,
+			"BATCH_NOT_READY",
+			"Some candidates are missing effective bucket or text",
+			{
+				reason: "MISSING_EFFECTIVE_FIELDS",
+				missingCandidateIds: missingIds,
+			}
+		);
+	}
+
+	// -------------------------------------------------------------------------
+	// 7. Phase 1: Build canonical → termId mapping
+	// -------------------------------------------------------------------------
+
+	// Filter unmaterialized candidates
+	const unmaterializedCandidates = candidatesWithEffective.filter(
+		(c) => c.materializedTermSenseId === null
+	);
+
+	// Count already materialized
+	const skippedAlreadyAcceptedCount =
+		candidateCount - unmaterializedCandidates.length;
+
+	// Get unique canonicals from unmaterialized candidates
+	const uniqueCanonicals = [
+		...new Set(unmaterializedCandidates.map((c) => normalize(c.term))),
+	];
+
+	// Pre-fetch existing terms for this user
+	type ExistingTermRow = {
+		id: string;
+		canonical: string;
+		primarySenseId: string | null;
+	};
+	let existingTerms: ExistingTermRow[] = [];
+	if (uniqueCanonicals.length > 0) {
+		existingTerms = await db
+			.select({
+				id: term.id,
+				canonical: term.canonical,
+				primarySenseId: term.primarySenseId,
+			})
+			.from(term)
+			.where(
+				and(
+					eq(term.userId, userId),
+					sql`${term.canonical} IN (${sql.join(
+						uniqueCanonicals.map((c) => sql`${c}`),
+						sql`, `
+					)})`
+				)
+			);
+	}
+
+	// Build map of existing terms: canonical → { termId, primarySenseId }
+	const existingTermMap = new Map<
+		string,
+		{ termId: string; primarySenseId: string | null }
+	>();
+	for (const t of existingTerms) {
+		existingTermMap.set(t.canonical, {
+			termId: t.id,
+			primarySenseId: t.primarySenseId,
+		});
+	}
+
+	// Pre-fetch primary sense buckets for existing terms with primary senses
+	const primarySenseIds = existingTerms
+		.map((t) => t.primarySenseId)
+		.filter((id): id is string => id !== null);
+
+	type PrimarySenseRow = { id: string; bucket: Bucket };
+	let primarySenses: PrimarySenseRow[] = [];
+	if (primarySenseIds.length > 0) {
+		primarySenses = await db
+			.select({
+				id: termSense.id,
+				bucket: termSense.bucket,
+			})
+			.from(termSense)
+			.where(
+				sql`${termSense.id} IN (${sql.join(
+					primarySenseIds.map((id) => sql`${id}`),
+					sql`, `
+				)})`
+			);
+	}
+
+	// Build map of primary sense buckets
+	const primarySenseBucketMap = new Map<string, Bucket>();
+	for (const ps of primarySenses) {
+		primarySenseBucketMap.set(ps.id, ps.bucket);
+	}
+
+	// Build canonical → termId map (including new terms to create)
+	// Also track which candidates are "term creators"
+	const canonicalToTermId = new Map<string, string>();
+	const termCreatorCandidateIds = new Set<string>();
+
+	for (const cand of unmaterializedCandidates) {
+		const canonical = normalize(cand.term);
+
+		if (!canonicalToTermId.has(canonical)) {
+			const existing = existingTermMap.get(canonical);
+			if (existing) {
+				// Term already exists
+				canonicalToTermId.set(canonical, existing.termId);
+			} else {
+				// New term - use deterministic ID from first candidate
+				const newTermId = `term:${cand.id}`;
+				canonicalToTermId.set(canonical, newTermId);
+				termCreatorCandidateIds.add(cand.id);
+			}
+		}
+	}
+
+	// -------------------------------------------------------------------------
+	// 8. Phase 2: Generate D1 batch statements
+	// -------------------------------------------------------------------------
+	const now = new Date();
+	const nowMs = now.getTime();
+	const statements: D1PreparedStatement[] = [];
+
+	// Counters for summary
+	let termCreatedCount = 0;
+	let termSenseCreatedCount = 0;
+	let flaggedCount = 0;
+
+	for (const cand of unmaterializedCandidates) {
+		const canonical = normalize(cand.term);
+		const termId = canonicalToTermId.get(canonical)!;
+		const termSenseId = `term_sense:${cand.id}`;
+
+		// Effective fields (already validated non-null)
+		const effectiveBucket = cand.effectiveBucket!;
+		const effectiveText = cand.effectiveText!;
+
+		// Determine if this candidate creates a new term
+		if (termCreatorCandidateIds.has(cand.id)) {
+			// INSERT OR IGNORE INTO term
+			const termStmt = db
+				.insert(term)
+				.values({
+					id: termId,
+					userId,
+					canonical,
+					displayTerm: cand.term,
+					primarySenseId: termSenseId,
+					createdAt: now,
+				})
+				.onConflictDoNothing()
+				.toSQL();
+
+			statements.push(
+				c.env.DB.prepare(termStmt.sql).bind(...termStmt.params)
+			);
+			termCreatedCount++;
+		}
+
+		// Determine flagged_reason
+		let flaggedReason: string | null = null;
+		const existingTermInfo = existingTermMap.get(canonical);
+		if (existingTermInfo?.primarySenseId) {
+			const primaryBucket = primarySenseBucketMap.get(
+				existingTermInfo.primarySenseId
+			);
+			if (primaryBucket && primaryBucket !== effectiveBucket) {
+				flaggedReason = "bucket_conflict";
+				flaggedCount++;
+			}
+		}
+
+		// INSERT OR IGNORE INTO term_sense
+		const senseStmt = db
+			.insert(termSense)
+			.values({
+				id: termSenseId,
+				termId,
+				bucket: effectiveBucket,
+				text: effectiveText,
+				source: "batch" as TermSenseSource,
+				flaggedReason,
+				createdAt: now,
+			})
+			.onConflictDoNothing()
+			.toSQL();
+
+		statements.push(c.env.DB.prepare(senseStmt.sql).bind(...senseStmt.params));
+		termSenseCreatedCount++;
+
+		// UPDATE candidate with materialization pointers
+		const candStmt = db
+			.update(candidate)
+			.set({
+				status: "accepted" as BatchStatus,
+				materializedTermId: termId,
+				materializedTermSenseId: termSenseId,
+				updatedAt: now,
+			})
+			.where(eq(candidate.id, cand.id))
+			.toSQL();
+
+		statements.push(c.env.DB.prepare(candStmt.sql).bind(...candStmt.params));
+	}
+
+	// Update batch status
+	const batchStmt = db
+		.update(batch)
+		.set({
+			status: "accepted" as BatchStatus,
+			updatedAt: now,
+		})
+		.where(eq(batch.id, batchId))
+		.toSQL();
+
+	statements.push(c.env.DB.prepare(batchStmt.sql).bind(...batchStmt.params));
+
+	// Build summary for idempotency storage
+	const summary: AcceptSummary = {
+		batchId,
+		status: "accepted",
+		candidateCount,
+		acceptedCount: termSenseCreatedCount,
+		skippedAlreadyAcceptedCount,
+		termCreatedCount,
+		termSenseCreatedCount,
+		flaggedCount,
+	};
+
+	// Insert idempotency key
+	const resultRef = `accept_summary:${toBase64Url(JSON.stringify(summary))}`;
+	const idempStmt = db
+		.insert(idempotencyKey)
+		.values({
+			userId,
+			scope: ACCEPT_ALL_SCOPE,
+			key: clientRequestId,
+			requestHash,
+			resultRef,
+			createdAt: now,
+		})
+		.toSQL();
+
+	statements.push(c.env.DB.prepare(idempStmt.sql).bind(...idempStmt.params));
+
+	// -------------------------------------------------------------------------
+	// 9. Phase 3: Execute all statements atomically
+	// -------------------------------------------------------------------------
+	try {
+		await c.env.DB.batch(statements);
+	} catch (error) {
+		// Handle race condition on idempotency key
+		if (
+			error instanceof Error &&
+			error.message.includes("UNIQUE constraint failed")
+		) {
+			// Re-check idempotency key
+			const racedKey = await db.query.idempotencyKey.findFirst({
+				where: and(
+					eq(idempotencyKey.userId, userId),
+					eq(idempotencyKey.scope, ACCEPT_ALL_SCOPE),
+					eq(idempotencyKey.key, clientRequestId)
+				),
+			});
+
+			if (racedKey) {
+				if (racedKey.requestHash === requestHash) {
+					// Replay
+					const resultRefMatch = racedKey.resultRef.match(
+						/^accept_summary:(.+)$/
+					);
+					if (resultRefMatch) {
+						try {
+							const summaryJson = fromBase64Url(resultRefMatch[1]);
+							const cachedSummary = JSON.parse(
+								summaryJson
+							) as AcceptSummary;
+							return c.json(cachedSummary, 200);
+						} catch {
+							// Fall through to error
+						}
+					}
+				} else {
+					// Conflict
+					const resultRefMatch = racedKey.resultRef.match(
+						/^accept_summary:(.+)$/
+					);
+					let originalBatchId = "unknown";
+					if (resultRefMatch) {
+						try {
+							const summaryJson = fromBase64Url(resultRefMatch[1]);
+							const storedSummary = JSON.parse(
+								summaryJson
+							) as AcceptSummary;
+							originalBatchId = storedSummary.batchId;
+						} catch {
+							// Fall through
+						}
+					}
+					return apiError(
+						c,
+						409,
+						"IDEMPOTENCY_CONFLICT",
+						"clientRequestId was used for a different batch",
+						{ originalBatchId }
+					);
+				}
+			}
+		}
+
+		console.error("Accept-all error:", error);
+		return apiError(c, 500, "INTERNAL_ERROR", "Failed to accept batch");
+	}
+
+	// -------------------------------------------------------------------------
+	// 10. Return summary
+	// -------------------------------------------------------------------------
+	return c.json(summary, 200);
+});
 
 export { batchRoutes };
