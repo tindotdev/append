@@ -2,7 +2,7 @@ import { env, SELF } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { schema, batch, candidate, idempotencyKey, user } from '../src/db';
+import { schema, batch, candidate, idempotencyKey, user, term, termSense } from '../src/db';
 import { applyMigrations } from './setup';
 
 // =============================================================================
@@ -78,8 +78,10 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
-	// Clean up test data after each test
+	// Clean up test data after each test (order matters for FK constraints)
 	await db.delete(idempotencyKey);
+	await db.delete(termSense);
+	await db.delete(term);
 	await db.delete(candidate);
 	await db.delete(batch);
 });
@@ -605,5 +607,551 @@ describe('OPTIONS preflight', () => {
 		});
 
 		expect(res.status).toBe(204);
+	});
+});
+
+// =============================================================================
+// POST /api/batch/:id/accept tests
+// =============================================================================
+
+describe('POST /api/batch/:id/accept', () => {
+	/**
+	 * Helper to create a batch with suggested candidates (ready for accept)
+	 */
+	async function createSuggestedBatch(termCount: number = 25): Promise<string> {
+		// Create batch
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms: generateTerms(termCount),
+				clientRequestId: generateUUID(),
+			}),
+		});
+		expect(createRes.status).toBe(201);
+		const { id: batchId } = (await createRes.json()) as any;
+
+		// Generate suggestions (stub provider)
+		const suggestRes = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
+			method: 'POST',
+			headers: { cookie: authCookie },
+		});
+		expect(suggestRes.status).toBe(200);
+
+		return batchId;
+	}
+
+	it('returns 401 when unauthenticated', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch/some-id/accept', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ clientRequestId: generateUUID() }),
+		});
+
+		expect(res.status).toBe(401);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('UNAUTHORIZED');
+	});
+
+	it('returns 404 for non-existent batch', async () => {
+		const res = await SELF.fetch(`https://example.com/api/batch/${generateUUID()}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId: generateUUID() }),
+		});
+
+		expect(res.status).toBe(404);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('NOT_FOUND');
+	});
+
+	it('returns 403 for non-owner batch', async () => {
+		// Create a foreign user and batch
+		const foreignUserId = generateUUID();
+		const foreignBatchId = generateUUID();
+		const now = new Date();
+
+		await db.insert(user).values({
+			id: foreignUserId,
+			name: 'Foreign User',
+			email: 'foreign-accept@example.com',
+			emailVerified: false,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		await db.insert(batch).values({
+			id: foreignBatchId,
+			userId: foreignUserId,
+			status: 'suggested',
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		// Try to accept as authenticated user
+		const res = await SELF.fetch(`https://example.com/api/batch/${foreignBatchId}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId: generateUUID() }),
+		});
+
+		expect(res.status).toBe(403);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('FORBIDDEN');
+
+		// Clean up
+		await db.delete(batch).where(eq(batch.id, foreignBatchId));
+		await db.delete(user).where(eq(user.id, foreignUserId));
+	});
+
+	it('returns 400 for missing clientRequestId', async () => {
+		const batchId = await createSuggestedBatch();
+
+		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({}),
+		});
+
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+		expect(body.error.message).toContain('clientRequestId');
+	});
+
+	it('returns 400 for invalid clientRequestId (not UUID)', async () => {
+		const batchId = await createSuggestedBatch();
+
+		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId: 'not-a-uuid' }),
+		});
+
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+		expect(body.error.message).toContain('UUID');
+	});
+
+	it('returns 409 BATCH_NOT_READY when suggestions are in progress', async () => {
+		// Create batch without suggestions
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms: generateTerms(25),
+				clientRequestId: generateUUID(),
+			}),
+		});
+		expect(createRes.status).toBe(201);
+		const { id: batchId } = (await createRes.json()) as any;
+
+		// Manually set a candidate to in_progress
+		const candidates = await (db.query as any).candidate.findMany({
+			where: eq(candidate.batchId, batchId),
+		});
+		await db.update(candidate).set({ suggestionStatus: 'in_progress' }).where(eq(candidate.id, candidates[0].id));
+
+		// Try to accept
+		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId: generateUUID() }),
+		});
+
+		expect(res.status).toBe(409);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('BATCH_NOT_READY');
+		expect(body.details.reason).toBe('SUGGESTIONS_IN_PROGRESS');
+		expect(body.details.inProgressCandidateIds).toContain(candidates[0].id);
+	});
+
+	it('returns 409 BATCH_NOT_READY when candidates are missing effective fields', async () => {
+		// Create batch without suggestions (no suggested fields)
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms: generateTerms(25),
+				clientRequestId: generateUUID(),
+			}),
+		});
+		expect(createRes.status).toBe(201);
+		const { id: batchId } = (await createRes.json()) as any;
+
+		// Try to accept without suggestions
+		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId: generateUUID() }),
+		});
+
+		expect(res.status).toBe(409);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('BATCH_NOT_READY');
+		expect(body.details.reason).toBe('MISSING_EFFECTIVE_FIELDS');
+		expect(body.details.missingCandidateIds).toHaveLength(25);
+	});
+
+	it('successfully creates terms and term_senses (200)', async () => {
+		const batchId = await createSuggestedBatch();
+
+		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId: generateUUID() }),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		expect(body.batchId).toBe(batchId);
+		expect(body.status).toBe('accepted');
+		expect(body.candidateCount).toBe(25);
+		expect(body.acceptedCount).toBe(25);
+		expect(body.skippedAlreadyAcceptedCount).toBe(0);
+		expect(body.termCreatedCount).toBe(25);
+		expect(body.termSenseCreatedCount).toBe(25);
+		expect(body.flaggedCount).toBe(0);
+
+		// Verify batch status is updated
+		const batchRow = await (db.query as any).batch.findFirst({
+			where: eq(batch.id, batchId),
+		});
+		expect(batchRow.status).toBe('accepted');
+
+		// Verify candidates are materialized
+		const candidates = await (db.query as any).candidate.findMany({
+			where: eq(candidate.batchId, batchId),
+		});
+		for (const cand of candidates) {
+			expect(cand.status).toBe('accepted');
+			expect(cand.materializedTermId).not.toBeNull();
+			expect(cand.materializedTermSenseId).not.toBeNull();
+		}
+
+		// Verify terms and term_senses created
+		const terms = await (db.query as any).term.findMany();
+		expect(terms.length).toBe(25);
+
+		const senses = await (db.query as any).termSense.findMany();
+		expect(senses.length).toBe(25);
+	});
+
+	it('replays with same clientRequestId (returns cached summary)', async () => {
+		const batchId = await createSuggestedBatch();
+		const clientRequestId = generateUUID();
+
+		// First accept
+		const res1 = await SELF.fetch(`https://example.com/api/batch/${batchId}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId }),
+		});
+
+		expect(res1.status).toBe(200);
+		const body1 = (await res1.json()) as any;
+
+		// Second accept (replay)
+		const res2 = await SELF.fetch(`https://example.com/api/batch/${batchId}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId }),
+		});
+
+		expect(res2.status).toBe(200);
+		const body2 = (await res2.json()) as any;
+
+		// Response should be identical
+		expect(body2).toEqual(body1);
+
+		// No duplicate terms/senses created
+		const terms = await (db.query as any).term.findMany();
+		expect(terms.length).toBe(25);
+
+		const senses = await (db.query as any).termSense.findMany();
+		expect(senses.length).toBe(25);
+	});
+
+	it('returns 409 IDEMPOTENCY_CONFLICT for same clientRequestId with different batch', async () => {
+		const batchId1 = await createSuggestedBatch();
+		const batchId2 = await createSuggestedBatch();
+		const clientRequestId = generateUUID();
+
+		// Accept batch 1
+		const res1 = await SELF.fetch(`https://example.com/api/batch/${batchId1}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId }),
+		});
+
+		expect(res1.status).toBe(200);
+
+		// Try to accept batch 2 with same clientRequestId
+		const res2 = await SELF.fetch(`https://example.com/api/batch/${batchId2}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId }),
+		});
+
+		expect(res2.status).toBe(409);
+		const body = (await res2.json()) as any;
+		expect(body.error.code).toBe('IDEMPOTENCY_CONFLICT');
+		expect(body.details.originalBatchId).toBe(batchId1);
+	});
+
+	it('retry with different clientRequestId skips already materialized candidates', async () => {
+		const batchId = await createSuggestedBatch();
+
+		// First accept
+		const res1 = await SELF.fetch(`https://example.com/api/batch/${batchId}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId: generateUUID() }),
+		});
+
+		expect(res1.status).toBe(200);
+		const body1 = (await res1.json()) as any;
+		expect(body1.acceptedCount).toBe(25);
+		expect(body1.skippedAlreadyAcceptedCount).toBe(0);
+
+		// Second accept with different clientRequestId
+		const res2 = await SELF.fetch(`https://example.com/api/batch/${batchId}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId: generateUUID() }),
+		});
+
+		expect(res2.status).toBe(200);
+		const body2 = (await res2.json()) as any;
+		expect(body2.acceptedCount).toBe(0);
+		expect(body2.skippedAlreadyAcceptedCount).toBe(25);
+
+		// No duplicate terms/senses
+		const terms = await (db.query as any).term.findMany();
+		expect(terms.length).toBe(25);
+
+		const senses = await (db.query as any).termSense.findMany();
+		expect(senses.length).toBe(25);
+	});
+
+	it('deduplicates same canonical terms within batch', async () => {
+		// Create batch with duplicate terms
+		const terms = ['duplicate', 'duplicate', 'duplicate', ...Array.from({ length: 22 }, (_, i) => `unique-${i}`)].join('\n');
+
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms,
+				clientRequestId: generateUUID(),
+			}),
+		});
+		expect(createRes.status).toBe(201);
+		const { id: batchId } = (await createRes.json()) as any;
+
+		// Suggest
+		await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
+			method: 'POST',
+			headers: { cookie: authCookie },
+		});
+
+		// Accept
+		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId: generateUUID() }),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		// 25 candidates, but only 23 unique terms (duplicate appears 3 times)
+		expect(body.candidateCount).toBe(25);
+		expect(body.termCreatedCount).toBe(23); // 22 unique + 1 "duplicate"
+		expect(body.termSenseCreatedCount).toBe(25); // Each candidate gets a sense
+
+		// Verify term count in DB
+		const termsInDb = await (db.query as any).term.findMany();
+		expect(termsInDb.length).toBe(23);
+
+		// Verify sense count in DB
+		const sensesInDb = await (db.query as any).termSense.findMany();
+		expect(sensesInDb.length).toBe(25);
+	});
+
+	it('flags bucket conflicts for existing terms', async () => {
+		// Create and accept first batch
+		const batchId1 = await createSuggestedBatch();
+
+		const res1 = await SELF.fetch(`https://example.com/api/batch/${batchId1}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId: generateUUID() }),
+		});
+		expect(res1.status).toBe(200);
+
+		// Get first term's canonical to create conflict
+		const firstTerm = await (db.query as any).term.findFirst();
+		const firstSense = await (db.query as any).termSense.findFirst({
+			where: eq(termSense.termId, firstTerm.id),
+		});
+
+		// Create second batch with same term but we'll override the bucket
+		const secondBatchTerms = [firstTerm.displayTerm, ...Array.from({ length: 24 }, (_, i) => `second-batch-term-${i}`)].join('\n');
+
+		const createRes2 = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms: secondBatchTerms,
+				clientRequestId: generateUUID(),
+			}),
+		});
+		expect(createRes2.status).toBe(201);
+		const { id: batchId2 } = (await createRes2.json()) as any;
+
+		// Suggest second batch
+		await SELF.fetch(`https://example.com/api/batch/${batchId2}/suggest`, {
+			method: 'POST',
+			headers: { cookie: authCookie },
+		});
+
+		// Set a different bucket for the conflicting candidate
+		const secondBatchCandidates = await (db.query as any).candidate.findMany({
+			where: eq(candidate.batchId, batchId2),
+		});
+		const conflictingCandidate = secondBatchCandidates.find((c: any) => c.term === firstTerm.displayTerm);
+
+		// Set a different bucket than the primary sense
+		const differentBucket = firstSense.bucket === 'foundations' ? 'backend' : 'foundations';
+		await db
+			.update(candidate)
+			.set({ chosenBucket: differentBucket })
+			.where(eq(candidate.id, conflictingCandidate.id));
+
+		// Accept second batch
+		const res2 = await SELF.fetch(`https://example.com/api/batch/${batchId2}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId: generateUUID() }),
+		});
+
+		expect(res2.status).toBe(200);
+		const body2 = (await res2.json()) as any;
+
+		// One flagged due to bucket conflict
+		expect(body2.flaggedCount).toBe(1);
+
+		// Verify flagged_reason in DB
+		const flaggedSenses = await (db.query as any).termSense.findMany({
+			where: eq(termSense.flaggedReason, 'bucket_conflict'),
+		});
+		expect(flaggedSenses.length).toBe(1);
+	});
+
+	it('uses chosen fields over suggested fields when set', async () => {
+		const batchId = await createSuggestedBatch();
+
+		// Override chosen fields for first candidate
+		const candidates = await (db.query as any).candidate.findMany({
+			where: eq(candidate.batchId, batchId),
+			orderBy: (c: any, { asc }: any) => [asc(c.position)],
+		});
+
+		await db
+			.update(candidate)
+			.set({
+				chosenBucket: 'deep-concepts',
+				chosenText: 'Custom definition override',
+			})
+			.where(eq(candidate.id, candidates[0].id));
+
+		// Accept
+		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/accept`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ clientRequestId: generateUUID() }),
+		});
+
+		expect(res.status).toBe(200);
+
+		// Verify the term sense uses chosen values
+		const updatedCandidate = await (db.query as any).candidate.findFirst({
+			where: eq(candidate.id, candidates[0].id),
+		});
+		const sense = await (db.query as any).termSense.findFirst({
+			where: eq(termSense.id, updatedCandidate.materializedTermSenseId),
+		});
+
+		expect(sense.bucket).toBe('deep-concepts');
+		expect(sense.text).toBe('Custom definition override');
 	});
 });
