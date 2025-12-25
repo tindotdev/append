@@ -16,6 +16,7 @@ import { ProtectedLayout } from "./components/ProtectedLayout";
 import { SignInPage } from "./pages/SignInPage";
 import { BatchNewPage } from "./pages/BatchNewPage";
 import { BatchDetailPage } from "./pages/BatchDetailPage";
+import { BucketFeedPage } from "./pages/BucketFeedPage";
 
 // Router context type
 interface RouterContext {
@@ -86,10 +87,17 @@ const batchDetailRoute = createRoute({
   component: BatchDetailPage,
 });
 
+// Bucket feed route (protected)
+const bucketFeedRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/bucket/$slug",
+  component: BucketFeedPage,
+});
+
 // Build route tree
 const routeTree = rootRoute.addChildren([
   signInRoute,
-  protectedRoute.addChildren([indexRoute, batchNewRoute, batchDetailRoute]),
+  protectedRoute.addChildren([indexRoute, batchNewRoute, batchDetailRoute, bucketFeedRoute]),
 ]);
 
 const router = createRouter({

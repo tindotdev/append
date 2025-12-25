@@ -146,3 +146,53 @@ export async function updateCandidate(
 
   return handleResponse<UpdateCandidateResponse>(response);
 }
+
+// =============================================================================
+// Bucket Feed API (Step 6)
+// =============================================================================
+
+export interface BucketFeedItem {
+  termId: string;
+  displayTerm: string;
+  canonical: string;
+  primarySense: {
+    id: string;
+    bucket: Bucket;
+    text: string;
+    createdAt: number;
+  };
+}
+
+export interface BucketFeedResponse {
+  bucket: string;
+  items: BucketFeedItem[];
+  nextCursor: string | null;
+}
+
+export interface GetBucketFeedOptions {
+  limit?: number;
+  cursor?: string;
+}
+
+export async function getBucketFeed(
+  slug: Bucket,
+  options?: GetBucketFeedOptions
+): Promise<BucketFeedResponse> {
+  const params = new URLSearchParams();
+  if (options?.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+  if (options?.cursor) {
+    params.set("cursor", options.cursor);
+  }
+
+  const queryString = params.toString();
+  const url = `${API_URL}/api/bucket/${slug}${queryString ? `?${queryString}` : ""}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    credentials: "include",
+  });
+
+  return handleResponse<BucketFeedResponse>(response);
+}
