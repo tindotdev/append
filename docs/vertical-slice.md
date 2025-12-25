@@ -42,7 +42,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
        - creates `candidate` rows with `status='captured'` ordered by input position (post-trim)
    - Candidate order preserves the post-trim input order; duplicates remain distinct candidates.
    - UI: `/batch/new` with textarea → submit → redirect to review (routes live under the protected layout; ADR 0005).
-3. [ ] **Worker API generates suggestions** (bucket + one-liner)
+3. [x] **Worker API generates suggestions** (bucket + one-liner)
    - ADRs (locked decisions):
      - Provider/model/routing: `docs/adr/0006-openai-gpt-5-mini-via-ai-gateway.md`
      - Storage + retry + cache: `docs/adr/0007-step-3-suggestions-on-candidate-plus-cache.md`
@@ -78,7 +78,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
          - After any suggestion attempt, set `candidate.status = 'suggested'` (even if the attempt ends in `error`).
          - After a suggest run, set `batch.status = 'suggested'` (even if partial errors exist).
        - Cost control (explicit): per-user, per-normalized-term cache (D1) is consulted in fill-missing mode.
-4. [ ] **UI review list**
+4. [x] **UI review list**
    - Route: `/batch/:id` (authenticated; lives under protected layout; ADR 0005).
    - Read model (explicit):
      - `GET /api/batch/:id` response `200` JSON:
@@ -269,7 +269,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
 
 ## Current focus
 
-**Step 3: Worker API generates suggestions**
+**Step 5: Accept-all materializes rows**
 
 ## Done criteria
 
