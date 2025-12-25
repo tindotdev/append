@@ -349,18 +349,28 @@ batchRoutes.post("/", async (c) => {
  *
  * Response: {
  *   id: string,
- *   status: string,
- *   createdAt: number,
- *   updatedAt: number,
+ *   status: "captured" | "suggested" | "accepted",
+ *   createdAt: number (epoch ms),
+ *   updatedAt: number (epoch ms),
  *   candidateCount: number,
  *   candidates: Array<{
  *     id: string,
  *     position: number,
  *     term: string,
  *     normalizedTerm: string,
- *     status: string,
- *     createdAt: number,
- *     updatedAt: number
+ *     status: "captured" | "suggested" | "accepted",
+ *     chosenBucket: Bucket | null,
+ *     chosenText: string | null,
+ *     suggestedBucket: Bucket | null,
+ *     suggestedText: string | null,
+ *     suggestionStatus: "in_progress" | "done" | "error" | null,
+ *     suggestionError: string | null,
+ *     suggestionAttempts: number,
+ *     version: number,
+ *     materializedTermId: string | null,
+ *     materializedTermSenseId: string | null,
+ *     createdAt: number (epoch ms),
+ *     updatedAt: number (epoch ms)
  *   }>
  * }
  */

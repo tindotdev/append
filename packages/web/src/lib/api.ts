@@ -56,12 +56,34 @@ export interface CreateBatchResponse {
   candidateCount: number;
 }
 
+/** Allowed bucket slugs */
+export type Bucket =
+  | "foundations"
+  | "backend"
+  | "frontend"
+  | "dx-tooling"
+  | "deep-concepts";
+
+/** Suggestion generation status */
+export type SuggestionStatus = "in_progress" | "done" | "error";
+
 export interface Candidate {
   id: string;
   position: number;
   term: string;
   normalizedTerm: string;
   status: string;
+  // Step 4 fields
+  chosenBucket: Bucket | null;
+  chosenText: string | null;
+  suggestedBucket: Bucket | null;
+  suggestedText: string | null;
+  suggestionStatus: SuggestionStatus | null;
+  suggestionError: string | null;
+  suggestionAttempts: number;
+  version: number;
+  materializedTermId: string | null;
+  materializedTermSenseId: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -95,4 +117,32 @@ export async function getBatch(id: string): Promise<BatchResponse> {
   });
 
   return handleResponse<BatchResponse>(response);
+}
+
+export interface UpdateCandidateRequest {
+  expectedVersion: number;
+  chosenBucket?: Bucket | null;
+  chosenText?: string | null;
+}
+
+export interface UpdateCandidateResponse {
+  candidate: Candidate;
+}
+
+export interface VersionConflictDetails {
+  currentVersion: number;
+}
+
+export async function updateCandidate(
+  id: string,
+  request: UpdateCandidateRequest
+): Promise<UpdateCandidateResponse> {
+  const response = await fetch(`${API_URL}/api/candidate/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(request),
+  });
+
+  return handleResponse<UpdateCandidateResponse>(response);
 }
