@@ -522,6 +522,76 @@ describe('GET /api/batch/:id', () => {
 			expect(body.candidates[i].term).toBe(`term-${i + 1}`);
 		}
 	});
+
+	it('returns Step 4 fields in candidate response', async () => {
+		// Create a batch
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms: generateTerms(25),
+				clientRequestId: generateUUID(),
+			}),
+		});
+
+		expect(createRes.status).toBe(201);
+		const { id: batchId } = (await createRes.json()) as any;
+
+		// Get the batch
+		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}`, {
+			headers: { cookie: authCookie },
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		// Verify each candidate includes Step 4 fields
+		for (const cand of body.candidates) {
+			// Core fields
+			expect(cand).toHaveProperty('id');
+			expect(cand).toHaveProperty('position');
+			expect(cand).toHaveProperty('term');
+			expect(cand).toHaveProperty('normalizedTerm');
+			expect(cand).toHaveProperty('status');
+
+			// Step 4 chosen fields
+			expect(cand).toHaveProperty('chosenBucket');
+			expect(cand).toHaveProperty('chosenText');
+
+			// Step 4 suggested fields
+			expect(cand).toHaveProperty('suggestedBucket');
+			expect(cand).toHaveProperty('suggestedText');
+			expect(cand).toHaveProperty('suggestionStatus');
+			expect(cand).toHaveProperty('suggestionError');
+			expect(cand).toHaveProperty('suggestionAttempts');
+
+			// Step 4 version and materialization fields
+			expect(cand).toHaveProperty('version');
+			expect(cand).toHaveProperty('materializedTermId');
+			expect(cand).toHaveProperty('materializedTermSenseId');
+
+			// Timestamps
+			expect(cand).toHaveProperty('createdAt');
+			expect(cand).toHaveProperty('updatedAt');
+			expect(cand.createdAt).toBeTypeOf('number');
+			expect(cand.updatedAt).toBeTypeOf('number');
+
+			// For a new batch, these should be null
+			expect(cand.chosenBucket).toBeNull();
+			expect(cand.chosenText).toBeNull();
+			expect(cand.suggestedBucket).toBeNull();
+			expect(cand.suggestedText).toBeNull();
+			expect(cand.suggestionStatus).toBeNull();
+			expect(cand.suggestionError).toBeNull();
+			expect(cand.suggestionAttempts).toBe(0);
+			expect(cand.version).toBe(1);
+			expect(cand.materializedTermId).toBeNull();
+			expect(cand.materializedTermSenseId).toBeNull();
+		}
+	});
 });
 
 // =============================================================================

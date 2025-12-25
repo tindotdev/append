@@ -29,7 +29,8 @@
 	 * https://developers.cloudflare.com/ai-gateway/integrations/worker-binding-methods/
 	 */
 	"ai": {
-		"binding": "AI"
+		"binding": "AI",
+		"remote": true,
 	},
 	/**
 	 * Environment Variables

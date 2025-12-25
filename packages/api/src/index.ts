@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { createAuth } from "./lib/auth";
 import { apiError } from "./lib/api-error";
 import { batchRoutes } from "./routes/batch";
+import { candidateRoutes } from "./routes/candidate";
 
 type Bindings = {
 	DB: D1Database;
@@ -145,5 +146,6 @@ app.get("/", (c) => c.json({ status: "ok" }));
 // =============================================================================
 
 app.route("/api/batch", batchRoutes);
+app.route("/api/candidate", candidateRoutes);
 
 export default app;
