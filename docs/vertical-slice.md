@@ -214,7 +214,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
      - `409 IDEMPOTENCY_CONFLICT` (same `clientRequestId` was used for a different batch):
        - `error.code = 'IDEMPOTENCY_CONFLICT'`
        - `details = { \"originalBatchId\": string }`
-6. [ ] **Bucket feed page**
+6. [x] **Bucket feed page**
    - Route: `/bucket/:slug` (authenticated; lives under protected layout; ADR 0005).
    - Buckets are the fixed slugs: `foundations | backend | frontend | dx-tooling | deep-concepts`.
    - API (explicit):
@@ -272,7 +272,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
 
 ## Current focus
 
-**Step 6: Bucket feed page**
+\*\*Step 7: Export page
 
 ## Done criteria
 
