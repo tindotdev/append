@@ -78,7 +78,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
          - After any suggestion attempt, set `candidate.status = 'suggested'` (even if the attempt ends in `error`).
          - After a suggest run, set `batch.status = 'suggested'` (even if partial errors exist).
        - Cost control (explicit): per-user, per-normalized-term cache (D1) is consulted in fill-missing mode.
-4. [ ] **UI review list**
+4. [x] **UI review list**
    - Route: `/batch/:id` (authenticated; lives under protected layout; ADR 0005).
    - Read model (explicit):
      - `GET /api/batch/:id` response `200` JSON:
@@ -269,7 +269,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
 
 ## Current focus
 
-**Step 3: Worker API generates suggestions**
+**Step 5: Accept-all materializes rows**
 
 ## Done criteria
 
