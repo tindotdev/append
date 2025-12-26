@@ -1,6 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ApiRequestError, createBatch } from "../lib/api";
 
 function parseTerms(input: string): string[] {
   return input
