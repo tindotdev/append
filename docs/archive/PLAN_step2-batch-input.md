@@ -495,7 +495,7 @@ Then tests can:
 
 ## 6) Implementation order (keeps slice runnable)
 
-1. Fix existing worker test (`packages/api/test/index.spec.ts`) so `pnpm --filter append-api test` is meaningful.
+1. Fix existing worker test (`packages/api/test/index.spec.ts`) so `pnpm --filter @append/api test` is meaningful.
 2. Add domain schema + migration (including CHECK constraints for all enums; index `term_sense(term_id, created_at)`).
 3. Add `/api/*` CORS + explicit `OPTIONS /api/*` preflight handler + auth guard (session check + `set-cookie` forwarding).
 4. Implement `POST /api/batch` + idempotency semantics, plus the transaction rollback proof test.
@@ -506,8 +506,8 @@ Then tests can:
 
 Schema/migration workflow (API):
 
-- Generate/refresh Better Auth schema (rare; only when auth config changes): `pnpm --filter append-api auth:generate`
-- Generate D1 migrations after schema changes: `pnpm --filter append-api db:generate`
-  - `drizzle-kit` needs a local D1 SQLite file; if it can’t find one, run `pnpm --filter append-api dev` once to create `.wrangler/**.sqlite`
-- Apply migrations locally: `pnpm --filter append-api db:migrate:local`
-- Apply migrations to prod: `pnpm --filter append-api db:migrate:prod`
+- Generate/refresh Better Auth schema (rare; only when auth config changes): `pnpm --filter @append/api auth:generate`
+- Generate D1 migrations after schema changes: `pnpm --filter @append/api db:generate`
+  - `drizzle-kit` needs a local D1 SQLite file; if it can’t find one, run `pnpm --filter @append/api dev` once to create `.wrangler/**.sqlite`
+- Apply migrations locally: `pnpm --filter @append/api db:migrate:local`
+- Apply migrations to prod: `pnpm --filter @append/api db:migrate:prod`

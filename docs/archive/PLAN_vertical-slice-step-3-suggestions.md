@@ -272,7 +272,7 @@ For a given batch:
 
 ## Validation
 
-- Run API tests: `pnpm --filter append-api test`
+- Run API tests: `pnpm --filter @append/api test`
 - Manual (dev):
   - Create batch via `POST /api/batch`
   - Generate suggestions via `POST /api/batch/{id}/suggest?limit=50`
