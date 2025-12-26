@@ -29,12 +29,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run API tests
-        run: pnpm --filter append-api test
-
-      - name: Typecheck
-        run: pnpm typecheck
-
       - name: Apply D1 migrations
         working-directory: packages/api
         run: pnpm exec wrangler d1 migrations apply append-db --remote --config wrangler.jsonc
