@@ -1,4 +1,24 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"]
+  "extends": ["config:recommended", "group:allNonMajor"],
+  "automerge": true,
+  "automergeType": "branch",
+  "platformAutomerge": false,
+  "packageRules": [
+    {
+      "description": "Pin vitest to v3.x (cloudflare/vitest-pool-workers not v4 compatible)",
+      "matchPackagePatterns": ["^vitest$", "^@vitest/"],
+      "allowedVersions": "<4.0.0"
+    },
+    {
+      "description": "Automerge non-major updates",
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "description": "Major updates need manual review",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ]
 }
