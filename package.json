@@ -16,7 +16,8 @@
 		"test": "pnpm -r --if-present test",
 		"test:api": "pnpm --filter @append/api test",
 		"deploy:api": "pnpm --filter @append/api run deploy",
-		"prepare": "simple-git-hooks"
+		"prepare": "simple-git-hooks",
+		"cf-typegen": "pnpm -r --if-present wrangler types"
 	},
 	"license": "MIT",
 	"packageManager": "pnpm@10.26.2",
