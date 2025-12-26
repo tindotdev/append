@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "append-api",
+	"name": "@append/api",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-12-19",
 	"compatibility_flags": ["nodejs_compat"],

@@ -88,12 +88,12 @@ Manual equivalent (from repo root):
 
 ```bash
 # API (migrations + deploy)
-pnpm --filter append-api exec wrangler d1 migrations apply append-db --remote --config packages/api/wrangler.jsonc
-pnpm --filter append-api run deploy -- --config packages/api/wrangler.jsonc
+pnpm --filter @append/api exec wrangler d1 migrations apply append-db --remote --config packages/api/wrangler.jsonc
+pnpm --filter @append/api run deploy -- --config packages/api/wrangler.jsonc
 
 # Web (build + deploy)
-pnpm --filter append-web run build
-pnpm --filter append-web exec wrangler pages deploy packages/web/dist --project-name "$CF_PAGES_PROJECT"
+pnpm --filter @append/web run build
+pnpm --filter @append/web exec wrangler pages deploy packages/web/dist --project-name "$CF_PAGES_PROJECT"
 ```
 
 ## Release tags (semver)
@@ -124,9 +124,9 @@ Checklist:
 ## Migrations
 
 - Better Auth schema changes:
-  1. `pnpm --filter append-api run auth:generate`
-  2. `pnpm --filter append-api run db:generate`
+  1. `pnpm --filter @append/api run auth:generate`
+  2. `pnpm --filter @append/api run db:generate`
   3. Apply D1 migrations (see deploy steps).
 - App schema changes:
-  1. `pnpm --filter append-api run db:generate`
+  1. `pnpm --filter @append/api run db:generate`
   2. Apply D1 migrations before deploying new API code.

@@ -1,21 +1,10 @@
+import { BUCKET_TITLES, type Bucket } from '@append/contracts/types';
+import { safeParseBucket } from '@append/contracts/validators';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
-import { BUCKET, type Bucket, schema, term, termSense } from '../db';
+import { schema, term, termSense } from '../db';
 import { apiError } from '../lib/api-error';
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-/** Mapping from bucket slug to display title */
-const BUCKET_TITLES: Record<Bucket, string> = {
-	foundations: 'Foundations',
-	backend: 'Backend',
-	frontend: 'Frontend',
-	'dx-tooling': 'DX Tooling',
-	'deep-concepts': 'Deep Concepts',
-};
 
 // =============================================================================
 // Types
@@ -64,10 +53,11 @@ exportRoutes.get('/:bucket', async (c) => {
 	// -------------------------------------------------------------------------
 	// 1. Validate bucket param
 	// -------------------------------------------------------------------------
-	if (!BUCKET.includes(bucketParam as Bucket)) {
+	const parsedBucket = safeParseBucket(bucketParam);
+	if (!parsedBucket.success) {
 		return apiError(c, 404, 'NOT_FOUND', `Invalid bucket: ${bucketParam}`);
 	}
-	const bucket = bucketParam as Bucket;
+	const bucket: Bucket = parsedBucket.output;
 
 	// -------------------------------------------------------------------------
 	// 2. Query terms with primary senses in this bucket

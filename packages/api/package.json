@@ -1,5 +1,5 @@
 {
-	"name": "append-api",
+	"name": "@append/api",
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
@@ -21,9 +21,10 @@
 		"drizzle-kit": "^0.31.8",
 		"typescript": "^5.5.2",
 		"vitest": "~3.2.4",
-		"wrangler": "^4.56.0"
+		"wrangler": "^4.54.0"
 	},
 	"dependencies": {
+		"@append/contracts": "workspace:*",
 		"better-auth": "^1.4.7",
 		"better-auth-cloudflare": "^0.2.9",
 		"drizzle-orm": "^0.45.1",

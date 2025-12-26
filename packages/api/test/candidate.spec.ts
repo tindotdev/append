@@ -1,4 +1,5 @@
 import { env, SELF } from 'cloudflare:test';
+import { BUCKETS } from '@append/contracts/types';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -589,7 +590,7 @@ describe('PUT /api/candidate/:id', () => {
 	});
 
 	it('accepts all valid bucket slugs', async () => {
-		const validBuckets = ['foundations', 'backend', 'frontend', 'dx-tooling', 'deep-concepts'];
+		const validBuckets = BUCKETS;
 		const { candidateId } = await createBatchWithCandidate(authCookie);
 
 		let currentVersion = 1;

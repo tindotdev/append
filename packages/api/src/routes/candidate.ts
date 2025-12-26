@@ -1,7 +1,9 @@
+import { BUCKETS, type Bucket } from '@append/contracts/types';
+import { safeParseBucket } from '@append/contracts/validators';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
-import { BUCKET, type Bucket, batch, candidate, schema } from '../db';
+import { batch, candidate, schema } from '../db';
 import { apiError } from '../lib/api-error';
 
 // =============================================================================
@@ -82,10 +84,11 @@ candidateRoutes.put('/:id', async (c) => {
 		if (body.chosenBucket === null) {
 			chosenBucket = null;
 		} else if (typeof body.chosenBucket === 'string') {
-			if (!BUCKET.includes(body.chosenBucket as Bucket)) {
-				return apiError(c, 400, 'VALIDATION_ERROR', `chosenBucket must be one of: ${BUCKET.join(', ')}`);
+			const parsedBucket = safeParseBucket(body.chosenBucket);
+			if (!parsedBucket.success) {
+				return apiError(c, 400, 'VALIDATION_ERROR', `chosenBucket must be one of: ${BUCKETS.join(', ')}`);
 			}
-			chosenBucket = body.chosenBucket as Bucket;
+			chosenBucket = parsedBucket.output;
 		} else {
 			return apiError(c, 400, 'VALIDATION_ERROR', 'chosenBucket must be a string or null');
 		}

@@ -68,7 +68,7 @@ Tests and typechecking run before every deployment in `.github/workflows/deploy.
 
 ```yaml
 - name: Run API tests
-  run: pnpm --filter append-api test
+  run: pnpm --filter @append/api test
 
 - name: Typecheck
   run: pnpm typecheck
@@ -80,7 +80,7 @@ Root-level test scripts in `package.json`:
 {
   "scripts": {
     "test": "pnpm -r --if-present test",
-    "test:api": "pnpm --filter append-api test"
+    "test:api": "pnpm --filter @append/api test"
   }
 }
 ```
@@ -390,16 +390,16 @@ Manual testing is sufficient until the app stabilizes.
 
 ```bash
 # Run all API tests
-pnpm --filter append-api test
+pnpm --filter @append/api test
 
 # Run specific test file
-pnpm --filter append-api test batch.spec.ts
+pnpm --filter @append/api test batch.spec.ts
 
 # Run tests in watch mode
-pnpm --filter append-api test --watch
+pnpm --filter @append/api test --watch
 
 # Run with coverage
-pnpm --filter append-api test --coverage
+pnpm --filter @append/api test --coverage
 ```
 
 ---

@@ -25,7 +25,7 @@
 - **Capture batch**: a group of Term (input) captured together.
 - **Candidate**: a Term (input) inside a batch with optional suggestions/edits, not yet accepted.
 - **Suggestion**: AI-proposed one-liner + bucket for a Candidate (stored on `Candidate` for Step 3; ADR 0007).
-- **Bucket**: one of `foundations | backend | frontend | dx-tooling | deep-concepts` (stable slug values used in DB + API + URLs).
+- **Bucket**: one of `foundations | backend | frontend | dx-tooling | deep-concepts` (stable slug values used in DB + API + URLs; source of truth: `packages/contracts/src/types/index.ts`).
 - **Term (entity)**: the canonical concept keyed by the normalized term (`canonical`).
 - **Sense**: an append-only meaning/usage note for a Term (entity) (one-liner, analogy, etc).
 - **Export**: rendering Terms/Senses back into ENG-LOG-compatible markdown files (convenience, not source of truth).

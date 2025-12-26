@@ -1,4 +1,5 @@
 import { env, SELF } from 'cloudflare:test';
+import { BUCKET_TITLES, BUCKETS } from '@append/contracts/types';
 import { drizzle } from 'drizzle-orm/d1';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { schema, term, termSense, user } from '../src/db';
@@ -549,13 +550,7 @@ describe('GET /api/export/:bucket', () => {
 	});
 
 	it('works with all valid bucket slugs and titles', async () => {
-		const buckets = [
-			{ slug: 'foundations', title: 'Foundations' },
-			{ slug: 'backend', title: 'Backend' },
-			{ slug: 'frontend', title: 'Frontend' },
-			{ slug: 'dx-tooling', title: 'DX Tooling' },
-			{ slug: 'deep-concepts', title: 'Deep Concepts' },
-		];
+		const buckets = BUCKETS.map((slug) => ({ slug, title: BUCKET_TITLES[slug] }));
 
 		for (const bucket of buckets) {
 			const res = await SELF.fetch(`https://example.com/api/export/${bucket.slug}`, {

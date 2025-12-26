@@ -1,7 +1,9 @@
+import type { Bucket } from '@append/contracts/types';
+import { safeParseBucket } from '@append/contracts/validators';
 import { and, desc, eq, isNull, lt, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
-import { BUCKET, type Bucket, schema, term, termSense } from '../db';
+import { schema, term, termSense } from '../db';
 import { apiError } from '../lib/api-error';
 
 // =============================================================================
@@ -106,10 +108,11 @@ bucketRoutes.get('/:slug', async (c) => {
 	// -------------------------------------------------------------------------
 	// 1. Validate bucket slug
 	// -------------------------------------------------------------------------
-	if (!BUCKET.includes(slug as Bucket)) {
+	const parsedBucket = safeParseBucket(slug);
+	if (!parsedBucket.success) {
 		return apiError(c, 404, 'NOT_FOUND', `Invalid bucket: ${slug}`);
 	}
-	const bucket = slug as Bucket;
+	const bucket: Bucket = parsedBucket.output;
 
 	// -------------------------------------------------------------------------
 	// 2. Parse and validate query params

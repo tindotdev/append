@@ -1,9 +1,9 @@
+import type { Bucket } from '@append/contracts/types';
 import { and, asc, count, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
 import {
 	type BatchStatus,
-	type Bucket,
 	batch,
 	candidate,
 	idempotencyKey,

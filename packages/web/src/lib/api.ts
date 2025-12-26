@@ -1,3 +1,5 @@
+import type { Bucket } from '@append/contracts/types';
+
 // API URL - local dev or production
 const API_URL = import.meta.env.DEV ? 'http://localhost:8787' : 'https://api.append.tindev.dev';
 
@@ -51,7 +53,7 @@ export interface CreateBatchResponse {
 }
 
 /** Allowed bucket slugs */
-export type Bucket = 'foundations' | 'backend' | 'frontend' | 'dx-tooling' | 'deep-concepts';
+export type { Bucket };
 
 /** Suggestion generation status */
 export type SuggestionStatus = 'in_progress' | 'done' | 'error';
