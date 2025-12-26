@@ -5,6 +5,7 @@ import { apiError } from "./lib/api-error";
 import { batchRoutes } from "./routes/batch";
 import { bucketRoutes } from "./routes/bucket";
 import { candidateRoutes } from "./routes/candidate";
+import { exportRoutes } from "./routes/export";
 
 type Bindings = {
 	DB: D1Database;
@@ -149,5 +150,6 @@ app.get("/", (c) => c.json({ status: "ok" }));
 app.route("/api/batch", batchRoutes);
 app.route("/api/bucket", bucketRoutes);
 app.route("/api/candidate", candidateRoutes);
+app.route("/api/export", exportRoutes);
 
 export default app;
