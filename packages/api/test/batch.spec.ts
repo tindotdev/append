@@ -380,6 +380,33 @@ describe('POST /api/batch', () => {
 		expect(candidates[2].normalizedTerm).toBe('multiple spaces');
 	});
 
+	it("rejects terms containing ': '", async () => {
+		const terms = [
+			"valid term",
+			"HTTP: Protocol", // Contains ': ' - should be rejected
+			...Array.from({ length: 23 }, (_, i) => `term-${i}`),
+		].join("\n");
+
+		const res = await SELF.fetch("https://example.com/api/batch", {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms,
+				clientRequestId: generateUUID(),
+			}),
+		});
+
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe("VALIDATION_ERROR");
+		expect(body.error.message).toBe(
+			"Term at line 2 contains ': ' which is not allowed"
+		);
+	});
+
 	it('preserves duplicates as distinct candidates', async () => {
 		const terms = ['duplicate-term', 'duplicate-term', 'duplicate-term', ...Array.from({ length: 22 }, (_, i) => `unique-term-${i}`)].join(
 			'\n',

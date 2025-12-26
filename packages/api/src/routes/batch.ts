@@ -156,7 +156,7 @@ batchRoutes.post("/", async (c) => {
 		);
 	}
 
-	// Check per-line length
+	// Check per-line length and content
 	for (let i = 0; i < termLines.length; i++) {
 		if (termLines[i].length > MAX_TERM_LENGTH) {
 			return apiError(
@@ -164,6 +164,15 @@ batchRoutes.post("/", async (c) => {
 				400,
 				"VALIDATION_ERROR",
 				`Term at line ${i + 1} exceeds ${MAX_TERM_LENGTH} characters`
+			);
+		}
+		// Reject ': ' in terms to ensure unambiguous export delimiter
+		if (termLines[i].includes(": ")) {
+			return apiError(
+				c,
+				400,
+				"VALIDATION_ERROR",
+				`Term at line ${i + 1} contains ': ' which is not allowed`
 			);
 		}
 	}

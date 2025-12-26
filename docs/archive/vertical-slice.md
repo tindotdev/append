@@ -33,6 +33,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
        - parse terms: split on `\r?\n` → trim each line → drop empty lines
        - candidate count must be 20–200 (inclusive)
        - each term max length: 200 characters
+       - each term must not contain `: ` (colon-space); if any line contains `: `, return `400 VALIDATION_ERROR` with message `"Term at line N contains ': ' which is not allowed"` (enforces unambiguous export delimiter)
      - Response:
        - `201` with `{ id, candidateCount }` on first create
        - `200` with the same `{ id, candidateCount }` on idempotent replay (same `clientRequestId` + same normalized terms payload)
@@ -241,7 +242,7 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
      - `400 VALIDATION_ERROR` (invalid `limit` or invalid/unparseable `cursor`)
      - `401 UNAUTHORIZED`
      - `404 NOT_FOUND` (invalid bucket slug)
-7. [ ] **Export page**
+7. [x] **Export page**
    - Route: `/export` (authenticated; lives under protected layout; ADR 0005).
    - Export format is markdown, one file per bucket, using the primary sense for each term.
    - API (explicit):
@@ -251,7 +252,12 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
        - `content-type: text/markdown; charset=utf-8`
        - `content-disposition: attachment; filename=\"{bucket}.md\"`
    - Response body (explicit):
-     - Export includes only terms that have a `primary_sense_id` and whose **primary sense bucket** equals `:bucket`.
+     - Export includes only terms that:
+       - belong to the authenticated user (`term.user_id = session.user.id`)
+       - are not archived (`term.archived_at IS NULL`)
+       - have a `primary_sense_id` (enforced by join)
+       - whose primary sense is not archived (`term_sense.archived_at IS NULL`)
+       - whose primary sense bucket equals `:bucket`
      - First line: `# {Bucket Title}` with this exact mapping:
        - `foundations` → `Foundations`
        - `backend` → `Backend`
@@ -259,20 +265,26 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
        - `dx-tooling` → `DX Tooling`
        - `deep-concepts` → `Deep Concepts`
        - Blank line
-       - Then one bullet per exported item: `- {displayTerm}: {primarySenseText}` where `{primarySenseText}` is the stored `term_sense.text` for the term’s primary sense.
+       - Then one bullet per exported item: `- {displayTerm}: {primarySenseText}` where `{primarySenseText}` is the stored `term_sense.text` for the term's primary sense.
        - File ends with a trailing newline (`\n`).
+   - Delimiter rule (explicit):
+     - The export format uses the first `: ` (colon-space) as the delimiter between term and definition.
+     - To guarantee unambiguous round-trip parsing, `display_term` must not contain `: ` (enforced by `POST /api/batch` validation).
+     - Definitions may contain `: ` freely.
    - Ordering (explicit, deterministic):
      - Export order is `primarySense.createdAt ASC`, then `termId ASC` as a tiebreaker.
    - Download behavior (explicit):
-     - The UI triggers 5 downloads by calling the export endpoint once per bucket in this fixed order:
-       - `foundations`, `backend`, `frontend`, `dx-tooling`, `deep-concepts`
+     - The UI provides per-bucket download buttons and a "Download all (5 files)" action.
+     - Downloads are triggered on explicit user click (not page-load).
+     - "Download all" downloads sequentially in this fixed order: `foundations`, `backend`, `frontend`, `dx-tooling`, `deep-concepts`.
+     - "Download all" continues on failure and shows a per-bucket result summary (success/failure).
    - Error responses:
      - `401 UNAUTHORIZED`
      - `404 NOT_FOUND` (invalid bucket slug)
 
 ## Current focus
 
-\*\*Step 7: Export page
+All steps complete. Vertical slice is feature-complete.
 
 ## Done criteria
 
