@@ -12,6 +12,11 @@
 - LLM provider/model: OpenAI `gpt-5-mini` via Cloudflare AI Gateway (ADR: `docs/adr/0006-openai-gpt-5-mini-via-ai-gateway.md`).
 - Step 3 suggestion storage: latest suggestion fields live on `Candidate` + per-term cache (ADR: `docs/adr/0007-step-3-suggestions-on-candidate-plus-cache.md`).
 
+## Current stage
+
+- Vertical slice steps 1–7 are complete and archived.
+- Focus: review all slices, refresh UI, and refactor where needed without changing locked decisions.
+
 ## Phase 1 — Domain (storage-agnostic)
 
 ### Glossary

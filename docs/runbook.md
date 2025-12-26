@@ -110,6 +110,17 @@ Process:
 4. Create a GitHub Release (optional, recommended for notes):
    - `gh release create vX.Y.Z --generate-notes`
 
+## Review pass (post-slice)
+
+When reviewing all 7 slices, keep the archived vertical-slice contract as the baseline.
+
+Checklist:
+
+1. Re-verify critical flows: capture → suggest → review → accept-all → bucket feed → export.
+2. Confirm API contracts still match `docs/archive/vertical-slice.md` (request/response shapes, error codes, status transitions).
+3. Spot-check UI for the "calm by default" feed and explicit review affordances.
+4. If refactoring touches API behavior, update docs and add a targeted regression test.
+
 ## Migrations
 
 - Better Auth schema changes:
