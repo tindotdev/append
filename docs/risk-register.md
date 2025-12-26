@@ -8,6 +8,8 @@
   - Mitigation: unique canonical `Term`, store duplicates as `TermSense` attachments; flag bucket conflicts for review.
 - Silent overwrites from multi-device usage.
   - Mitigation: optimistic locking on candidate edits.
+- Refactor regressions while consolidating slice flows (accept/suggest/edit contracts drift).
+  - Mitigation: re-run vertical-slice checks, keep API contracts in `docs/archive/vertical-slice.md` in sync, add targeted tests for edits/accept-all.
 - Import ambiguity (non-bullets, multi-line bullets, malformed markdown).
   - Mitigation: preview step + explicit “skip/convert” rules.
 
@@ -17,6 +19,8 @@
   - Mitigation: start with Google-only; keep auth surface small.
 - Client/server type drift (SPA ↔ Worker API).
   - Mitigation: optional Hono RPC or shared type package; keep API surface small early.
+- UI refresh scope creep during review pass.
+  - Mitigation: track changes against vertical-slice UI contracts; defer new features to a milestone.
 - Scope creep on “code explanation” and transcription.
   - Mitigation: ship text-only explanations first; add audio later as a separate milestone.
 

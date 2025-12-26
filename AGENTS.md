@@ -24,11 +24,19 @@
 - ADR 0003: Bucket feed shows primary sense by default (expand; “Needs review” view)
 - ADR 0004: SPA (React + TanStack Router) + Hono on Workers (no SSR)
 - ADR 0005: Web auth gating via protected layout route
+- ADR 0006: OpenAI `gpt-5-mini` via Cloudflare AI Gateway
+- ADR 0007: Step 3 suggestions stored on `candidate` + per-term cache
+- ADR 0008: Accept-all idempotency via candidate materialization pointers
 
 ## Working mode
 
 - Implement by milestones starting at `docs/build-plan.md` and keep `docs/vertical-slice.md` runnable ASAP.
 - Any material decision change → add a new ADR in `docs/adr/` and mark the old one “Superseded” (avoid rewriting history).
+
+## Current stage
+
+- Vertical slice step 7 is complete and archived.
+- Focus: review all 7 slices, refresh UI, and refactor where needed.
 
 ## Engineering defaults (unless an ADR says otherwise)
 

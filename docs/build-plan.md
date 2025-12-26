@@ -1,5 +1,10 @@
 # Append — Build plan (milestones)
 
+## Current stage
+
+- Vertical slice steps 1–7 are complete and archived (see `docs/archive/vertical-slice.md`).
+- Focus now: review all slices, refresh UI, and refactor where needed.
+
 ## Milestone 1 — Canonical log entries (no AI, no import)
 
 - Google SSO login.

@@ -284,7 +284,8 @@ Ship a usable "off-load the brain" flow end-to-end, with canonical storage insid
 
 ## Current focus
 
-All steps complete. Vertical slice is feature-complete.
+All steps complete. Vertical slice is archived and feature-complete.
+Current work: review all 7 slices, refresh UI, and refactor as needed.
 
 ## Done criteria
 
