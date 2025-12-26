@@ -5,8 +5,7 @@
   "scripts": {
     "dev": "vite --port 5173",
     "build": "vite build && tsc",
-    "preview": "vite preview",
-    "test": "vitest run"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@tanstack/react-router": "^1.132.0",
