@@ -1,8 +1,8 @@
-import { Hono } from "hono";
-import { drizzle } from "drizzle-orm/d1";
-import { eq, and, isNull, lt, or, desc } from "drizzle-orm";
-import { apiError } from "../lib/api-error";
-import { schema, term, termSense, BUCKET, type Bucket } from "../db";
+import { and, desc, eq, isNull, lt, or } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/d1';
+import { Hono } from 'hono';
+import { BUCKET, type Bucket, schema, term, termSense } from '../db';
+import { apiError } from '../lib/api-error';
 
 // =============================================================================
 // Constants
@@ -56,28 +56,23 @@ function encodeCursor(payload: CursorPayload): string {
 	const bytes = new TextEncoder().encode(json);
 	const base64 = btoa(String.fromCharCode(...bytes));
 	// Convert to base64url (no padding)
-	return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+	return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 function decodeCursor(cursor: string): CursorPayload | null {
 	try {
 		// Convert from base64url to base64
-		let base64 = cursor.replace(/-/g, "+").replace(/_/g, "/");
+		let base64 = cursor.replace(/-/g, '+').replace(/_/g, '/');
 		// Add padding if needed
 		while (base64.length % 4 !== 0) {
-			base64 += "=";
+			base64 += '=';
 		}
 		const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 		const json = new TextDecoder().decode(bytes);
 		const parsed = JSON.parse(json);
 
 		// Validate shape
-		if (
-			typeof parsed !== "object" ||
-			parsed === null ||
-			typeof parsed.createdAt !== "number" ||
-			typeof parsed.termId !== "string"
-		) {
+		if (typeof parsed !== 'object' || parsed === null || typeof parsed.createdAt !== 'number' || typeof parsed.termId !== 'string') {
 			return null;
 		}
 
@@ -103,51 +98,41 @@ const bucketRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
  * Response 200: { bucket, items, nextCursor }
  * Errors: 400, 401, 404
  */
-bucketRoutes.get("/:slug", async (c) => {
-	const userId = c.get("userId");
-	const slug = c.req.param("slug");
+bucketRoutes.get('/:slug', async (c) => {
+	const userId = c.get('userId');
+	const slug = c.req.param('slug');
 	const db = drizzle(c.env.DB, { schema });
 
 	// -------------------------------------------------------------------------
 	// 1. Validate bucket slug
 	// -------------------------------------------------------------------------
 	if (!BUCKET.includes(slug as Bucket)) {
-		return apiError(c, 404, "NOT_FOUND", `Invalid bucket: ${slug}`);
+		return apiError(c, 404, 'NOT_FOUND', `Invalid bucket: ${slug}`);
 	}
 	const bucket = slug as Bucket;
 
 	// -------------------------------------------------------------------------
 	// 2. Parse and validate query params
 	// -------------------------------------------------------------------------
-	const limitParam = c.req.query("limit");
+	const limitParam = c.req.query('limit');
 	let limit = DEFAULT_LIMIT;
 	if (limitParam !== undefined) {
 		const parsed = parseInt(limitParam, 10);
 		if (isNaN(parsed) || !Number.isInteger(parsed)) {
-			return apiError(
-				c,
-				400,
-				"VALIDATION_ERROR",
-				"limit must be an integer"
-			);
+			return apiError(c, 400, 'VALIDATION_ERROR', 'limit must be an integer');
 		}
 		if (parsed < MIN_LIMIT || parsed > MAX_LIMIT) {
-			return apiError(
-				c,
-				400,
-				"VALIDATION_ERROR",
-				`limit must be between ${MIN_LIMIT} and ${MAX_LIMIT}`
-			);
+			return apiError(c, 400, 'VALIDATION_ERROR', `limit must be between ${MIN_LIMIT} and ${MAX_LIMIT}`);
 		}
 		limit = parsed;
 	}
 
-	const cursorParam = c.req.query("cursor");
+	const cursorParam = c.req.query('cursor');
 	let cursor: CursorPayload | null = null;
-	if (cursorParam !== undefined && cursorParam !== "") {
+	if (cursorParam !== undefined && cursorParam !== '') {
 		cursor = decodeCursor(cursorParam);
 		if (cursor === null) {
-			return apiError(c, 400, "VALIDATION_ERROR", "Invalid cursor");
+			return apiError(c, 400, 'VALIDATION_ERROR', 'Invalid cursor');
 		}
 	}
 
@@ -163,12 +148,7 @@ bucketRoutes.get("/:slug", async (c) => {
 	// - term.archived_at IS NULL
 	// - term_sense.bucket = bucket
 	// - term_sense.archived_at IS NULL
-	const baseConditions = and(
-		eq(term.userId, userId),
-		isNull(term.archivedAt),
-		eq(termSense.bucket, bucket),
-		isNull(termSense.archivedAt)
-	);
+	const baseConditions = and(eq(term.userId, userId), isNull(term.archivedAt), eq(termSense.bucket, bucket), isNull(termSense.archivedAt));
 
 	// Build the full WHERE clause with optional cursor pagination
 	let whereClause;
@@ -179,10 +159,7 @@ bucketRoutes.get("/:slug", async (c) => {
 			baseConditions,
 			or(
 				lt(termSense.createdAt, new Date(cursor.createdAt)),
-				and(
-					eq(termSense.createdAt, new Date(cursor.createdAt)),
-					lt(term.id, cursor.termId)
-				)
+				and(eq(termSense.createdAt, new Date(cursor.createdAt)), lt(term.id, cursor.termId))
 			)
 		);
 	} else {

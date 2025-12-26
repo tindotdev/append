@@ -1,8 +1,8 @@
-import { Hono } from "hono";
-import { drizzle } from "drizzle-orm/d1";
-import { eq, and, isNull, asc } from "drizzle-orm";
-import { apiError } from "../lib/api-error";
-import { schema, term, termSense, BUCKET, type Bucket } from "../db";
+import { and, asc, eq, isNull } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/d1';
+import { Hono } from 'hono';
+import { BUCKET, type Bucket, schema, term, termSense } from '../db';
+import { apiError } from '../lib/api-error';
 
 // =============================================================================
 // Constants
@@ -10,11 +10,11 @@ import { schema, term, termSense, BUCKET, type Bucket } from "../db";
 
 /** Mapping from bucket slug to display title */
 const BUCKET_TITLES: Record<Bucket, string> = {
-	foundations: "Foundations",
-	backend: "Backend",
-	frontend: "Frontend",
-	"dx-tooling": "DX Tooling",
-	"deep-concepts": "Deep Concepts",
+	foundations: 'Foundations',
+	backend: 'Backend',
+	frontend: 'Frontend',
+	'dx-tooling': 'DX Tooling',
+	'deep-concepts': 'Deep Concepts',
 };
 
 // =============================================================================
@@ -56,16 +56,16 @@ const exportRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
  * - term_sense.archived_at IS NULL
  * - term_sense.bucket = :bucket
  */
-exportRoutes.get("/:bucket", async (c) => {
-	const userId = c.get("userId");
-	const bucketParam = c.req.param("bucket");
+exportRoutes.get('/:bucket', async (c) => {
+	const userId = c.get('userId');
+	const bucketParam = c.req.param('bucket');
 	const db = drizzle(c.env.DB, { schema });
 
 	// -------------------------------------------------------------------------
 	// 1. Validate bucket param
 	// -------------------------------------------------------------------------
 	if (!BUCKET.includes(bucketParam as Bucket)) {
-		return apiError(c, 404, "NOT_FOUND", `Invalid bucket: ${bucketParam}`);
+		return apiError(c, 404, 'NOT_FOUND', `Invalid bucket: ${bucketParam}`);
 	}
 	const bucket = bucketParam as Bucket;
 
@@ -81,28 +81,21 @@ exportRoutes.get("/:bucket", async (c) => {
 		})
 		.from(term)
 		.innerJoin(termSense, eq(term.primarySenseId, termSense.id))
-		.where(
-			and(
-				eq(term.userId, userId),
-				isNull(term.archivedAt),
-				eq(termSense.bucket, bucket),
-				isNull(termSense.archivedAt)
-			)
-		)
+		.where(and(eq(term.userId, userId), isNull(term.archivedAt), eq(termSense.bucket, bucket), isNull(termSense.archivedAt)))
 		.orderBy(asc(termSense.createdAt), asc(term.id));
 
 	// -------------------------------------------------------------------------
 	// 3. Generate markdown content
 	// -------------------------------------------------------------------------
 	const title = BUCKET_TITLES[bucket];
-	const lines: string[] = [`# ${title}`, ""];
+	const lines: string[] = [`# ${title}`, ''];
 
 	for (const row of rows) {
 		lines.push(`- ${row.displayTerm}: ${row.senseText}`);
 	}
 
 	// Add trailing newline
-	const markdown = lines.join("\n") + "\n";
+	const markdown = lines.join('\n') + '\n';
 
 	// -------------------------------------------------------------------------
 	// 4. Return response with correct headers
@@ -110,8 +103,8 @@ exportRoutes.get("/:bucket", async (c) => {
 	return new Response(markdown, {
 		status: 200,
 		headers: {
-			"content-type": "text/markdown; charset=utf-8",
-			"content-disposition": `attachment; filename="${bucket}.md"`,
+			'content-type': 'text/markdown; charset=utf-8',
+			'content-disposition': `attachment; filename="${bucket}.md"`,
 		},
 	});
 });

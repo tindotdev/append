@@ -1,11 +1,11 @@
-import type { D1Database, IncomingRequestCfProperties } from "@cloudflare/workers-types";
-import { betterAuth } from "better-auth";
-import { withCloudflare } from "better-auth-cloudflare";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { drizzle } from "drizzle-orm/d1";
-import { eq } from "drizzle-orm";
-import { APIError } from "better-auth/api";
-import { schema, user } from "../../db";
+import type { D1Database, IncomingRequestCfProperties } from '@cloudflare/workers-types';
+import { betterAuth } from 'better-auth';
+import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { APIError } from 'better-auth/api';
+import { withCloudflare } from 'better-auth-cloudflare';
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/d1';
+import { schema, type user } from '../../db';
 
 type Env = {
 	DB: D1Database;
@@ -51,8 +51,8 @@ function isUserAllowed(env: Env, userEmail: string, accountId?: string): boolean
 
 function assertAllowlistConfigured(env: Env): void {
 	if (!env.ALLOWED_SUB && !env.ALLOWED_EMAIL) {
-		throw new APIError("FORBIDDEN", {
-			message: "Access denied: allowlist not configured",
+		throw new APIError('FORBIDDEN', {
+			message: 'Access denied: allowlist not configured',
 		});
 	}
 }
@@ -63,8 +63,8 @@ function assertAllowlistConfigured(env: Env): void {
  */
 function isEmailPasswordAuthEnabled(env?: Env): boolean {
 	if (!env) return false;
-	if (env.ENABLE_TEST_EMAIL_PASSWORD_AUTH !== "1") return false;
-	if (!env.BETTER_AUTH_URL?.startsWith("http://localhost")) return false;
+	if (env.ENABLE_TEST_EMAIL_PASSWORD_AUTH !== '1') return false;
+	if (!env.BETTER_AUTH_URL?.startsWith('http://localhost')) return false;
 	return true;
 }
 
@@ -88,15 +88,15 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 					: undefined,
 			},
 			{
-				appName: "append",
+				appName: 'append',
 				secret: env?.BETTER_AUTH_SECRET,
 				baseURL: env?.BETTER_AUTH_URL,
-				basePath: "/auth",
-				trustedOrigins: ["http://localhost:5173", "https://append.tindev.dev"],
+				basePath: '/auth',
+				trustedOrigins: ['http://localhost:5173', 'https://append.tindev.dev'],
 				socialProviders: {
 					google: {
-						clientId: env?.GOOGLE_CLIENT_ID || "",
-						clientSecret: env?.GOOGLE_CLIENT_SECRET || "",
+						clientId: env?.GOOGLE_CLIENT_ID || '',
+						clientSecret: env?.GOOGLE_CLIENT_SECRET || '',
 					},
 				},
 				// Email/password auth for test environment only (§5.2)
@@ -118,8 +118,8 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 							before: async (user) => {
 								assertAllowlistConfigured(env);
 								if (!user.email) {
-									throw new APIError("FORBIDDEN", {
-										message: "Access denied: email not provided",
+									throw new APIError('FORBIDDEN', {
+										message: 'Access denied: email not provided',
 									});
 								}
 
@@ -128,8 +128,8 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 								// If only ALLOWED_EMAIL is set, check here
 								if (!env.ALLOWED_SUB && env.ALLOWED_EMAIL) {
 									if (!isUserAllowed(env, user.email)) {
-										throw new APIError("FORBIDDEN", {
-											message: "Access denied: not on allowlist",
+										throw new APIError('FORBIDDEN', {
+											message: 'Access denied: not on allowlist',
 										});
 									}
 								}
@@ -143,10 +143,10 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 								assertAllowlistConfigured(env);
 
 								// Google: enforce sub allowlist if configured (ADR 0001 primary rule)
-								if (account.providerId === "google" && env.ALLOWED_SUB) {
+								if (account.providerId === 'google' && env.ALLOWED_SUB) {
 									if (!account.accountId || account.accountId !== env.ALLOWED_SUB) {
-										throw new APIError("FORBIDDEN", {
-											message: "Access denied: not on allowlist",
+										throw new APIError('FORBIDDEN', {
+											message: 'Access denied: not on allowlist',
 										});
 									}
 									return;
@@ -155,8 +155,8 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 								// Non-Google providers: sub allowlist does not apply.
 								// Require ALLOWED_EMAIL match (fail closed if missing).
 								if (!env.ALLOWED_EMAIL) {
-									throw new APIError("FORBIDDEN", {
-										message: "Access denied: email allowlist required",
+									throw new APIError('FORBIDDEN', {
+										message: 'Access denied: email allowlist required',
 									});
 								}
 
@@ -166,8 +166,8 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 								});
 
 								if (!userRow?.email || !isEmailAllowed(env, userRow.email)) {
-									throw new APIError("FORBIDDEN", {
-										message: "Access denied: not on allowlist",
+									throw new APIError('FORBIDDEN', {
+										message: 'Access denied: not on allowlist',
 									});
 								}
 							},
@@ -180,7 +180,7 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 			? {}
 			: {
 					database: drizzleAdapter({} as D1Database, {
-						provider: "sqlite",
+						provider: 'sqlite',
 					}),
 				}),
 	});

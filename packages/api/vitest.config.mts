@@ -6,7 +6,7 @@ export default defineWorkersConfig({
 			workers: {
 				wrangler: {
 					configPath: './wrangler.jsonc',
-					environment: 'test',  // Use test environment with email/password auth (§5.2)
+					environment: 'test', // Use test environment with email/password auth (§5.2)
 				},
 				// Override .dev.vars with test-specific values
 				miniflare: {

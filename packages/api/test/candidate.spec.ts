@@ -1,8 +1,8 @@
 import { env, SELF } from 'cloudflare:test';
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { schema, batch, candidate, idempotencyKey, user } from '../src/db';
+import { drizzle } from 'drizzle-orm/d1';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { batch, candidate, idempotencyKey, schema, user } from '../src/db';
 import { applyMigrations } from './setup';
 
 // =============================================================================

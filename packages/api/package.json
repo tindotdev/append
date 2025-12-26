@@ -7,6 +7,7 @@
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"test": "vitest",
+		"typecheck": "tsc --noEmit",
 		"cf-typegen": "wrangler types",
 		"auth:generate": "pnpm dlx @better-auth/cli generate --config ./src/lib/auth/index.ts --output ./src/db/auth.schema.ts -y",
 		"db:generate": "drizzle-kit generate",

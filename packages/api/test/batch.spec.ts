@@ -1,8 +1,8 @@
 import { env, SELF } from 'cloudflare:test';
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { schema, batch, candidate, idempotencyKey, user, term, termSense } from '../src/db';
+import { drizzle } from 'drizzle-orm/d1';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { batch, candidate, idempotencyKey, schema, term, termSense, user } from '../src/db';
 import { applyMigrations } from './setup';
 
 // =============================================================================
@@ -382,15 +382,15 @@ describe('POST /api/batch', () => {
 
 	it("rejects terms containing ': '", async () => {
 		const terms = [
-			"valid term",
-			"HTTP: Protocol", // Contains ': ' - should be rejected
+			'valid term',
+			'HTTP: Protocol', // Contains ': ' - should be rejected
 			...Array.from({ length: 23 }, (_, i) => `term-${i}`),
-		].join("\n");
+		].join('\n');
 
-		const res = await SELF.fetch("https://example.com/api/batch", {
-			method: "POST",
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
 			headers: {
-				"content-type": "application/json",
+				'content-type': 'application/json',
 				cookie: authCookie,
 			},
 			body: JSON.stringify({
@@ -401,15 +401,13 @@ describe('POST /api/batch', () => {
 
 		expect(res.status).toBe(400);
 		const body = (await res.json()) as any;
-		expect(body.error.code).toBe("VALIDATION_ERROR");
-		expect(body.error.message).toBe(
-			"Term at line 2 contains ': ' which is not allowed"
-		);
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+		expect(body.error.message).toBe("Term at line 2 contains ': ' which is not allowed");
 	});
 
 	it('preserves duplicates as distinct candidates', async () => {
 		const terms = ['duplicate-term', 'duplicate-term', 'duplicate-term', ...Array.from({ length: 22 }, (_, i) => `unique-term-${i}`)].join(
-			'\n',
+			'\n'
 		);
 
 		const res = await SELF.fetch('https://example.com/api/batch', {
@@ -1113,10 +1111,7 @@ describe('POST /api/batch/:id/accept', () => {
 
 		// Set a different bucket than the primary sense
 		const differentBucket = firstSense.bucket === 'foundations' ? 'backend' : 'foundations';
-		await db
-			.update(candidate)
-			.set({ chosenBucket: differentBucket })
-			.where(eq(candidate.id, conflictingCandidate.id));
+		await db.update(candidate).set({ chosenBucket: differentBucket }).where(eq(candidate.id, conflictingCandidate.id));
 
 		// Accept second batch
 		const res2 = await SELF.fetch(`https://example.com/api/batch/${batchId2}/accept`, {

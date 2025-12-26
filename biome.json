@@ -1,0 +1,126 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true,
+		"defaultBranch": "main"
+	},
+	"files": {
+		"includes": [
+			"**",
+			"!node_modules",
+			"!dist",
+			"!.turbo",
+			"!.wrangler",
+			"!.wrangler-home",
+			"!.pnpm",
+			"!.pnpm-store",
+			"!**/routeTree.gen.ts",
+			"!**/worker-configuration.d.ts",
+			"!**/.vite",
+			"!**/.mf",
+			"!**/.cache",
+			"!**/drizzle/meta/*.json"
+		],
+		"ignoreUnknown": true
+	},
+	"formatter": {
+		"enabled": true,
+		"formatWithErrors": false,
+		"indentStyle": "tab",
+		"indentWidth": 1,
+		"lineWidth": 140,
+		"lineEnding": "lf"
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"a11y": {
+				"useButtonType": "warn",
+				"useKeyWithClickEvents": "warn"
+			},
+			"complexity": {
+				"noExcessiveCognitiveComplexity": "warn",
+				"noForEach": "off"
+			},
+			"correctness": {
+				"noUnusedVariables": "error",
+				"useHookAtTopLevel": "error"
+			},
+			"performance": {
+				"noAccumulatingSpread": "warn"
+			},
+			"style": {
+				"noNonNullAssertion": "warn",
+				"useTemplate": "warn"
+			},
+			"suspicious": {
+				"noConsole": "off",
+				"noExplicitAny": "warn"
+			}
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "single",
+			"semicolons": "always",
+			"trailingCommas": "es5",
+			"arrowParentheses": "always"
+		}
+	},
+	"json": {
+		"formatter": {
+			"enabled": true,
+			"indentStyle": "tab"
+		},
+		"parser": {
+			"allowComments": true,
+			"allowTrailingCommas": true
+		}
+	},
+	"css": {
+		"parser": {
+			"cssModules": false,
+			"tailwindDirectives": true
+		},
+		"formatter": {
+			"enabled": true,
+			"indentStyle": "tab",
+			"lineWidth": 140
+		}
+	},
+	"overrides": [
+		{
+			"includes": ["packages/web/src/**/*.tsx", "packages/web/src/**/*.jsx"],
+			"linter": {
+				"rules": {
+					"a11y": {
+						"useButtonType": "error"
+					},
+					"correctness": {
+						"useExhaustiveDependencies": "warn",
+						"useHookAtTopLevel": "error"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["**/*.jsonc", "**/wrangler.jsonc"],
+			"json": {
+				"parser": {
+					"allowComments": true
+				}
+			}
+		}
+	],
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	}
+}
