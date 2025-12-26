@@ -17,6 +17,7 @@ import { SignInPage } from "./pages/SignInPage";
 import { BatchNewPage } from "./pages/BatchNewPage";
 import { BatchDetailPage } from "./pages/BatchDetailPage";
 import { BucketFeedPage } from "./pages/BucketFeedPage";
+import { ExportPage } from "./pages/ExportPage";
 
 // Router context type
 interface RouterContext {
@@ -94,10 +95,17 @@ const bucketFeedRoute = createRoute({
   component: BucketFeedPage,
 });
 
+// Export route (protected)
+const exportRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/export",
+  component: ExportPage,
+});
+
 // Build route tree
 const routeTree = rootRoute.addChildren([
   signInRoute,
-  protectedRoute.addChildren([indexRoute, batchNewRoute, batchDetailRoute, bucketFeedRoute]),
+  protectedRoute.addChildren([indexRoute, batchNewRoute, batchDetailRoute, bucketFeedRoute, exportRoute]),
 ]);
 
 const router = createRouter({
