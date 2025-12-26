@@ -3,7 +3,7 @@
  * Provides stub and OpenAI implementations for generating bucket + one-liner suggestions.
  */
 
-import { BUCKET, type Bucket } from '../db/domain.schema';
+import { BUCKET_LIST, BUCKETS, type Bucket, isBucket } from '@append/contracts/types';
 
 // =============================================================================
 // Constants
@@ -25,7 +25,7 @@ export const MAX_TEXT_LENGTH = 500;
 
 const SYSTEM_PROMPT_V1 = `You generate suggestions for a personal vocabulary app. Output MUST be valid JSON with exactly two keys: "bucket" and "text".
 Rules:
-- "bucket" MUST be exactly one of: foundations, backend, frontend, dx-tooling, deep-concepts
+- "bucket" MUST be exactly one of: ${BUCKET_LIST}
 - "text" MUST be a single line (no newline characters) and MUST be <= 500 characters
 - Do not include markdown, code fences, explanations, or any extra keys`;
 
@@ -92,7 +92,7 @@ export function validateSuggestion(raw: unknown): SuggestionOutcome {
 	}
 
 	const bucket = obj.bucket as string;
-	if (!BUCKET.includes(bucket as Bucket)) {
+	if (!isBucket(bucket)) {
 		return {
 			success: false,
 			error: {
@@ -159,8 +159,8 @@ function simpleHash(str: string): number {
  * Stub suggestion generator - deterministic based on normalized term.
  */
 export function generateStubSuggestion(normalizedTerm: string): SuggestionResult {
-	const bucketIndex = simpleHash(normalizedTerm) % BUCKET.length;
-	const bucket = BUCKET[bucketIndex];
+	const bucketIndex = simpleHash(normalizedTerm) % BUCKETS.length;
+	const bucket = BUCKETS[bucketIndex];
 	const text = `One-liner for: ${normalizedTerm}`;
 
 	return { bucket, text };

@@ -1,4 +1,5 @@
 import { env, SELF } from 'cloudflare:test';
+import { BUCKETS } from '@append/contracts/types';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -503,7 +504,7 @@ describe('POST /api/batch/:id/suggest', () => {
 		}
 
 		// Verify buckets are one of the valid options
-		const validBuckets = ['foundations', 'backend', 'frontend', 'dx-tooling', 'deep-concepts'];
+		const validBuckets = BUCKETS;
 		for (const cand of candidates) {
 			expect(validBuckets).toContain(cand.suggestedBucket);
 		}

@@ -1,3 +1,4 @@
+import { BUCKETS, type Bucket } from '@append/contracts/types';
 import { sql } from 'drizzle-orm';
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { user } from './auth.schema';
@@ -10,9 +11,7 @@ import { user } from './auth.schema';
 export const BATCH_STATUS = ['captured', 'suggested', 'accepted'] as const;
 export type BatchStatus = (typeof BATCH_STATUS)[number];
 
-/** Knowledge domain buckets */
-export const BUCKET = ['foundations', 'backend', 'frontend', 'dx-tooling', 'deep-concepts'] as const;
-export type Bucket = (typeof BUCKET)[number];
+const BUCKETS_SQL = sql.raw(BUCKETS.map((bucket) => `'${bucket}'`).join(', '));
 
 /** Suggestion generation status */
 export const SUGGESTION_STATUS = ['in_progress', 'done', 'error'] as const;
@@ -106,14 +105,8 @@ export const candidate = sqliteTable(
 		uniqueIndex('candidate_batch_position_unique').on(table.batchId, table.position),
 		index('candidate_suggestion_lookup_idx').on(table.batchId, table.suggestionStatus, table.suggestionAttempts),
 		check('candidate_status_check', sql`${table.status} IN ('captured', 'suggested', 'accepted')`),
-		check(
-			'candidate_chosen_bucket_check',
-			sql`${table.chosenBucket} IS NULL OR ${table.chosenBucket} IN ('foundations', 'backend', 'frontend', 'dx-tooling', 'deep-concepts')`
-		),
-		check(
-			'candidate_suggested_bucket_check',
-			sql`${table.suggestedBucket} IS NULL OR ${table.suggestedBucket} IN ('foundations', 'backend', 'frontend', 'dx-tooling', 'deep-concepts')`
-		),
+		check('candidate_chosen_bucket_check', sql`${table.chosenBucket} IS NULL OR ${table.chosenBucket} IN (${BUCKETS_SQL})`),
+		check('candidate_suggested_bucket_check', sql`${table.suggestedBucket} IS NULL OR ${table.suggestedBucket} IN (${BUCKETS_SQL})`),
 		check(
 			'candidate_suggestion_status_check',
 			sql`${table.suggestionStatus} IS NULL OR ${table.suggestionStatus} IN ('in_progress', 'done', 'error')`
@@ -162,7 +155,7 @@ export const termSense = sqliteTable(
 	},
 	(table) => [
 		index('term_sense_term_created_idx').on(table.termId, table.createdAt),
-		check('term_sense_bucket_check', sql`${table.bucket} IN ('foundations', 'backend', 'frontend', 'dx-tooling', 'deep-concepts')`),
+		check('term_sense_bucket_check', sql`${table.bucket} IN (${BUCKETS_SQL})`),
 		check('term_sense_source_check', sql`${table.source} IN ('manual', 'batch', 'import')`),
 	]
 );
@@ -211,9 +204,6 @@ export const suggestionCache = sqliteTable(
 	},
 	(table) => [
 		uniqueIndex('suggestion_cache_user_term_model_version_unique').on(table.userId, table.normalizedTerm, table.model, table.promptVersion),
-		check(
-			'suggestion_cache_bucket_check',
-			sql`${table.suggestedBucket} IN ('foundations', 'backend', 'frontend', 'dx-tooling', 'deep-concepts')`
-		),
+		check('suggestion_cache_bucket_check', sql`${table.suggestedBucket} IN (${BUCKETS_SQL})`),
 	]
 );

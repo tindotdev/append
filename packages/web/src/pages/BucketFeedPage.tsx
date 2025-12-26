@@ -1,22 +1,7 @@
+import { BUCKET_TITLES, BUCKETS, isBucket } from '@append/contracts/types';
 import { useParams } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiRequestError, type Bucket, type BucketFeedItem, getBucketFeed } from '../lib/api';
-
-/** Valid bucket slugs */
-const VALID_BUCKETS: Bucket[] = ['foundations', 'backend', 'frontend', 'dx-tooling', 'deep-concepts'];
-
-/** Bucket slug to display title mapping */
-const BUCKET_TITLES: Record<Bucket, string> = {
-	foundations: 'Foundations',
-	backend: 'Backend',
-	frontend: 'Frontend',
-	'dx-tooling': 'DX Tooling',
-	'deep-concepts': 'Deep Concepts',
-};
-
-function isValidBucket(slug: string): slug is Bucket {
-	return VALID_BUCKETS.includes(slug as Bucket);
-}
 
 export function BucketFeedPage() {
 	const { slug } = useParams({ from: '/protected/bucket/$slug' });
@@ -28,18 +13,18 @@ export function BucketFeedPage() {
 	const [error, setError] = useState<string | null>(null);
 
 	// Validate slug
-	if (!isValidBucket(slug)) {
+	if (!isBucket(slug)) {
 		return (
 			<div className="max-w-4xl">
 				<div className="flex flex-col items-center justify-center py-12 text-center">
 					<p className="text-zinc-400">Bucket not found.</p>
-					<p className="text-zinc-500 text-sm mt-2">Valid buckets: {VALID_BUCKETS.join(', ')}</p>
+					<p className="text-zinc-500 text-sm mt-2">Valid buckets: {BUCKETS.join(', ')}</p>
 				</div>
 			</div>
 		);
 	}
 
-	const bucket = slug as Bucket;
+	const bucket: Bucket = slug;
 	const title = BUCKET_TITLES[bucket];
 
 	const fetchInitialPage = useCallback(async () => {

@@ -1,5 +1,9 @@
 # Agent Guide: `append` (lean)
 
+## Commands
+
+- `pnpm -r --if-present typecheck`
+
 ## Source of truth
 
 - Design snapshot: `docs/design.md`

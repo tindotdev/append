@@ -1,4 +1,5 @@
 import { env, SELF } from 'cloudflare:test';
+import { BUCKETS } from '@append/contracts/types';
 import { drizzle } from 'drizzle-orm/d1';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { schema, term, termSense, user } from '../src/db';
@@ -708,9 +709,7 @@ describe('GET /api/bucket/:slug', () => {
 	});
 
 	it('works with all valid bucket slugs', async () => {
-		const buckets = ['foundations', 'backend', 'frontend', 'dx-tooling', 'deep-concepts'];
-
-		for (const bucket of buckets) {
+		for (const bucket of BUCKETS) {
 			const res = await SELF.fetch(`https://example.com/api/bucket/${bucket}`, {
 				headers: { cookie: authCookie },
 			});

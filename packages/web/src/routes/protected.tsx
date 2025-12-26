@@ -5,8 +5,9 @@ import { BatchDetailPage } from '../pages/BatchDetailPage';
 import { BatchNewPage } from '../pages/BatchNewPage';
 import { BucketFeedPage } from '../pages/BucketFeedPage';
 import { ExportPage } from '../pages/ExportPage';
+import { SearchPage } from '../pages/SearchPage';
 
-export function createProtectedRoutes(rootRoute: AnyRoute) {
+export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: TParentRoute) {
 	const protectedRoute = createRoute({
 		getParentRoute: () => rootRoute,
 		id: 'protected',
@@ -50,7 +51,20 @@ export function createProtectedRoutes(rootRoute: AnyRoute) {
 		component: ExportPage,
 	});
 
-	protectedRoute.addChildren([indexRoute, batchNewRoute, batchDetailRoute, bucketFeedRoute, exportRoute]);
+	const searchRoute = createRoute({
+		getParentRoute: () => protectedRoute,
+		path: '/search',
+		component: SearchPage,
+	});
 
-	return { protectedRoute };
+	const protectedRouteWithChildren = protectedRoute.addChildren([
+		indexRoute,
+		batchNewRoute,
+		batchDetailRoute,
+		bucketFeedRoute,
+		exportRoute,
+		searchRoute,
+	]);
+
+	return { protectedRoute: protectedRouteWithChildren };
 }

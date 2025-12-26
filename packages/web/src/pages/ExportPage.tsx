@@ -1,17 +1,6 @@
+import { BUCKET_TITLES, BUCKETS } from '@append/contracts/types';
 import { useState } from 'react';
 import { type Bucket, type DownloadResult, downloadBucketExport } from '../lib/api';
-
-/** Buckets in fixed download order */
-const BUCKETS: Bucket[] = ['foundations', 'backend', 'frontend', 'dx-tooling', 'deep-concepts'];
-
-/** Bucket slug to display title mapping */
-const BUCKET_TITLES: Record<Bucket, string> = {
-	foundations: 'Foundations',
-	backend: 'Backend',
-	frontend: 'Frontend',
-	'dx-tooling': 'DX Tooling',
-	'deep-concepts': 'Deep Concepts',
-};
 
 type BucketResult = DownloadResult | null;
 
@@ -21,16 +10,13 @@ interface ExportState {
 	results: Record<Bucket, BucketResult>;
 }
 
+const emptyResults = (): Record<Bucket, BucketResult> =>
+	Object.fromEntries(BUCKETS.map((bucket) => [bucket, null])) as Record<Bucket, BucketResult>;
+
 const initialState: ExportState = {
 	isDownloading: false,
 	currentBucket: null,
-	results: {
-		foundations: null,
-		backend: null,
-		frontend: null,
-		'dx-tooling': null,
-		'deep-concepts': null,
-	},
+	results: emptyResults(),
 };
 
 export function ExportPage() {
@@ -56,13 +42,14 @@ export function ExportPage() {
 
 	const downloadAll = async () => {
 		// Reset all results
+		const resetResults = emptyResults();
 		setState({
 			isDownloading: true,
 			currentBucket: null,
-			results: initialState.results,
+			results: resetResults,
 		});
 
-		const newResults = { ...initialState.results };
+		const newResults = { ...resetResults };
 
 		// Download sequentially to preserve order
 		for (const bucket of BUCKETS) {
@@ -110,7 +97,7 @@ export function ExportPage() {
 							Downloading {BUCKET_TITLES[state.currentBucket!]}...
 						</>
 					) : (
-						<>Download all (5 files)</>
+						<>Download all ({BUCKETS.length} files)</>
 					)}
 				</button>
 			</div>

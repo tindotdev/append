@@ -5,8 +5,8 @@
 	"type": "module",
 	"scripts": {
 		"dev": "pnpm -r --parallel dev",
-		"dev:api": "pnpm --filter append-api run dev",
-		"dev:web": "pnpm --filter append-web run dev",
+		"dev:api": "pnpm --filter @append/api run dev",
+		"dev:web": "pnpm --filter @append/web run dev",
 		"build": "pnpm -r --if-present build",
 		"typecheck": "pnpm -r --if-present typecheck",
 		"lint": "biome lint --write .",
@@ -14,8 +14,8 @@
 		"check": "biome check --write .",
 		"ci:lint": "biome ci .",
 		"test": "pnpm -r --if-present test",
-		"test:api": "pnpm --filter append-api test",
-		"deploy:api": "pnpm --filter append-api run deploy",
+		"test:api": "pnpm --filter @append/api test",
+		"deploy:api": "pnpm --filter @append/api run deploy",
 		"prepare": "simple-git-hooks"
 	},
 	"license": "MIT",

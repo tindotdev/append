@@ -1,19 +1,16 @@
 import { type AnyRoute, createRoute, redirect } from '@tanstack/react-router';
-import type { AuthContextType } from '@/providers';
+import type { AuthContextType } from '@/components/AuthProvider';
 
 import { SignInPage } from '../pages/SignInPage';
 
-interface RouterContext {
-	auth: AuthContextType;
-}
-
-export function createPublicRoutes(rootRoute: AnyRoute) {
+export function createPublicRoutes<TParentRoute extends AnyRoute>(rootRoute: TParentRoute) {
 	const signInRoute = createRoute({
 		getParentRoute: () => rootRoute,
 		path: '/sign-in',
-		beforeLoad: ({ context }: { context: RouterContext }) => {
-			if (!context.auth.isPending && context.auth.data) {
-				throw redirect({ to: '/batch/new' as '/' });
+		beforeLoad: ({ context }) => {
+			const { auth } = context as { auth: AuthContextType };
+			if (!auth.isPending && auth.data) {
+				throw redirect({ to: '/batch/new' });
 			}
 		},
 		component: SignInPage,
