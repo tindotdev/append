@@ -11,16 +11,15 @@ export function generateUUID(): string {
 export async function sha256Hex(input: string): Promise<string> {
 	const encoder = new TextEncoder();
 	const data = encoder.encode(input);
-	const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+	const hashBuffer = await crypto.subtle.digest('SHA-256', data);
 	const hashArray = Array.from(new Uint8Array(hashBuffer));
-	return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+	return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
  * Validate that a string is a valid UUID (RFC 4122 format).
  */
 export function isValidUUID(value: string): boolean {
-	const uuidRegex =
-		/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+	const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 	return uuidRegex.test(value);
 }

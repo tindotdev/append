@@ -1,23 +1,23 @@
-import type { Context } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import type { Context } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 
 /**
  * Standard API error codes for /api/* routes.
  * Keep in sync with PLAN_step2-batch-input.md §4.0.
  */
 export type ApiErrorCode =
-	| "VALIDATION_ERROR"
-	| "INVALID_JSON"
-	| "PAYLOAD_TOO_LARGE"
-	| "UNAUTHORIZED"
-	| "FORBIDDEN"
-	| "NOT_FOUND"
-	| "VERSION_CONFLICT"
-	| "BATCH_NOT_READY"
-	| "IDEMPOTENCY_CONFLICT"
-	| "SERVICE_UNAVAILABLE"
-	| "CONFIGURATION_ERROR"
-	| "INTERNAL_ERROR";
+	| 'VALIDATION_ERROR'
+	| 'INVALID_JSON'
+	| 'PAYLOAD_TOO_LARGE'
+	| 'UNAUTHORIZED'
+	| 'FORBIDDEN'
+	| 'NOT_FOUND'
+	| 'VERSION_CONFLICT'
+	| 'BATCH_NOT_READY'
+	| 'IDEMPOTENCY_CONFLICT'
+	| 'SERVICE_UNAVAILABLE'
+	| 'CONFIGURATION_ERROR'
+	| 'INTERNAL_ERROR';
 
 /**
  * Standard API error response shape.

@@ -1,39 +1,56 @@
 {
-  "name": "append",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "pnpm -r --parallel dev",
-    "dev:api": "pnpm --filter append-api run dev",
-    "dev:web": "pnpm --filter append-web run dev",
-    "build": "pnpm -r --if-present build",
-    "typecheck": "pnpm -r --if-present typecheck",
-    "lint": "pnpm -r --if-present lint",
-    "test": "pnpm -r --if-present test",
-    "test:api": "pnpm --filter append-api test",
-    "deploy:api": "pnpm --filter append-api run deploy"
-  },
-  "license": "MIT",
-  "packageManager": "pnpm@10.26.2",
-  "volta": {
-    "node": "24.12.0"
-  },
-  "engines": {
-    "node": ">=20",
-    "pnpm": ">=9"
-  },
-  "pnpm": {
-    "peerDependencyRules": {
-      "ignoreMissing": ["vitest"],
-      "allowedVersions": {
-        "drizzle-orm": ">=0.41.0"
-      }
-    },
-    "overrides": {
-      "vitest": "~3.2.4",
-      "@vitest/runner": "~3.2.4",
-      "@vitest/snapshot": "~3.2.4"
-    }
-  }
+	"name": "append",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "pnpm -r --parallel dev",
+		"dev:api": "pnpm --filter append-api run dev",
+		"dev:web": "pnpm --filter append-web run dev",
+		"build": "pnpm -r --if-present build",
+		"typecheck": "pnpm -r --if-present typecheck",
+		"lint": "biome lint --write .",
+		"format": "biome format --write .",
+		"check": "biome check --write .",
+		"ci:lint": "biome ci .",
+		"test": "pnpm -r --if-present test",
+		"test:api": "pnpm --filter append-api test",
+		"deploy:api": "pnpm --filter append-api run deploy",
+		"prepare": "simple-git-hooks"
+	},
+	"license": "MIT",
+	"packageManager": "pnpm@10.26.2",
+	"volta": {
+		"node": "24.12.0"
+	},
+	"engines": {
+		"node": ">=20",
+		"pnpm": ">=9"
+	},
+	"pnpm": {
+		"peerDependencyRules": {
+			"ignoreMissing": [
+				"vitest"
+			],
+			"allowedVersions": {
+				"drizzle-orm": ">=0.41.0"
+			}
+		},
+		"overrides": {
+			"vitest": "~3.2.4",
+			"@vitest/runner": "~3.2.4",
+			"@vitest/snapshot": "~3.2.4"
+		}
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.10",
+		"nano-staged": "^0.9.0",
+		"simple-git-hooks": "^2.13.1"
+	},
+	"simple-git-hooks": {
+		"pre-commit": "pnpm nano-staged"
+	},
+	"nano-staged": {
+		"*.{ts,tsx,js,jsx,json,jsonc,css}": "biome format --write --files-ignore-unknown=true"
+	}
 }

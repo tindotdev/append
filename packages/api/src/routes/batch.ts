@@ -1,35 +1,35 @@
-import { Hono } from "hono";
-import { drizzle } from "drizzle-orm/d1";
-import { eq, count, and, asc, isNull, or, lt, sql } from "drizzle-orm";
-import { apiError } from "../lib/api-error";
-import { generateUUID, sha256Hex, isValidUUID } from "../lib/crypto";
+import { and, asc, count, eq, isNull, lt, or, sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/d1';
+import { Hono } from 'hono';
 import {
-	schema,
+	type BatchStatus,
+	type Bucket,
 	batch,
 	candidate,
 	idempotencyKey,
+	normalize,
+	type SuggestionStatus,
+	schema,
 	suggestionCache,
+	type TermSenseSource,
 	term,
 	termSense,
-	normalize,
-	type BatchStatus,
-	type Bucket,
-	type SuggestionStatus,
-	type TermSenseSource,
-} from "../db";
+} from '../db';
+import { apiError } from '../lib/api-error';
+import { generateUUID, isValidUUID, sha256Hex } from '../lib/crypto';
 import {
-	generateStubSuggestion,
-	generateOpenAISuggestion,
-	type SuggestionProvider,
 	type AIGatewayConfig,
-	SUGGESTION_MODEL,
-	PROMPT_VERSION,
-	MAX_SUGGESTION_ATTEMPTS,
-	SUGGESTION_TIMEOUT_MS,
 	DEFAULT_LIMIT,
-	MIN_LIMIT,
+	generateOpenAISuggestion,
+	generateStubSuggestion,
 	MAX_LIMIT,
-} from "../lib/suggestions";
+	MAX_SUGGESTION_ATTEMPTS,
+	MIN_LIMIT,
+	PROMPT_VERSION,
+	SUGGESTION_MODEL,
+	SUGGESTION_TIMEOUT_MS,
+	type SuggestionProvider,
+} from '../lib/suggestions';
 
 // =============================================================================
 // Constants
@@ -39,8 +39,8 @@ const MAX_BODY_SIZE = 64 * 1024; // 64 KiB
 const MIN_TERMS = 20;
 const MAX_TERMS = 200;
 const MAX_TERM_LENGTH = 200;
-const IDEMPOTENCY_SCOPE = "capture_terms";
-const ACCEPT_ALL_SCOPE = "accept_all";
+const IDEMPOTENCY_SCOPE = 'capture_terms';
+const ACCEPT_ALL_SCOPE = 'accept_all';
 
 // =============================================================================
 // Types
@@ -70,22 +70,22 @@ const batchRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
  * Request: { terms: string, clientRequestId: string }
  * Response: { id: string, candidateCount: number }
  */
-batchRoutes.post("/", async (c) => {
-	const userId = c.get("userId");
+batchRoutes.post('/', async (c) => {
+	const userId = c.get('userId');
 	const db = drizzle(c.env.DB, { schema });
 
 	// -------------------------------------------------------------------------
 	// 1. Enforce body size limit (streaming check before parsing)
 	// -------------------------------------------------------------------------
-	const contentLength = c.req.header("content-length");
+	const contentLength = c.req.header('content-length');
 	if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
-		return apiError(c, 413, "PAYLOAD_TOO_LARGE", "Request body too large");
+		return apiError(c, 413, 'PAYLOAD_TOO_LARGE', 'Request body too large');
 	}
 
 	// Read body with limit enforcement
 	const rawBody = await c.req.text();
 	if (rawBody.length > MAX_BODY_SIZE) {
-		return apiError(c, 413, "PAYLOAD_TOO_LARGE", "Request body too large");
+		return apiError(c, 413, 'PAYLOAD_TOO_LARGE', 'Request body too large');
 	}
 
 	// -------------------------------------------------------------------------
@@ -95,7 +95,7 @@ batchRoutes.post("/", async (c) => {
 	try {
 		body = JSON.parse(rawBody);
 	} catch {
-		return apiError(c, 400, "INVALID_JSON", "Invalid JSON in request body");
+		return apiError(c, 400, 'INVALID_JSON', 'Invalid JSON in request body');
 	}
 
 	// -------------------------------------------------------------------------
@@ -103,29 +103,19 @@ batchRoutes.post("/", async (c) => {
 	// -------------------------------------------------------------------------
 	const { terms, clientRequestId } = body;
 
-	if (typeof clientRequestId !== "string" || !clientRequestId) {
-		return apiError(
-			c,
-			400,
-			"VALIDATION_ERROR",
-			"clientRequestId is required"
-		);
+	if (typeof clientRequestId !== 'string' || !clientRequestId) {
+		return apiError(c, 400, 'VALIDATION_ERROR', 'clientRequestId is required');
 	}
 
 	if (!isValidUUID(clientRequestId)) {
-		return apiError(
-			c,
-			400,
-			"VALIDATION_ERROR",
-			"clientRequestId must be a valid UUID"
-		);
+		return apiError(c, 400, 'VALIDATION_ERROR', 'clientRequestId must be a valid UUID');
 	}
 
 	// -------------------------------------------------------------------------
 	// 4. Validate and parse terms
 	// -------------------------------------------------------------------------
-	if (typeof terms !== "string") {
-		return apiError(c, 400, "VALIDATION_ERROR", "terms is required");
+	if (typeof terms !== 'string') {
+		return apiError(c, 400, 'VALIDATION_ERROR', 'terms is required');
 	}
 
 	// Split on \r?\n, trim each line, drop empty lines
@@ -135,52 +125,32 @@ batchRoutes.post("/", async (c) => {
 		.filter((line) => line.length > 0);
 
 	if (termLines.length === 0) {
-		return apiError(c, 400, "VALIDATION_ERROR", "terms cannot be empty");
+		return apiError(c, 400, 'VALIDATION_ERROR', 'terms cannot be empty');
 	}
 
 	if (termLines.length < MIN_TERMS) {
-		return apiError(
-			c,
-			400,
-			"VALIDATION_ERROR",
-			`At least ${MIN_TERMS} terms are required`
-		);
+		return apiError(c, 400, 'VALIDATION_ERROR', `At least ${MIN_TERMS} terms are required`);
 	}
 
 	if (termLines.length > MAX_TERMS) {
-		return apiError(
-			c,
-			400,
-			"VALIDATION_ERROR",
-			`At most ${MAX_TERMS} terms are allowed`
-		);
+		return apiError(c, 400, 'VALIDATION_ERROR', `At most ${MAX_TERMS} terms are allowed`);
 	}
 
 	// Check per-line length and content
 	for (let i = 0; i < termLines.length; i++) {
 		if (termLines[i].length > MAX_TERM_LENGTH) {
-			return apiError(
-				c,
-				400,
-				"VALIDATION_ERROR",
-				`Term at line ${i + 1} exceeds ${MAX_TERM_LENGTH} characters`
-			);
+			return apiError(c, 400, 'VALIDATION_ERROR', `Term at line ${i + 1} exceeds ${MAX_TERM_LENGTH} characters`);
 		}
 		// Reject ': ' in terms to ensure unambiguous export delimiter
-		if (termLines[i].includes(": ")) {
-			return apiError(
-				c,
-				400,
-				"VALIDATION_ERROR",
-				`Term at line ${i + 1} contains ': ' which is not allowed`
-			);
+		if (termLines[i].includes(': ')) {
+			return apiError(c, 400, 'VALIDATION_ERROR', `Term at line ${i + 1} contains ': ' which is not allowed`);
 		}
 	}
 
 	// -------------------------------------------------------------------------
 	// 5. Compute request_hash for idempotency
 	// -------------------------------------------------------------------------
-	const canonicalTerms = termLines.join("\n");
+	const canonicalTerms = termLines.join('\n');
 	const requestHash = await sha256Hex(canonicalTerms);
 
 	// -------------------------------------------------------------------------
@@ -189,42 +159,25 @@ batchRoutes.post("/", async (c) => {
 
 	// Check for existing idempotency key
 	const existingKey = await db.query.idempotencyKey.findFirst({
-		where: and(
-			eq(idempotencyKey.userId, userId),
-			eq(idempotencyKey.scope, IDEMPOTENCY_SCOPE),
-			eq(idempotencyKey.key, clientRequestId)
-		),
+		where: and(eq(idempotencyKey.userId, userId), eq(idempotencyKey.scope, IDEMPOTENCY_SCOPE), eq(idempotencyKey.key, clientRequestId)),
 	});
 
 	if (existingKey) {
 		// Check if hash matches (replay) or differs (conflict)
 		if (existingKey.requestHash !== requestHash) {
-			return apiError(
-				c,
-				409,
-				"IDEMPOTENCY_CONFLICT",
-				"clientRequestId was used with different request body"
-			);
+			return apiError(c, 409, 'IDEMPOTENCY_CONFLICT', 'clientRequestId was used with different request body');
 		}
 
 		// Replay: parse result_ref and return existing batch
 		const resultRefMatch = existingKey.resultRef.match(/^batch:(.+)$/);
 		if (!resultRefMatch) {
-			return apiError(
-				c,
-				500,
-				"INTERNAL_ERROR",
-				"Invalid idempotency result reference"
-			);
+			return apiError(c, 500, 'INTERNAL_ERROR', 'Invalid idempotency result reference');
 		}
 
 		const batchId = resultRefMatch[1];
 
 		// Get candidate count for replay response
-		const [countResult] = await db
-			.select({ count: count() })
-			.from(candidate)
-			.where(eq(candidate.batchId, batchId));
+		const [countResult] = await db.select({ count: count() }).from(candidate).where(eq(candidate.batchId, batchId));
 
 		const candidateCount = countResult?.count ?? 0;
 
@@ -234,12 +187,7 @@ batchRoutes.post("/", async (c) => {
 				where: eq(batch.id, batchId),
 			});
 			if (!existingBatch) {
-				return apiError(
-					c,
-					500,
-					"INTERNAL_ERROR",
-					"Referenced batch no longer exists"
-				);
+				return apiError(c, 500, 'INTERNAL_ERROR', 'Referenced batch no longer exists');
 			}
 		}
 
@@ -252,7 +200,7 @@ batchRoutes.post("/", async (c) => {
 
 	const batchId = generateUUID();
 	const now = new Date();
-	const initialStatus: BatchStatus = "captured";
+	const initialStatus: BatchStatus = 'captured';
 
 	try {
 		// Use D1's batch API for atomic operations
@@ -300,12 +248,8 @@ batchRoutes.post("/", async (c) => {
 		// Execute all statements in a D1 batch (atomic)
 		const statements = [
 			c.env.DB.prepare(batchStatement.sql).bind(...batchStatement.params),
-			...candidateStatements.map((s) =>
-				c.env.DB.prepare(s.sql).bind(...s.params)
-			),
-			c.env.DB.prepare(idempotencyStatement.sql).bind(
-				...idempotencyStatement.params
-			),
+			...candidateStatements.map((s) => c.env.DB.prepare(s.sql).bind(...s.params)),
+			c.env.DB.prepare(idempotencyStatement.sql).bind(...idempotencyStatement.params),
 		];
 
 		await c.env.DB.batch(statements);
@@ -314,46 +258,28 @@ batchRoutes.post("/", async (c) => {
 	} catch (error) {
 		// Handle race condition: if idempotency key insert fails due to PK conflict,
 		// re-select and return replay or conflict
-		if (
-			error instanceof Error &&
-			error.message.includes("UNIQUE constraint failed")
-		) {
+		if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
 			const racedKey = await db.query.idempotencyKey.findFirst({
-				where: and(
-					eq(idempotencyKey.userId, userId),
-					eq(idempotencyKey.scope, IDEMPOTENCY_SCOPE),
-					eq(idempotencyKey.key, clientRequestId)
-				),
+				where: and(eq(idempotencyKey.userId, userId), eq(idempotencyKey.scope, IDEMPOTENCY_SCOPE), eq(idempotencyKey.key, clientRequestId)),
 			});
 
 			if (racedKey) {
 				if (racedKey.requestHash !== requestHash) {
-					return apiError(
-						c,
-						409,
-						"IDEMPOTENCY_CONFLICT",
-						"clientRequestId was used with different request body"
-					);
+					return apiError(c, 409, 'IDEMPOTENCY_CONFLICT', 'clientRequestId was used with different request body');
 				}
 
 				const resultRefMatch = racedKey.resultRef.match(/^batch:(.+)$/);
 				if (resultRefMatch) {
 					const existingBatchId = resultRefMatch[1];
-					const [countResult] = await db
-						.select({ count: count() })
-						.from(candidate)
-						.where(eq(candidate.batchId, existingBatchId));
+					const [countResult] = await db.select({ count: count() }).from(candidate).where(eq(candidate.batchId, existingBatchId));
 
-					return c.json(
-						{ id: existingBatchId, candidateCount: countResult?.count ?? 0 },
-						200
-					);
+					return c.json({ id: existingBatchId, candidateCount: countResult?.count ?? 0 }, 200);
 				}
 			}
 		}
 
-		console.error("Batch creation error:", error);
-		return apiError(c, 500, "INTERNAL_ERROR", "Failed to create batch");
+		console.error('Batch creation error:', error);
+		return apiError(c, 500, 'INTERNAL_ERROR', 'Failed to create batch');
 	}
 });
 
@@ -387,9 +313,9 @@ batchRoutes.post("/", async (c) => {
  *   }>
  * }
  */
-batchRoutes.get("/:id", async (c) => {
-	const userId = c.get("userId");
-	const batchId = c.req.param("id");
+batchRoutes.get('/:id', async (c) => {
+	const userId = c.get('userId');
+	const batchId = c.req.param('id');
 	const db = drizzle(c.env.DB, { schema });
 
 	// Lookup batch by id
@@ -399,12 +325,12 @@ batchRoutes.get("/:id", async (c) => {
 
 	// 404 if missing
 	if (!batchRow) {
-		return apiError(c, 404, "NOT_FOUND", "Batch not found");
+		return apiError(c, 404, 'NOT_FOUND', 'Batch not found');
 	}
 
 	// 403 if not owner
 	if (batchRow.userId !== userId) {
-		return apiError(c, 403, "FORBIDDEN", "Access denied");
+		return apiError(c, 403, 'FORBIDDEN', 'Access denied');
 	}
 
 	// Get candidates ordered by position
@@ -482,51 +408,41 @@ batchRoutes.get("/:id", async (c) => {
  *   }
  * }
  */
-batchRoutes.post("/:id/suggest", async (c) => {
-	const userId = c.get("userId");
-	const batchId = c.req.param("id");
+batchRoutes.post('/:id/suggest', async (c) => {
+	const userId = c.get('userId');
+	const batchId = c.req.param('id');
 	const db = drizzle(c.env.DB, { schema });
 
 	// -------------------------------------------------------------------------
 	// 1. Validate query params
 	// -------------------------------------------------------------------------
-	const limitParam = c.req.query("limit");
-	const regenerateParam = c.req.query("regenerate");
+	const limitParam = c.req.query('limit');
+	const regenerateParam = c.req.query('regenerate');
 
 	let limit = DEFAULT_LIMIT;
 	if (limitParam !== undefined) {
 		const parsed = parseInt(limitParam, 10);
 		if (isNaN(parsed) || parsed < MIN_LIMIT || parsed > MAX_LIMIT) {
-			return apiError(
-				c,
-				400,
-				"VALIDATION_ERROR",
-				`limit must be an integer between ${MIN_LIMIT} and ${MAX_LIMIT}`
-			);
+			return apiError(c, 400, 'VALIDATION_ERROR', `limit must be an integer between ${MIN_LIMIT} and ${MAX_LIMIT}`);
 		}
 		limit = parsed;
 	}
 
-	const isRegenerate = regenerateParam === "1";
-	const mode = isRegenerate ? "regenerate" : "fill-missing";
+	const isRegenerate = regenerateParam === '1';
+	const mode = isRegenerate ? 'regenerate' : 'fill-missing';
 
 	// -------------------------------------------------------------------------
 	// 2. Check provider configuration
 	// -------------------------------------------------------------------------
-	const provider = (c.env.SUGGESTIONS_PROVIDER || "openai") as SuggestionProvider;
+	const provider = (c.env.SUGGESTIONS_PROVIDER || 'openai') as SuggestionProvider;
 
-	if (provider === "disabled") {
-		return apiError(c, 503, "SERVICE_UNAVAILABLE", "Suggestions are disabled");
+	if (provider === 'disabled') {
+		return apiError(c, 503, 'SERVICE_UNAVAILABLE', 'Suggestions are disabled');
 	}
 
-	if (provider === "openai") {
+	if (provider === 'openai') {
 		if (!c.env.CF_AIG_TOKEN || !c.env.AI_GATEWAY_ID) {
-			return apiError(
-				c,
-				500,
-				"CONFIGURATION_ERROR",
-				"OpenAI provider requires CF_AIG_TOKEN and AI_GATEWAY_ID"
-			);
+			return apiError(c, 500, 'CONFIGURATION_ERROR', 'OpenAI provider requires CF_AIG_TOKEN and AI_GATEWAY_ID');
 		}
 	}
 
@@ -538,11 +454,11 @@ batchRoutes.post("/:id/suggest", async (c) => {
 	});
 
 	if (!batchRow) {
-		return apiError(c, 404, "NOT_FOUND", "Batch not found");
+		return apiError(c, 404, 'NOT_FOUND', 'Batch not found');
 	}
 
 	if (batchRow.userId !== userId) {
-		return apiError(c, 403, "FORBIDDEN", "Access denied");
+		return apiError(c, 403, 'FORBIDDEN', 'Access denied');
 	}
 
 	// -------------------------------------------------------------------------
@@ -586,7 +502,7 @@ batchRoutes.post("/:id/suggest", async (c) => {
 		if (cand.suggestedBucket !== null && cand.suggestedText !== null) {
 			return false;
 		}
-		if (cand.suggestionStatus === "in_progress") {
+		if (cand.suggestionStatus === 'in_progress') {
 			return false;
 		}
 		return true;
@@ -600,7 +516,7 @@ batchRoutes.post("/:id/suggest", async (c) => {
 		for (const cand of allCandidates) {
 			if (cand.suggestedBucket !== null && cand.suggestedText !== null) {
 				skippedAlreadySuggested++;
-			} else if (cand.suggestionStatus === "in_progress") {
+			} else if (cand.suggestionStatus === 'in_progress') {
 				skippedInProgress++;
 			}
 		}
@@ -627,17 +543,7 @@ batchRoutes.post("/:id/suggest", async (c) => {
 	// Process candidates sequentially (simpler and more memory efficient for Workers)
 	// The stub provider is synchronous so concurrency isn't needed in test mode
 	for (const cand of candidatesToProcess) {
-		await processCandidate(
-			cand,
-			userId,
-			batchId,
-			provider,
-			isRegenerate,
-			processedTerms,
-			results,
-			db,
-			c.env
-		);
+		await processCandidate(cand, userId, batchId, provider, isRegenerate, processedTerms, results, db, c.env);
 	}
 
 	// -------------------------------------------------------------------------
@@ -645,7 +551,7 @@ batchRoutes.post("/:id/suggest", async (c) => {
 	// -------------------------------------------------------------------------
 	await db
 		.update(batch)
-		.set({ status: "suggested" as BatchStatus, updatedAt: new Date() })
+		.set({ status: 'suggested' as BatchStatus, updatedAt: new Date() })
 		.where(eq(batch.id, batchId));
 
 	// -------------------------------------------------------------------------
@@ -701,10 +607,10 @@ async function processCandidate(
 			.set({
 				suggestedBucket: inBatchCached.bucket,
 				suggestedText: inBatchCached.text,
-				suggestionStatus: "done" as SuggestionStatus,
+				suggestionStatus: 'done' as SuggestionStatus,
 				suggestionError: null,
 				suggestionUpdatedAt: now,
-				status: "suggested" as BatchStatus,
+				status: 'suggested' as BatchStatus,
 				updatedAt: now,
 			})
 			.where(eq(candidate.id, cand.id));
@@ -734,10 +640,10 @@ async function processCandidate(
 				.set({
 					suggestedBucket: cachedSuggestion.suggestedBucket,
 					suggestedText: cachedSuggestion.suggestedText,
-					suggestionStatus: "done" as SuggestionStatus,
+					suggestionStatus: 'done' as SuggestionStatus,
 					suggestionError: null,
 					suggestionUpdatedAt: now,
-					status: "suggested" as BatchStatus,
+					status: 'suggested' as BatchStatus,
 					updatedAt: now,
 				})
 				.where(eq(candidate.id, cand.id));
@@ -757,7 +663,7 @@ async function processCandidate(
 	const claimResult = await db
 		.update(candidate)
 		.set({
-			suggestionStatus: "in_progress" as SuggestionStatus,
+			suggestionStatus: 'in_progress' as SuggestionStatus,
 			suggestionAttempts: sql`${candidate.suggestionAttempts} + 1`,
 			suggestionUpdatedAt: now,
 			updatedAt: now,
@@ -765,11 +671,7 @@ async function processCandidate(
 		.where(
 			and(
 				eq(candidate.id, cand.id),
-				or(
-					isNull(candidate.suggestionStatus),
-					eq(candidate.suggestionStatus, "done"),
-					eq(candidate.suggestionStatus, "error")
-				),
+				or(isNull(candidate.suggestionStatus), eq(candidate.suggestionStatus, 'done'), eq(candidate.suggestionStatus, 'error')),
 				lt(candidate.suggestionAttempts, MAX_SUGGESTION_ATTEMPTS)
 			)
 		)
@@ -785,29 +687,25 @@ async function processCandidate(
 	let suggestionResult: { bucket: Bucket; text: string } | null = null;
 	let errorMessage: string | null = null;
 
-	if (provider === "stub") {
+	if (provider === 'stub') {
 		// Stub provider - deterministic
 		const stub = generateStubSuggestion(cand.normalizedTerm);
 		suggestionResult = stub;
-	} else if (provider === "openai") {
+	} else if (provider === 'openai') {
 		// OpenAI provider with timeout
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), SUGGESTION_TIMEOUT_MS);
 
 		try {
 			// Get gateway URL using AI binding
-			const gatewayBaseUrl = await env.AI.gateway(env.AI_GATEWAY_ID!).getUrl("openai");
+			const gatewayBaseUrl = await env.AI.gateway(env.AI_GATEWAY_ID!).getUrl('openai');
 
 			const config: AIGatewayConfig = {
 				cfToken: env.CF_AIG_TOKEN!,
 				gatewayBaseUrl,
 			};
 
-			const outcome = await generateOpenAISuggestion(
-				cand.term,
-				config,
-				controller.signal
-			);
+			const outcome = await generateOpenAISuggestion(cand.term, config, controller.signal);
 
 			if (outcome.success) {
 				suggestionResult = outcome.result;
@@ -826,10 +724,10 @@ async function processCandidate(
 			.set({
 				suggestedBucket: suggestionResult.bucket,
 				suggestedText: suggestionResult.text,
-				suggestionStatus: "done" as SuggestionStatus,
+				suggestionStatus: 'done' as SuggestionStatus,
 				suggestionError: null,
 				suggestionUpdatedAt: new Date(),
-				status: "suggested" as BatchStatus,
+				status: 'suggested' as BatchStatus,
 				updatedAt: new Date(),
 			})
 			.where(eq(candidate.id, cand.id));
@@ -854,12 +752,7 @@ async function processCandidate(
 						updatedAt: new Date(),
 					})
 					.onConflictDoUpdate({
-						target: [
-							suggestionCache.userId,
-							suggestionCache.normalizedTerm,
-							suggestionCache.model,
-							suggestionCache.promptVersion,
-						],
+						target: [suggestionCache.userId, suggestionCache.normalizedTerm, suggestionCache.model, suggestionCache.promptVersion],
 						set: {
 							suggestedBucket: suggestionResult.bucket,
 							suggestedText: suggestionResult.text,
@@ -876,10 +769,10 @@ async function processCandidate(
 		await db
 			.update(candidate)
 			.set({
-				suggestionStatus: "error" as SuggestionStatus,
-				suggestionError: errorMessage || "Unknown error",
+				suggestionStatus: 'error' as SuggestionStatus,
+				suggestionError: errorMessage || 'Unknown error',
 				suggestionUpdatedAt: new Date(),
-				status: "suggested" as BatchStatus,
+				status: 'suggested' as BatchStatus,
 				updatedAt: new Date(),
 			})
 			.where(eq(candidate.id, cand.id));
@@ -899,7 +792,7 @@ function toBase64Url(input: string): string {
 	const encoder = new TextEncoder();
 	const bytes = encoder.encode(input);
 	const base64 = btoa(String.fromCharCode(...bytes));
-	return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+	return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /**
@@ -907,10 +800,10 @@ function toBase64Url(input: string): string {
  */
 function fromBase64Url(input: string): string {
 	// Restore standard base64 characters
-	let base64 = input.replace(/-/g, "+").replace(/_/g, "/");
+	let base64 = input.replace(/-/g, '+').replace(/_/g, '/');
 	// Add padding if needed
 	while (base64.length % 4 !== 0) {
-		base64 += "=";
+		base64 += '=';
 	}
 	const binary = atob(base64);
 	const bytes = new Uint8Array(binary.length);
@@ -926,7 +819,7 @@ function fromBase64Url(input: string): string {
 
 interface AcceptSummary {
 	batchId: string;
-	status: "accepted";
+	status: 'accepted';
 	candidateCount: number;
 	acceptedCount: number;
 	skippedAlreadyAcceptedCount: number;
@@ -942,9 +835,9 @@ interface AcceptSummary {
  *
  * Response: AcceptSummary
  */
-batchRoutes.post("/:id/accept", async (c) => {
-	const userId = c.get("userId");
-	const batchId = c.req.param("id");
+batchRoutes.post('/:id/accept', async (c) => {
+	const userId = c.get('userId');
+	const batchId = c.req.param('id');
 	const db = drizzle(c.env.DB, { schema });
 
 	// -------------------------------------------------------------------------
@@ -954,27 +847,17 @@ batchRoutes.post("/:id/accept", async (c) => {
 	try {
 		body = await c.req.json();
 	} catch {
-		return apiError(c, 400, "INVALID_JSON", "Invalid JSON in request body");
+		return apiError(c, 400, 'INVALID_JSON', 'Invalid JSON in request body');
 	}
 
 	const { clientRequestId } = body;
 
-	if (typeof clientRequestId !== "string" || !clientRequestId) {
-		return apiError(
-			c,
-			400,
-			"VALIDATION_ERROR",
-			"clientRequestId is required"
-		);
+	if (typeof clientRequestId !== 'string' || !clientRequestId) {
+		return apiError(c, 400, 'VALIDATION_ERROR', 'clientRequestId is required');
 	}
 
 	if (!isValidUUID(clientRequestId)) {
-		return apiError(
-			c,
-			400,
-			"VALIDATION_ERROR",
-			"clientRequestId must be a valid UUID"
-		);
+		return apiError(c, 400, 'VALIDATION_ERROR', 'clientRequestId must be a valid UUID');
 	}
 
 	// -------------------------------------------------------------------------
@@ -985,11 +868,11 @@ batchRoutes.post("/:id/accept", async (c) => {
 	});
 
 	if (!batchRow) {
-		return apiError(c, 404, "NOT_FOUND", "Batch not found");
+		return apiError(c, 404, 'NOT_FOUND', 'Batch not found');
 	}
 
 	if (batchRow.userId !== userId) {
-		return apiError(c, 403, "FORBIDDEN", "Access denied");
+		return apiError(c, 403, 'FORBIDDEN', 'Access denied');
 	}
 
 	// -------------------------------------------------------------------------
@@ -998,26 +881,15 @@ batchRoutes.post("/:id/accept", async (c) => {
 	const requestHash = await sha256Hex(`batch:${batchId}`);
 
 	const existingKey = await db.query.idempotencyKey.findFirst({
-		where: and(
-			eq(idempotencyKey.userId, userId),
-			eq(idempotencyKey.scope, ACCEPT_ALL_SCOPE),
-			eq(idempotencyKey.key, clientRequestId)
-		),
+		where: and(eq(idempotencyKey.userId, userId), eq(idempotencyKey.scope, ACCEPT_ALL_SCOPE), eq(idempotencyKey.key, clientRequestId)),
 	});
 
 	if (existingKey) {
 		if (existingKey.requestHash === requestHash) {
 			// Replay: decode and return cached summary
-			const resultRefMatch = existingKey.resultRef.match(
-				/^accept_summary:(.+)$/
-			);
+			const resultRefMatch = existingKey.resultRef.match(/^accept_summary:(.+)$/);
 			if (!resultRefMatch) {
-				return apiError(
-					c,
-					500,
-					"INTERNAL_ERROR",
-					"Invalid idempotency result reference"
-				);
+				return apiError(c, 500, 'INTERNAL_ERROR', 'Invalid idempotency result reference');
 			}
 
 			try {
@@ -1025,20 +897,13 @@ batchRoutes.post("/:id/accept", async (c) => {
 				const cachedSummary = JSON.parse(summaryJson) as AcceptSummary;
 				return c.json(cachedSummary, 200);
 			} catch {
-				return apiError(
-					c,
-					500,
-					"INTERNAL_ERROR",
-					"Invalid idempotency result reference"
-				);
+				return apiError(c, 500, 'INTERNAL_ERROR', 'Invalid idempotency result reference');
 			}
 		} else {
 			// Conflict: same clientRequestId used for different batch
 			// Extract originalBatchId from the stored result_ref
-			const resultRefMatch = existingKey.resultRef.match(
-				/^accept_summary:(.+)$/
-			);
-			let originalBatchId = "unknown";
+			const resultRefMatch = existingKey.resultRef.match(/^accept_summary:(.+)$/);
+			let originalBatchId = 'unknown';
 			if (resultRefMatch) {
 				try {
 					const summaryJson = fromBase64Url(resultRefMatch[1]);
@@ -1046,22 +911,11 @@ batchRoutes.post("/:id/accept", async (c) => {
 					originalBatchId = storedSummary.batchId;
 				} catch {
 					// If we can't decode, return 500
-					return apiError(
-						c,
-						500,
-						"INTERNAL_ERROR",
-						"Invalid idempotency result reference"
-					);
+					return apiError(c, 500, 'INTERNAL_ERROR', 'Invalid idempotency result reference');
 				}
 			}
 
-			return apiError(
-				c,
-				409,
-				"IDEMPOTENCY_CONFLICT",
-				"clientRequestId was used for a different batch",
-				{ originalBatchId }
-			);
+			return apiError(c, 409, 'IDEMPOTENCY_CONFLICT', 'clientRequestId was used for a different batch', { originalBatchId });
 		}
 	}
 
@@ -1091,21 +945,13 @@ batchRoutes.post("/:id/accept", async (c) => {
 	// -------------------------------------------------------------------------
 	// 5. Precondition: check for in-progress suggestions
 	// -------------------------------------------------------------------------
-	const inProgressIds = allCandidates
-		.filter((c) => c.suggestionStatus === "in_progress")
-		.map((c) => c.id);
+	const inProgressIds = allCandidates.filter((c) => c.suggestionStatus === 'in_progress').map((c) => c.id);
 
 	if (inProgressIds.length > 0) {
-		return apiError(
-			c,
-			409,
-			"BATCH_NOT_READY",
-			"Some candidates have suggestions in progress",
-			{
-				reason: "SUGGESTIONS_IN_PROGRESS",
-				inProgressCandidateIds: inProgressIds,
-			}
-		);
+		return apiError(c, 409, 'BATCH_NOT_READY', 'Some candidates have suggestions in progress', {
+			reason: 'SUGGESTIONS_IN_PROGRESS',
+			inProgressCandidateIds: inProgressIds,
+		});
 	}
 
 	// -------------------------------------------------------------------------
@@ -1116,29 +962,19 @@ batchRoutes.post("/:id/accept", async (c) => {
 		effectiveText: string | null;
 	};
 
-	const candidatesWithEffective: CandidateWithEffective[] = allCandidates.map(
-		(cand) => ({
-			...cand,
-			effectiveBucket: cand.chosenBucket ?? cand.suggestedBucket,
-			effectiveText: cand.chosenText ?? cand.suggestedText,
-		})
-	);
+	const candidatesWithEffective: CandidateWithEffective[] = allCandidates.map((cand) => ({
+		...cand,
+		effectiveBucket: cand.chosenBucket ?? cand.suggestedBucket,
+		effectiveText: cand.chosenText ?? cand.suggestedText,
+	}));
 
-	const missingIds = candidatesWithEffective
-		.filter((c) => c.effectiveBucket === null || c.effectiveText === null)
-		.map((c) => c.id);
+	const missingIds = candidatesWithEffective.filter((c) => c.effectiveBucket === null || c.effectiveText === null).map((c) => c.id);
 
 	if (missingIds.length > 0) {
-		return apiError(
-			c,
-			409,
-			"BATCH_NOT_READY",
-			"Some candidates are missing effective bucket or text",
-			{
-				reason: "MISSING_EFFECTIVE_FIELDS",
-				missingCandidateIds: missingIds,
-			}
-		);
+		return apiError(c, 409, 'BATCH_NOT_READY', 'Some candidates are missing effective bucket or text', {
+			reason: 'MISSING_EFFECTIVE_FIELDS',
+			missingCandidateIds: missingIds,
+		});
 	}
 
 	// -------------------------------------------------------------------------
@@ -1146,18 +982,13 @@ batchRoutes.post("/:id/accept", async (c) => {
 	// -------------------------------------------------------------------------
 
 	// Filter unmaterialized candidates
-	const unmaterializedCandidates = candidatesWithEffective.filter(
-		(c) => c.materializedTermSenseId === null
-	);
+	const unmaterializedCandidates = candidatesWithEffective.filter((c) => c.materializedTermSenseId === null);
 
 	// Count already materialized
-	const skippedAlreadyAcceptedCount =
-		candidateCount - unmaterializedCandidates.length;
+	const skippedAlreadyAcceptedCount = candidateCount - unmaterializedCandidates.length;
 
 	// Get unique canonicals from unmaterialized candidates
-	const uniqueCanonicals = [
-		...new Set(unmaterializedCandidates.map((c) => normalize(c.term))),
-	];
+	const uniqueCanonicals = [...new Set(unmaterializedCandidates.map((c) => normalize(c.term)))];
 
 	// Pre-fetch existing terms for this user
 	type ExistingTermRow = {
@@ -1186,10 +1017,7 @@ batchRoutes.post("/:id/accept", async (c) => {
 	}
 
 	// Build map of existing terms: canonical → { termId, primarySenseId }
-	const existingTermMap = new Map<
-		string,
-		{ termId: string; primarySenseId: string | null }
-	>();
+	const existingTermMap = new Map<string, { termId: string; primarySenseId: string | null }>();
 	for (const t of existingTerms) {
 		existingTermMap.set(t.canonical, {
 			termId: t.id,
@@ -1198,9 +1026,7 @@ batchRoutes.post("/:id/accept", async (c) => {
 	}
 
 	// Pre-fetch primary sense buckets for existing terms with primary senses
-	const primarySenseIds = existingTerms
-		.map((t) => t.primarySenseId)
-		.filter((id): id is string => id !== null);
+	const primarySenseIds = existingTerms.map((t) => t.primarySenseId).filter((id): id is string => id !== null);
 
 	type PrimarySenseRow = { id: string; bucket: Bucket };
 	let primarySenses: PrimarySenseRow[] = [];
@@ -1284,9 +1110,7 @@ batchRoutes.post("/:id/accept", async (c) => {
 				.onConflictDoNothing()
 				.toSQL();
 
-			statements.push(
-				c.env.DB.prepare(termStmt.sql).bind(...termStmt.params)
-			);
+			statements.push(c.env.DB.prepare(termStmt.sql).bind(...termStmt.params));
 			termCreatedCount++;
 		}
 
@@ -1294,11 +1118,9 @@ batchRoutes.post("/:id/accept", async (c) => {
 		let flaggedReason: string | null = null;
 		const existingTermInfo = existingTermMap.get(canonical);
 		if (existingTermInfo?.primarySenseId) {
-			const primaryBucket = primarySenseBucketMap.get(
-				existingTermInfo.primarySenseId
-			);
+			const primaryBucket = primarySenseBucketMap.get(existingTermInfo.primarySenseId);
 			if (primaryBucket && primaryBucket !== effectiveBucket) {
-				flaggedReason = "bucket_conflict";
+				flaggedReason = 'bucket_conflict';
 				flaggedCount++;
 			}
 		}
@@ -1311,7 +1133,7 @@ batchRoutes.post("/:id/accept", async (c) => {
 				termId,
 				bucket: effectiveBucket,
 				text: effectiveText,
-				source: "batch" as TermSenseSource,
+				source: 'batch' as TermSenseSource,
 				flaggedReason,
 				createdAt: now,
 			})
@@ -1325,7 +1147,7 @@ batchRoutes.post("/:id/accept", async (c) => {
 		const candStmt = db
 			.update(candidate)
 			.set({
-				status: "accepted" as BatchStatus,
+				status: 'accepted' as BatchStatus,
 				materializedTermId: termId,
 				materializedTermSenseId: termSenseId,
 				updatedAt: now,
@@ -1340,7 +1162,7 @@ batchRoutes.post("/:id/accept", async (c) => {
 	const batchStmt = db
 		.update(batch)
 		.set({
-			status: "accepted" as BatchStatus,
+			status: 'accepted' as BatchStatus,
 			updatedAt: now,
 		})
 		.where(eq(batch.id, batchId))
@@ -1351,7 +1173,7 @@ batchRoutes.post("/:id/accept", async (c) => {
 	// Build summary for idempotency storage
 	const summary: AcceptSummary = {
 		batchId,
-		status: "accepted",
+		status: 'accepted',
 		candidateCount,
 		acceptedCount: termSenseCreatedCount,
 		skippedAlreadyAcceptedCount,
@@ -1383,31 +1205,20 @@ batchRoutes.post("/:id/accept", async (c) => {
 		await c.env.DB.batch(statements);
 	} catch (error) {
 		// Handle race condition on idempotency key
-		if (
-			error instanceof Error &&
-			error.message.includes("UNIQUE constraint failed")
-		) {
+		if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
 			// Re-check idempotency key
 			const racedKey = await db.query.idempotencyKey.findFirst({
-				where: and(
-					eq(idempotencyKey.userId, userId),
-					eq(idempotencyKey.scope, ACCEPT_ALL_SCOPE),
-					eq(idempotencyKey.key, clientRequestId)
-				),
+				where: and(eq(idempotencyKey.userId, userId), eq(idempotencyKey.scope, ACCEPT_ALL_SCOPE), eq(idempotencyKey.key, clientRequestId)),
 			});
 
 			if (racedKey) {
 				if (racedKey.requestHash === requestHash) {
 					// Replay
-					const resultRefMatch = racedKey.resultRef.match(
-						/^accept_summary:(.+)$/
-					);
+					const resultRefMatch = racedKey.resultRef.match(/^accept_summary:(.+)$/);
 					if (resultRefMatch) {
 						try {
 							const summaryJson = fromBase64Url(resultRefMatch[1]);
-							const cachedSummary = JSON.parse(
-								summaryJson
-							) as AcceptSummary;
+							const cachedSummary = JSON.parse(summaryJson) as AcceptSummary;
 							return c.json(cachedSummary, 200);
 						} catch {
 							// Fall through to error
@@ -1415,34 +1226,24 @@ batchRoutes.post("/:id/accept", async (c) => {
 					}
 				} else {
 					// Conflict
-					const resultRefMatch = racedKey.resultRef.match(
-						/^accept_summary:(.+)$/
-					);
-					let originalBatchId = "unknown";
+					const resultRefMatch = racedKey.resultRef.match(/^accept_summary:(.+)$/);
+					let originalBatchId = 'unknown';
 					if (resultRefMatch) {
 						try {
 							const summaryJson = fromBase64Url(resultRefMatch[1]);
-							const storedSummary = JSON.parse(
-								summaryJson
-							) as AcceptSummary;
+							const storedSummary = JSON.parse(summaryJson) as AcceptSummary;
 							originalBatchId = storedSummary.batchId;
 						} catch {
 							// Fall through
 						}
 					}
-					return apiError(
-						c,
-						409,
-						"IDEMPOTENCY_CONFLICT",
-						"clientRequestId was used for a different batch",
-						{ originalBatchId }
-					);
+					return apiError(c, 409, 'IDEMPOTENCY_CONFLICT', 'clientRequestId was used for a different batch', { originalBatchId });
 				}
 			}
 		}
 
-		console.error("Accept-all error:", error);
-		return apiError(c, 500, "INTERNAL_ERROR", "Failed to accept batch");
+		console.error('Accept-all error:', error);
+		return apiError(c, 500, 'INTERNAL_ERROR', 'Failed to accept batch');
 	}
 
 	// -------------------------------------------------------------------------

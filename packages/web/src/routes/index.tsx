@@ -1,21 +1,20 @@
-import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-
-import { createProtectedRoutes } from "./protected";
-import { createPublicRoutes } from "./public";
-import { AuthContextType } from "@/providers";
+import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
+import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
+import type { AuthContextType } from '@/providers';
+import { createProtectedRoutes } from './protected';
+import { createPublicRoutes } from './public';
 
 export interface RouterContext {
-  auth: AuthContextType
+	auth: AuthContextType;
 }
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
-  component: () => (
-    <>
-      <Outlet />
-      <TanStackRouterDevtools />
-    </>
-  ),
+	component: () => (
+		<>
+			<Outlet />
+			<TanStackRouterDevtools />
+		</>
+	),
 });
 
 const { signInRoute } = createPublicRoutes(rootRoute);
