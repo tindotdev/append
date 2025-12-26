@@ -13,7 +13,7 @@
 
 - `GET /api/bucket/:slug` returns the exact response shape specified in `docs/vertical-slice.md` Step 6, ordered by `primarySense.createdAt DESC, termId DESC`, with a working `cursor`/`nextCursor` contract.
 - `/bucket/:slug` renders a “calm by default” feed showing each term’s `displayTerm` and its `primarySense.text`, supports loading additional pages when `nextCursor` is present, and handles empty/loading/error states.
-- `pnpm --filter append-api test` and `pnpm --filter append-web build` succeed.
+- `pnpm --filter @append/api test` and `pnpm --filter @append/web build` succeed.
 
 ## Constraints
 
@@ -120,8 +120,8 @@
 
 ## Validation
 
-- API tests: `pnpm --filter append-api test`
-- Web build/typecheck: `pnpm --filter append-web build`
+- API tests: `pnpm --filter @append/api test`
+- Web build/typecheck: `pnpm --filter @append/web build`
 
 ## Risks & Rollback
 

@@ -243,13 +243,13 @@ WHERE id = :id AND version = :expectedVersion
 
 ```bash
 # API tests (includes new candidate.spec.ts)
-pnpm --filter append-api test
+pnpm --filter @append/api test
 
 # Typecheck both packages
 pnpm typecheck
 
 # Web build (ensures route compiles)
-pnpm --filter append-web build
+pnpm --filter @append/web build
 ```
 
 **Manual UI sanity** (requires Step 1 auth config from `docs/vertical-slice.md`):
@@ -297,9 +297,9 @@ git checkout HEAD -- docs/vertical-slice.md
 
 ```bash
 # Should pass with pre-change behavior
-pnpm --filter append-api test
+pnpm --filter @append/api test
 pnpm typecheck
-pnpm --filter append-web build
+pnpm --filter @append/web build
 ```
 
 ## Sign-off

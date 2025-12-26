@@ -309,13 +309,13 @@ Add new `describe("POST /api/batch/:id/accept", ...)` block with tests:
 
 ```bash
 # API tests (includes new accept-all tests)
-pnpm --filter append-api test
+pnpm --filter @append/api test
 
 # Typecheck both packages
 pnpm typecheck
 
 # Web build (ensures no type breaks)
-pnpm --filter append-web build
+pnpm --filter @append/web build
 ```
 
 ## Risks & Rollback
@@ -346,9 +346,9 @@ git checkout HEAD -- docs/vertical-slice.md
 **Verify rollback succeeded**:
 
 ```bash
-pnpm --filter append-api test
+pnpm --filter @append/api test
 pnpm typecheck
-pnpm --filter append-web build
+pnpm --filter @append/web build
 ```
 
 **Production rollback** (if already deployed):
@@ -356,7 +356,7 @@ pnpm --filter append-web build
 ```bash
 # Redeploy previous version from main branch
 git checkout main
-pnpm --filter append-api run deploy
+pnpm --filter @append/api run deploy
 ```
 
 Or if using CI: revert the merge commit and let CI redeploy.
@@ -371,4 +371,4 @@ Or if using CI: revert the merge commit and let CI redeploy.
   2. `details.originalBatchId` derivation explicitly documented (decode result_ref → parse JSON → extract batchId)
   3. Same-run canonical duplicates handled via Phase 1 canonical→termId mapping (first by position wins)
   4. DB Dependencies section added with full table of relied-upon constraints/columns
-  5. Production rollback command corrected to `pnpm --filter append-api run deploy`
+  5. Production rollback command corrected to `pnpm --filter @append/api run deploy`
