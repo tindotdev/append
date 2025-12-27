@@ -4,7 +4,7 @@ import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
 import { batch, candidate, schema } from '../db';
-import { apiError } from '../lib/api-error';
+import { apiError } from '../shared/api-error';
 
 // =============================================================================
 // Constants

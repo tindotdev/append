@@ -402,7 +402,7 @@ describe('POST /api/batch', () => {
 		expect(res.status).toBe(400);
 		const body = (await res.json()) as any;
 		expect(body.error.code).toBe('VALIDATION_ERROR');
-		expect(body.error.message).toBe("Term at line 2 contains ': ' which is not allowed");
+		expect(body.error.message).toBe('Term contains ": " which is not allowed');
 	});
 
 	it('preserves duplicates as distinct candidates', async () => {
@@ -963,11 +963,13 @@ describe('POST /api/batch/:id/accept', () => {
 		const { id: batchId } = (await createRes.json()) as any;
 
 		// Generate suggestions (stub provider)
+		// Must consume the SSE stream to ensure all database writes complete
 		const suggestRes = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
 			method: 'POST',
 			headers: { cookie: authCookie },
 		});
 		expect(suggestRes.status).toBe(200);
+		await suggestRes.text(); // Consume SSE stream to completion
 
 		return batchId;
 	}
