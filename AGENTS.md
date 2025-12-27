@@ -1,5 +1,9 @@
 # Agent Guide: `append` (lean)
 
+## Monorepo workspace
+
+- ./pnpm-workspace.yaml
+
 ## Commands
 
 - `pnpm -r --if-present typecheck`
