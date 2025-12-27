@@ -57,3 +57,8 @@
 - SSR/adapters complexity for this private app.
 - Silent overwrites (last-write-wins) on user edits.
 - Premature queues/events/microservices.
+
+## LLMS.txt
+
+- `ai-sdk`: ./tmp/ai-sdk/llms.txt
+- `valibot`: ./tmp/valibot/AGENTS.md
