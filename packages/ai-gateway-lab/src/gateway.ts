@@ -16,3 +16,5 @@ export const aigateway = createAiGateway({
 });
 
 export const openai = createOpenAI();
+
+export type OpenAIModel = Parameters<typeof openai.chat>[0];
