@@ -2,6 +2,7 @@ import { type AnyRoute, createRoute, redirect } from '@tanstack/react-router';
 
 import { ProtectedLayout } from '../components/ProtectedLayout';
 import { BatchDetailPage } from '../pages/BatchDetailPage';
+import { BatchListPage } from '../pages/BatchListPage';
 import { BatchNewPage } from '../pages/BatchNewPage';
 import { BucketFeedPage } from '../pages/BucketFeedPage';
 import { ExportPage } from '../pages/ExportPage';
@@ -25,6 +26,12 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 		beforeLoad: () => {
 			throw redirect({ to: '/batch/new' });
 		},
+	});
+
+	const batchListRoute = createRoute({
+		getParentRoute: () => protectedRoute,
+		path: '/batch',
+		component: BatchListPage,
 	});
 
 	const batchNewRoute = createRoute({
@@ -59,6 +66,7 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 
 	const protectedRouteWithChildren = protectedRoute.addChildren([
 		indexRoute,
+		batchListRoute,
 		batchNewRoute,
 		batchDetailRoute,
 		bucketFeedRoute,

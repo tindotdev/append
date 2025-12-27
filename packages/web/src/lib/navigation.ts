@@ -3,6 +3,7 @@ import { BUCKET_OPTIONS } from '@append/contracts/types';
 export const CAPTURE_NAV = { to: '/batch/new', label: 'Capture' } as const;
 
 export const HEADER_NAV = [
+	{ to: '/batch', label: 'Batches' },
 	{ to: '/search', label: 'Search' },
 	{ to: '/export', label: 'Export' },
 ] as const;

@@ -108,6 +108,72 @@ export async function getBatch(id: string): Promise<BatchResponse> {
 	return handleResponse<BatchResponse>(response);
 }
 
+// =============================================================================
+// List Batches API
+// =============================================================================
+
+export interface BatchListItem {
+	id: string;
+	status: 'captured' | 'suggested' | 'accepted';
+	candidateCount: number;
+	createdAt: number;
+	updatedAt: number;
+}
+
+export interface ListBatchesResponse {
+	batches: BatchListItem[];
+	nextCursor: string | null;
+}
+
+export interface ListBatchesOptions {
+	limit?: number;
+	cursor?: string;
+}
+
+export async function listBatches(options?: ListBatchesOptions): Promise<ListBatchesResponse> {
+	const params = new URLSearchParams();
+	if (options?.limit !== undefined) {
+		params.set('limit', String(options.limit));
+	}
+	if (options?.cursor) {
+		params.set('cursor', options.cursor);
+	}
+
+	const queryString = params.toString();
+	const url = `${API_URL}/api/batch${queryString ? `?${queryString}` : ''}`;
+
+	const response = await fetch(url, {
+		method: 'GET',
+		credentials: 'include',
+	});
+
+	return handleResponse<ListBatchesResponse>(response);
+}
+
+export interface RetrySuggestionsResponse {
+	batchId: string;
+	mode: 'fill-missing' | 'regenerate';
+	limit: number;
+	candidateCount: number;
+	eligibleCount: number;
+	results: {
+		suggested: number;
+		cached: number;
+		skippedAlreadySuggested: number;
+		skippedInProgress: number;
+		errors: number;
+	};
+}
+
+export async function retrySuggestions(batchId: string): Promise<RetrySuggestionsResponse> {
+	const response = await fetch(`${API_URL}/api/batch/${batchId}/suggest`, {
+		method: 'POST',
+		credentials: 'include',
+	});
+
+	return handleResponse<RetrySuggestionsResponse>(response);
+}
+
 export interface UpdateCandidateRequest {
 	expectedVersion: number;
 	chosenBucket?: Bucket | null;
