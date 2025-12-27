@@ -3,7 +3,6 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
 
 /**
  * Standard API error codes for /api/* routes.
- * Keep in sync with PLAN_step2-batch-input.md §4.0.
  */
 export type ApiErrorCode =
 	| 'VALIDATION_ERROR'

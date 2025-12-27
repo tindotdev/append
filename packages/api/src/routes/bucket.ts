@@ -4,7 +4,7 @@ import { and, desc, eq, isNull, lt, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
 import { schema, term, termSense } from '../db';
-import { apiError } from '../lib/api-error';
+import { apiError } from '../shared/api-error';
 
 // =============================================================================
 // Constants

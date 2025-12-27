@@ -1,8 +1,12 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { apiError } from './lib/api-error';
+import { apiError } from './shared/api-error';
 import { createAuth } from './lib/auth';
-import { batchRoutes } from './routes/batch';
+// Feature routes (vertical slice architecture)
+import { batchRoutes } from './features/batch/routes';
+import { suggestionsRoutes } from './features/suggestions/routes';
+import { acceptRoutes } from './features/accept/routes';
+// Legacy routes (not yet migrated)
 import { bucketRoutes } from './routes/bucket';
 import { candidateRoutes } from './routes/candidate';
 import { exportRoutes } from './routes/export';
@@ -147,7 +151,11 @@ app.get('/', (c) => c.json({ status: 'ok' }));
 // API routes
 // =============================================================================
 
+// Feature routes (vertical slice architecture)
 app.route('/api/batch', batchRoutes);
+app.route('/api', suggestionsRoutes);
+app.route('/api', acceptRoutes);
+// Legacy routes (not yet migrated)
 app.route('/api/bucket', bucketRoutes);
 app.route('/api/candidate', candidateRoutes);
 app.route('/api/export', exportRoutes);
