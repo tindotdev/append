@@ -3,6 +3,7 @@
 ## Purpose
 
 - Local lab for testing Cloudflare AI Gateway + LLM providers
+- Use Vercel `ai` sdk
 
 ## Commands
 
