@@ -1,0 +1,9 @@
+# Environment files with secrets
+.env
+
+# Node modules (managed by pnpm workspace)
+node_modules/
+
+# Output logs from batch runs
+*.log
+output/
