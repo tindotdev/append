@@ -7,3 +7,6 @@ node_modules/
 # Output logs from batch runs
 *.log
 output/
+
+# LLM response cache
+.llm-cache/
