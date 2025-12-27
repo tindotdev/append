@@ -1,22 +1,19 @@
 import { generateText } from 'ai';
-import { createAiGateway } from 'ai-gateway-provider';
-import { createOpenAI } from 'ai-gateway-provider/providers/openai';
+import { cacheResponse, findCachedResponse } from './cache';
+import { aigateway, openai } from './gateway';
 
-const accountId = process.env.CF_ACCOUNT_ID!;
-const gateway = process.env.AI_GATEWAY_ID!;
-const apiKey = process.env.CF_AIG_TOKEN!;
+const provider = 'openai';
+const prompt = "Who's Tin Dejphachon?";
 
-const aigateway = createAiGateway({
-	accountId,
-	gateway,
-	apiKey,
-});
+let response = findCachedResponse(provider, prompt);
 
-const openai = createOpenAI();
-
-const response = await generateText({
-	model: aigateway(openai.chat('gpt-5-mini')),
-	prompt: "Who's Tin Dejphachon?",
-});
-
-console.log(response);
+if (response) {
+	console.log('(cached)', response);
+} else {
+	response = await generateText({
+		model: aigateway(openai.chat('gpt-4.1-mini')),
+		prompt,
+	});
+	cacheResponse(provider, prompt, response);
+	console.log(response);
+}
