@@ -58,9 +58,36 @@ Planning docs live in `docs/`:
 1. Add words
 2. Go learn it
 3. Comeback trying to explain it (aka. add descriptions)
-   Note: the descriptions could be either of all of these five forms 1. AHA one-liner 2. Analogy 3. Pseudocode 4. Actual code (this one tricky. request for further discussion) 5. Vocal explaination (require transcription)
+   Note: the descriptions could be either of all of these five forms
+   1. AHA one-liner
+   2. Analogy
+   3. Pseudocode
+   4. Actual code (this one tricky. request for further discussion)
+   5. Vocal explanation (require transcription)
 4. See feedback by checking if the explanation is correct or not
 
 ## Reference
 
 - eng-log: /mnt/68ce8b89-5b49-4f3f-857c-8c9edca5b28e/code/github/eng-log/README.md
+
+## Case3: Open in ChatGpt or Claude
+
+Please educate me and explain what does {term} mean in simple terms with real-world examples.
+Please add a funny memorable anology if that helps.
+
+### Example from Prisma documentation
+
+Intent question:
+
+```
+Read https://prisma.io/docs/getting-started/ so I can ask questions about it.
+```
+
+Claude Example:
+<https://claude.ai/new?q=Read%20https://prisma.io/docs/getting-started/%20so%20I%20can%20ask%20questions%20about%20it>.
+
+Open AI Example:
+<https://chatgpt.com/?q=Read+https%3A%2F%2Fprisma.io%2Fdocs%2Fgetting-started%2F+so+I+can+ask+questions+about+it>.
+<https://chatgpt.com/?prompt=Read+https%3A%2F%2Fprisma.io%2Fdocs%2Fgetting-started%2F+so+I+can+ask+questions+about+it>.
+
+Note: the `q` is changed to `prompt` in the OpenAI example
