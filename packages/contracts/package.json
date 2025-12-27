@@ -21,6 +21,6 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"valibot": "^0.31.0"
+		"valibot": "^1.2.0"
 	}
 }
