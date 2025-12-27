@@ -284,6 +284,113 @@ batchRoutes.post('/', async (c) => {
 });
 
 /**
+ * GET /api/batch - List batches for the authenticated user (most recent first)
+ *
+ * Query params:
+ *   - limit (optional): integer, default 20, min 1, max 100
+ *   - cursor (optional): batch ID to start after (for pagination)
+ *
+ * Response: {
+ *   batches: Array<{
+ *     id: string,
+ *     status: "captured" | "suggested" | "accepted",
+ *     candidateCount: number,
+ *     createdAt: number (epoch ms),
+ *     updatedAt: number (epoch ms)
+ *   }>,
+ *   nextCursor: string | null
+ * }
+ */
+batchRoutes.get('/', async (c) => {
+	const userId = c.get('userId');
+	const db = drizzle(c.env.DB, { schema });
+
+	// Parse and validate query params
+	const limitParam = c.req.query('limit');
+	const cursor = c.req.query('cursor');
+
+	let limit = 20;
+	if (limitParam !== undefined) {
+		const parsed = parseInt(limitParam, 10);
+		if (isNaN(parsed) || parsed < 1 || parsed > 100) {
+			return apiError(c, 400, 'VALIDATION_ERROR', 'limit must be an integer between 1 and 100');
+		}
+		limit = parsed;
+	}
+
+	// Build query conditions
+	const conditions = [eq(batch.userId, userId)];
+
+	// If cursor provided, get batches created before the cursor batch
+	if (cursor) {
+		const cursorBatch = await db.query.batch.findFirst({
+			where: eq(batch.id, cursor),
+			columns: { createdAt: true },
+		});
+
+		if (cursorBatch) {
+			// Use createdAt for cursor-based pagination (most recent first)
+			conditions.push(or(lt(batch.createdAt, cursorBatch.createdAt), and(eq(batch.createdAt, cursorBatch.createdAt), lt(batch.id, cursor)))!);
+		}
+	}
+
+	// Fetch batches with one extra to determine if there's a next page
+	const batches = await db
+		.select({
+			id: batch.id,
+			status: batch.status,
+			createdAt: batch.createdAt,
+			updatedAt: batch.updatedAt,
+		})
+		.from(batch)
+		.where(and(...conditions))
+		.orderBy(sql`${batch.createdAt} DESC, ${batch.id} DESC`)
+		.limit(limit + 1);
+
+	// Determine if there's a next page
+	const hasNextPage = batches.length > limit;
+	const resultBatches = hasNextPage ? batches.slice(0, limit) : batches;
+	const nextCursor = hasNextPage ? resultBatches[resultBatches.length - 1]?.id : null;
+
+	// Get candidate counts for all batches in one query
+	const batchIds = resultBatches.map((b) => b.id);
+	let candidateCounts: { batchId: string; count: number }[] = [];
+
+	if (batchIds.length > 0) {
+		candidateCounts = await db
+			.select({
+				batchId: candidate.batchId,
+				count: count(),
+			})
+			.from(candidate)
+			.where(
+				sql`${candidate.batchId} IN (${sql.join(
+					batchIds.map((id) => sql`${id}`),
+					sql`, `
+				)})`
+			)
+			.groupBy(candidate.batchId);
+	}
+
+	// Build map of batch ID to candidate count
+	const countMap = new Map<string, number>();
+	for (const cc of candidateCounts) {
+		countMap.set(cc.batchId, cc.count);
+	}
+
+	return c.json({
+		batches: resultBatches.map((b) => ({
+			id: b.id,
+			status: b.status,
+			candidateCount: countMap.get(b.id) ?? 0,
+			createdAt: b.createdAt.getTime(),
+			updatedAt: b.updatedAt.getTime(),
+		})),
+		nextCursor,
+	});
+});
+
+/**
  * GET /api/batch/:id - Get a batch by ID (owner-only)
  *
  * Response: {

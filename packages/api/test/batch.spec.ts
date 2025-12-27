@@ -622,6 +622,309 @@ describe('GET /api/batch/:id', () => {
 });
 
 // =============================================================================
+// GET /api/batch (list) tests
+// =============================================================================
+
+describe('GET /api/batch (list)', () => {
+	it('returns 401 when unauthenticated', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch');
+		expect(res.status).toBe(401);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('UNAUTHORIZED');
+	});
+
+	it('returns empty list when user has no batches', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			headers: { cookie: authCookie },
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+		expect(body.batches).toEqual([]);
+		expect(body.nextCursor).toBeNull();
+	});
+
+	it('returns batches ordered by most recent first', async () => {
+		// Create 3 batches
+		const batchIds: string[] = [];
+		for (let i = 0; i < 3; i++) {
+			const res = await SELF.fetch('https://example.com/api/batch', {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json',
+					cookie: authCookie,
+				},
+				body: JSON.stringify({
+					terms: generateTerms(25),
+					clientRequestId: generateUUID(),
+				}),
+			});
+			expect(res.status).toBe(201);
+			const { id } = (await res.json()) as any;
+			batchIds.push(id);
+		}
+
+		// List batches
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			headers: { cookie: authCookie },
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		expect(body.batches).toHaveLength(3);
+		// Most recent first (reverse order of creation)
+		expect(body.batches[0].id).toBe(batchIds[2]);
+		expect(body.batches[1].id).toBe(batchIds[1]);
+		expect(body.batches[2].id).toBe(batchIds[0]);
+		expect(body.nextCursor).toBeNull();
+	});
+
+	it('returns batch with correct fields', async () => {
+		// Create a batch
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms: generateTerms(25),
+				clientRequestId: generateUUID(),
+			}),
+		});
+		expect(createRes.status).toBe(201);
+		const { id: batchId } = (await createRes.json()) as any;
+
+		// List batches
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			headers: { cookie: authCookie },
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		expect(body.batches).toHaveLength(1);
+		const batchItem = body.batches[0];
+
+		expect(batchItem.id).toBe(batchId);
+		expect(batchItem.status).toBe('captured');
+		expect(batchItem.candidateCount).toBe(25);
+		expect(batchItem.createdAt).toBeTypeOf('number');
+		expect(batchItem.updatedAt).toBeTypeOf('number');
+	});
+
+	it('respects limit parameter', async () => {
+		// Create 5 batches
+		for (let i = 0; i < 5; i++) {
+			const res = await SELF.fetch('https://example.com/api/batch', {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json',
+					cookie: authCookie,
+				},
+				body: JSON.stringify({
+					terms: generateTerms(25),
+					clientRequestId: generateUUID(),
+				}),
+			});
+			expect(res.status).toBe(201);
+		}
+
+		// List with limit=2
+		const res = await SELF.fetch('https://example.com/api/batch?limit=2', {
+			headers: { cookie: authCookie },
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		expect(body.batches).toHaveLength(2);
+		expect(body.nextCursor).not.toBeNull();
+	});
+
+	it('returns 400 for invalid limit', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch?limit=0', {
+			headers: { cookie: authCookie },
+		});
+
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+	});
+
+	it('returns 400 for limit > 100', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch?limit=101', {
+			headers: { cookie: authCookie },
+		});
+
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+	});
+
+	it('supports cursor-based pagination', async () => {
+		// Create 5 batches
+		const batchIds: string[] = [];
+		for (let i = 0; i < 5; i++) {
+			const res = await SELF.fetch('https://example.com/api/batch', {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json',
+					cookie: authCookie,
+				},
+				body: JSON.stringify({
+					terms: generateTerms(25),
+					clientRequestId: generateUUID(),
+				}),
+			});
+			expect(res.status).toBe(201);
+			const { id } = (await res.json()) as any;
+			batchIds.push(id);
+		}
+
+		// First page (limit=2)
+		const res1 = await SELF.fetch('https://example.com/api/batch?limit=2', {
+			headers: { cookie: authCookie },
+		});
+
+		expect(res1.status).toBe(200);
+		const body1 = (await res1.json()) as any;
+
+		expect(body1.batches).toHaveLength(2);
+		expect(body1.batches[0].id).toBe(batchIds[4]); // Most recent
+		expect(body1.batches[1].id).toBe(batchIds[3]);
+		expect(body1.nextCursor).not.toBeNull();
+
+		// Second page
+		const res2 = await SELF.fetch(`https://example.com/api/batch?limit=2&cursor=${body1.nextCursor}`, {
+			headers: { cookie: authCookie },
+		});
+
+		expect(res2.status).toBe(200);
+		const body2 = (await res2.json()) as any;
+
+		expect(body2.batches).toHaveLength(2);
+		expect(body2.batches[0].id).toBe(batchIds[2]);
+		expect(body2.batches[1].id).toBe(batchIds[1]);
+		expect(body2.nextCursor).not.toBeNull();
+
+		// Third page (last)
+		const res3 = await SELF.fetch(`https://example.com/api/batch?limit=2&cursor=${body2.nextCursor}`, {
+			headers: { cookie: authCookie },
+		});
+
+		expect(res3.status).toBe(200);
+		const body3 = (await res3.json()) as any;
+
+		expect(body3.batches).toHaveLength(1);
+		expect(body3.batches[0].id).toBe(batchIds[0]); // Oldest
+		expect(body3.nextCursor).toBeNull(); // No more pages
+	});
+
+	it('does not return batches from other users', async () => {
+		// Create a batch as authenticated user
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms: generateTerms(25),
+				clientRequestId: generateUUID(),
+			}),
+		});
+		expect(createRes.status).toBe(201);
+
+		// Create a foreign user with a batch directly in DB
+		const foreignUserId = generateUUID();
+		const foreignBatchId = generateUUID();
+		const now = new Date();
+
+		await db.insert(user).values({
+			id: foreignUserId,
+			name: 'Foreign List User',
+			email: 'foreign-list@example.com',
+			emailVerified: false,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		await db.insert(batch).values({
+			id: foreignBatchId,
+			userId: foreignUserId,
+			status: 'captured',
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		await db.insert(candidate).values({
+			id: generateUUID(),
+			batchId: foreignBatchId,
+			position: 0,
+			term: 'foreign-term',
+			normalizedTerm: 'foreign-term',
+			status: 'captured',
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		// List batches as authenticated user
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			headers: { cookie: authCookie },
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		// Should only see own batch, not foreign batch
+		expect(body.batches).toHaveLength(1);
+		expect(body.batches[0].id).not.toBe(foreignBatchId);
+
+		// Clean up foreign user data
+		await db.delete(candidate).where(eq(candidate.batchId, foreignBatchId));
+		await db.delete(batch).where(eq(batch.id, foreignBatchId));
+		await db.delete(user).where(eq(user.id, foreignUserId));
+	});
+
+	it('reflects updated batch status', async () => {
+		// Create and suggest a batch
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms: generateTerms(25),
+				clientRequestId: generateUUID(),
+			}),
+		});
+		expect(createRes.status).toBe(201);
+		const { id: batchId } = (await createRes.json()) as any;
+
+		// Generate suggestions
+		const suggestRes = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
+			method: 'POST',
+			headers: { cookie: authCookie },
+		});
+		expect(suggestRes.status).toBe(200);
+
+		// List batches
+		const res = await SELF.fetch('https://example.com/api/batch', {
+			headers: { cookie: authCookie },
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		expect(body.batches).toHaveLength(1);
+		expect(body.batches[0].status).toBe('suggested');
+	});
+});
+
+// =============================================================================
 // OPTIONS preflight tests
 // =============================================================================
 

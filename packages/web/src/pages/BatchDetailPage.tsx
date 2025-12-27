@@ -11,7 +11,15 @@ import {
 	LoadingState,
 	useCandidateRowStates,
 } from '../components/batch-detail';
-import { ApiRequestError, type BatchResponse, type Candidate, getBatch, type UpdateCandidateRequest, updateCandidate } from '../lib/api';
+import {
+	ApiRequestError,
+	type BatchResponse,
+	type Candidate,
+	getBatch,
+	retrySuggestions,
+	type UpdateCandidateRequest,
+	updateCandidate,
+} from '../lib/api';
 
 const TOAST_TIMEOUT_MS = 5000;
 
@@ -50,6 +58,7 @@ export function BatchDetailPage() {
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<BatchError | null>(null);
 	const [toast, setToast] = useState<string | null>(null);
+	const [isRetrying, setIsRetrying] = useState(false);
 	const { rowStates, initialize, updateDraft, markSaving, markError, applyCandidate } = useCandidateRowStates();
 
 	const fetchBatch = useCallback(async () => {
@@ -139,6 +148,23 @@ export function BatchDetailPage() {
 		[persistCandidate]
 	);
 
+	const handleRetryFailed = useCallback(async () => {
+		setIsRetrying(true);
+		try {
+			await retrySuggestions(batchId);
+			await fetchBatch();
+			setToast('Suggestions regenerated successfully');
+		} catch (err) {
+			if (err instanceof ApiRequestError) {
+				setToast(`Retry failed: ${err.message}`);
+			} else {
+				setToast('Failed to retry suggestions. Please try again.');
+			}
+		} finally {
+			setIsRetrying(false);
+		}
+	}, [batchId, fetchBatch]);
+
 	if (isLoading) {
 		return <LoadingState />;
 	}
@@ -167,7 +193,7 @@ export function BatchDetailPage() {
 	return (
 		<div className="max-w-4xl">
 			<BatchToast message={toast} />
-			<BatchHeader batch={batch} />
+			<BatchHeader batch={batch} isRetrying={isRetrying} onRetryFailed={handleRetryFailed} />
 			<CandidateList
 				candidates={batch.candidates}
 				rowStates={rowStates}
@@ -176,9 +202,14 @@ export function BatchDetailPage() {
 				onSave={handleSave}
 				onClear={handleClearOverrides}
 			/>
-			<Link to="/batch/new" className="mt-6 inline-block text-zinc-400 hover:text-white transition-colors">
-				&larr; Create another batch
-			</Link>
+			<div className="mt-6 flex gap-4">
+				<Link to="/batch" className="text-zinc-400 hover:text-white transition-colors">
+					&larr; View all batches
+				</Link>
+				<Link to="/batch/new" className="text-zinc-400 hover:text-white transition-colors">
+					Create another batch
+				</Link>
+			</div>
 		</div>
 	);
 }
