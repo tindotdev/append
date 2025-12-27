@@ -4,8 +4,13 @@ import { join } from 'node:path';
 
 const CACHE_DIR = '.llm-cache';
 
-interface CachedEntry<T = unknown> {
+export interface CacheKey<TModel extends string = string> {
+	provider: string;
+	model: TModel;
 	prompt: string;
+}
+
+interface CachedEntry<T = unknown> extends CacheKey {
 	response: T;
 	cachedAt: string;
 }
@@ -26,30 +31,30 @@ function timestamp(): string {
 	return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 }
 
-function getCachePath(provider: string): string {
-	return join(CACHE_DIR, provider);
+function getCachePath({ provider, model }: Pick<CacheKey, 'provider' | 'model'>): string {
+	return join(CACHE_DIR, provider, model);
 }
 
-export function findCachedResponse<T = unknown>(provider: string, prompt: string): T | null {
-	const dir = getCachePath(provider);
+export function findCachedResponse<T = unknown, TModel extends string = string>(key: CacheKey<TModel>): T | null {
+	const dir = getCachePath(key);
 	if (!existsSync(dir)) return null;
 
-	const hash = shortHash(prompt);
+	const hash = shortHash(key.prompt);
 	const files = readdirSync(dir).filter((f) => f.includes(`_${hash}.json`));
 
 	for (const file of files) {
 		const data = JSON.parse(readFileSync(join(dir, file), 'utf-8')) as CachedEntry<T>;
-		if (data.prompt === prompt) return data.response;
+		if (data.prompt === key.prompt) return data.response;
 	}
 	return null;
 }
 
-export function cacheResponse(provider: string, prompt: string, response: unknown): void {
-	const dir = getCachePath(provider);
+export function cacheResponse<TModel extends string = string>(key: CacheKey<TModel>, response: unknown): void {
+	const dir = getCachePath(key);
 	if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
-	const filename = `${timestamp()}_${slugify(prompt)}_${shortHash(prompt)}.json`;
-	const data: CachedEntry = { prompt, response, cachedAt: new Date().toISOString() };
+	const filename = `${timestamp()}_${slugify(key.prompt)}_${shortHash(key.prompt)}.json`;
+	const entry: CachedEntry = { ...key, response, cachedAt: new Date().toISOString() };
 
-	writeFileSync(join(dir, filename), JSON.stringify(data, null, 2));
+	writeFileSync(join(dir, filename), JSON.stringify(entry, null, 2));
 }
