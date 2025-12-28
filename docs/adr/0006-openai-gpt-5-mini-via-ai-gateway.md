@@ -1,7 +1,8 @@
 # ADR 0006 — OpenAI `gpt-5-mini` via Cloudflare AI Gateway
 
-Status: Accepted
+Status: Superseded
 Date: 2025-12-23
+Superseded by: ADR 0009 (LLM SDK + streaming) and ADR 0010 (secret management)
 
 ## Context
 
