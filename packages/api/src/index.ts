@@ -3,13 +3,12 @@ import { cors } from 'hono/cors';
 import { apiError } from './shared/api-error';
 import { createAuth } from './lib/auth';
 // Feature routes (vertical slice architecture)
+import { acceptRoutes } from './features/accept/routes';
 import { batchRoutes } from './features/batch/routes';
 import { bucketRoutes } from './features/bucket/routes';
 import { candidateRoutes } from './features/candidate/routes';
+import { exportRoutes } from './features/export/routes';
 import { suggestionsRoutes } from './features/suggestions/routes';
-import { acceptRoutes } from './features/accept/routes';
-// Legacy routes (not yet migrated)
-import { exportRoutes } from './routes/export';
 
 type Bindings = {
 	DB: D1Database;
@@ -152,12 +151,11 @@ app.get('/', (c) => c.json({ status: 'ok' }));
 // =============================================================================
 
 // Feature routes (vertical slice architecture)
+app.route('/api', acceptRoutes);
 app.route('/api/batch', batchRoutes);
 app.route('/api/bucket', bucketRoutes);
 app.route('/api/candidate', candidateRoutes);
-app.route('/api', suggestionsRoutes);
-app.route('/api', acceptRoutes);
-// Legacy routes (not yet migrated)
 app.route('/api/export', exportRoutes);
+app.route('/api', suggestionsRoutes);
 
 export default app;
