@@ -1,5 +1,5 @@
-import { getSuggestionFlags } from './suggestions';
 import type { BatchResponse } from '../types';
+import { getSuggestionFlags } from './suggestions';
 
 interface BatchHeaderProps {
 	batch: BatchResponse;

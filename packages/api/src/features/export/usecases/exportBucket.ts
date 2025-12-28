@@ -8,7 +8,7 @@
 import { BUCKET_TITLES, type Bucket } from '@append/contracts/types';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { term, termSense, type schema } from '../../../db';
+import { type schema, term, termSense } from '../../../db';
 
 /**
  * Export all terms in a bucket as markdown.
@@ -50,5 +50,5 @@ export async function exportBucket(db: DrizzleD1Database<typeof schema>, userId:
 	}
 
 	// Add trailing newline
-	return lines.join('\n') + '\n';
+	return `${lines.join('\n')}\n`;
 }

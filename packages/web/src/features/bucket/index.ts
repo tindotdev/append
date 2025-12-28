@@ -1,8 +1,6 @@
 // API
-export { getBucketFeed, useBucketFeed, bucketKeys } from './api/get-bucket-feed';
-
-// Types
-export type { BucketFeedItem, BucketFeedResponse, GetBucketFeedOptions } from './types';
-
+export { bucketKeys, getBucketFeed, useBucketFeed } from './api/get-bucket-feed';
 // Pages
 export { BucketFeedPage } from './pages/BucketFeedPage';
+// Types
+export type { BucketFeedItem, BucketFeedResponse, GetBucketFeedOptions } from './types';

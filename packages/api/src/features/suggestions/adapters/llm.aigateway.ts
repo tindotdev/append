@@ -6,11 +6,11 @@
  */
 
 import { valibotSchema } from '@ai-sdk/valibot';
-import { BucketSchema, BUCKET_LIST } from '@append/contracts';
+import { BUCKET_LIST, BucketSchema } from '@append/contracts';
 import { generateText, Output } from 'ai';
 import { createAiGateway } from 'ai-gateway-provider';
 import { createOpenAI } from 'ai-gateway-provider/providers/openai';
-import { strictObject, string, pipe, maxLength } from 'valibot';
+import { maxLength, pipe, strictObject, string } from 'valibot';
 import type { LlmClient, Suggestion } from '../ports/llm';
 
 /**

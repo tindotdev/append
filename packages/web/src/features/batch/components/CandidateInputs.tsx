@@ -15,8 +15,11 @@ export function CandidateInputs({
 	return (
 		<div className="flex flex-wrap gap-3">
 			<div className="flex flex-col gap-1">
-				<label className="text-xs text-zinc-500">Bucket</label>
+				<label htmlFor="candidate-bucket" className="text-xs text-zinc-500">
+					Bucket
+				</label>
 				<select
+					id="candidate-bucket"
 					value={draft.bucket ?? ''}
 					onChange={(event) => onDraftChange({ bucket: event.target.value ? (event.target.value as Bucket) : null })}
 					disabled={isSaving}
@@ -31,8 +34,11 @@ export function CandidateInputs({
 				</select>
 			</div>
 			<div className="flex flex-col gap-1 flex-1 min-w-[200px]">
-				<label className="text-xs text-zinc-500">Definition</label>
+				<label htmlFor="candidate-definition" className="text-xs text-zinc-500">
+					Definition
+				</label>
 				<input
+					id="candidate-definition"
 					type="text"
 					value={draft.text}
 					onChange={(event) => onDraftChange({ text: event.target.value })}

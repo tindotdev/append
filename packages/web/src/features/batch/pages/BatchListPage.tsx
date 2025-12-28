@@ -61,7 +61,11 @@ export function BatchListPage() {
 				<h2 className="text-xl font-semibold">My Batches</h2>
 				<div className="flex flex-col items-center justify-center py-12 text-center">
 					<p className="text-zinc-400">Something went wrong. Please try again.</p>
-					<button onClick={() => refetch()} className="mt-4 px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors">
+					<button
+						type="button"
+						onClick={() => refetch()}
+						className="mt-4 px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors"
+					>
 						Retry
 					</button>
 				</div>
@@ -124,6 +128,7 @@ export function BatchListPage() {
 			{hasNextPage && (
 				<div className="mt-6 flex justify-center">
 					<button
+						type="button"
 						onClick={() => fetchNextPage()}
 						disabled={isFetchingNextPage}
 						className="px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"

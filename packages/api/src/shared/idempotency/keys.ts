@@ -5,8 +5,8 @@
  * Each key stores a request hash for conflict detection and a result reference.
  */
 
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { idempotencyKey, type schema } from '../../db';
 
 export type IdempotencyScope = 'capture_terms' | 'accept_all';

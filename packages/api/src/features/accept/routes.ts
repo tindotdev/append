@@ -2,14 +2,14 @@
  * Accept routes: accept all candidates in a batch.
  */
 
-import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
+import { Hono } from 'hono';
 import * as v from 'valibot';
-import type { Bindings, Variables } from '../../platform/env';
 import { schema } from '../../db';
+import type { Bindings, Variables } from '../../platform/env';
 import { apiError } from '../../shared/api-error';
-import { AcceptAllSchema } from './validation/acceptAll.schema';
 import { acceptAll } from './usecases/acceptAll';
+import { AcceptAllSchema } from './validation/acceptAll.schema';
 
 export const acceptRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 

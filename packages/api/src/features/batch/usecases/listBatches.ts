@@ -4,10 +4,10 @@
  * Returns paginated batches with candidate counts.
  */
 
-import { count, and, eq, lt, or, sql, asc } from 'drizzle-orm';
+import { and, count, eq, lt, or, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { batch, candidate, type BatchStatus, type schema } from '../../../db';
-import type { ListBatchesInput, PaginationCursor } from '../validation/listBatches.schema';
+import { type BatchStatus, batch, candidate, type schema } from '../../../db';
+import type { ListBatchesInput } from '../validation/listBatches.schema';
 import { decodeCursor, encodeCursor } from '../validation/listBatches.schema';
 
 /**
@@ -52,9 +52,11 @@ export async function listBatches(
 		const decoded = decodeCursor(cursor);
 		if (decoded) {
 			// Use (createdAt, id) tuple for stable cursor-based pagination
-			conditions.push(
-				or(lt(batch.createdAt, new Date(decoded.createdAt)), and(eq(batch.createdAt, new Date(decoded.createdAt)), lt(batch.id, decoded.id)))!
+			const cursorCondition = or(
+				lt(batch.createdAt, new Date(decoded.createdAt)),
+				and(eq(batch.createdAt, new Date(decoded.createdAt)), lt(batch.id, decoded.id))
 			);
+			if (cursorCondition) conditions.push(cursorCondition);
 		}
 	}
 

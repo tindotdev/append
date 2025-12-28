@@ -1,5 +1,5 @@
-import boundaries from 'eslint-plugin-boundaries';
 import typescriptParser from '@typescript-eslint/parser';
+import boundaries from 'eslint-plugin-boundaries';
 
 export default [
 	{
@@ -56,7 +56,7 @@ export default [
 						{
 							from: ['feature'],
 							allow: [
-								['feature', { featureName: '${from.featureName}' }], // Same feature only
+								['feature', { featureName: `\${from.featureName}` }], // Same feature only
 								'lib',
 								'components',
 							],

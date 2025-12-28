@@ -1,6 +1,6 @@
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { API_URL } from '@/lib/api-client';
-import type { SuggestStartEvent, SuggestCandidateEvent, SuggestDoneEvent } from '../types';
+import type { SuggestCandidateEvent, SuggestDoneEvent, SuggestStartEvent } from '../types';
 
 export interface GenerateSuggestionsCallbacks {
 	onStart?: (event: SuggestStartEvent) => void;

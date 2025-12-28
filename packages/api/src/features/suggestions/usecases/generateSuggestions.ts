@@ -4,14 +4,14 @@
  * Streams progress events to the client as candidates are processed.
  */
 
-import { and, eq, lt, or, isNull, asc, sql } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { Bucket } from '@append/contracts/types';
-import { batch, candidate, type BatchStatus, type SuggestionStatus, type schema } from '../../../db';
+import { and, asc, eq, isNull, lt, or, sql } from 'drizzle-orm';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { type BatchStatus, batch, candidate, type SuggestionStatus, type schema } from '../../../db';
 import { sseEvent } from '../../../platform/sse';
+import { PROMPT_VERSION, SUGGESTION_MODEL } from '../adapters/llm.aigateway';
+import { cacheSuggestion, findCachedSuggestion } from '../data/suggestion-cache';
 import type { LlmClient, Suggestion } from '../ports/llm';
-import { SUGGESTION_MODEL, PROMPT_VERSION } from '../adapters/llm.aigateway';
-import { findCachedSuggestion, cacheSuggestion } from '../data/suggestion-cache';
 import { MAX_SUGGESTION_ATTEMPTS, type SuggestionMode } from '../validation/suggest.schema';
 
 /**

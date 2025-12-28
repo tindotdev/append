@@ -2,17 +2,17 @@
  * Suggestions routes: generate suggestions for batch candidates.
  */
 
-import { Hono } from 'hono';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/d1';
+import { Hono } from 'hono';
 import * as v from 'valibot';
+import { batch, schema } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
 import { sseHeaders } from '../../platform/sse';
-import { schema, batch } from '../../db';
 import { apiError } from '../../shared/api-error';
 import { createLlmClient } from './adapters';
-import { SuggestSchema, DEFAULT_LIMIT } from './validation/suggest.schema';
 import { generateSuggestions } from './usecases/generateSuggestions';
+import { SuggestSchema } from './validation/suggest.schema';
 
 export const suggestionsRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 

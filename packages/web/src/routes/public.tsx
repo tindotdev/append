@@ -1,6 +1,6 @@
 import { type AnyRoute, createRoute, redirect } from '@tanstack/react-router';
-import type { AuthContextType } from '@/features/auth/hooks/use-auth';
 import { SignInPage } from '@/features/auth';
+import type { AuthContextType } from '@/features/auth/hooks/use-auth';
 
 export function createPublicRoutes<TParentRoute extends AnyRoute>(rootRoute: TParentRoute) {
 	const signInRoute = createRoute({

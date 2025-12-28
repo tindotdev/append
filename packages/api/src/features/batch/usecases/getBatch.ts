@@ -4,10 +4,10 @@
  * Returns the batch with all its candidates.
  */
 
-import { eq, asc } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { batch, candidate, type BatchStatus, type SuggestionStatus, type schema } from '../../../db';
 import type { Bucket } from '@append/contracts/types';
+import { asc, eq } from 'drizzle-orm';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { type BatchStatus, batch, candidate, type SuggestionStatus, type schema } from '../../../db';
 
 /**
  * Candidate detail for get batch response.
