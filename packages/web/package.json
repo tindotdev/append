@@ -6,7 +6,8 @@
 		"dev": "vite --port 5173",
 		"build": "vite build && tsc",
 		"preview": "vite preview",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"lint:boundaries": "eslint src --no-warn-ignored"
 	},
 	"dependencies": {
 		"@append/contracts": "workspace:*",

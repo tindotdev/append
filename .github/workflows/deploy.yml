@@ -29,6 +29,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint (Biome)
+        run: pnpm ci:lint
+
+      - name: Lint (Boundaries)
+        run: pnpm lint:boundaries
+
+      - name: Run tests
+        run: pnpm test
+
       - name: Apply D1 migrations
         working-directory: packages/api
         run: pnpm exec wrangler d1 migrations apply append-db --remote --config wrangler.jsonc

@@ -25,6 +25,7 @@ Ensure new functionality doesn't break existing foundations as the project evolv
 | Test Utilities        | ✅ Auth, generators, cleanup | `packages/api/test/batch.spec.ts` |
 | D1 Test Environment   | ✅ Migrations auto-apply     | `packages/api/test/setup.ts`      |
 | CI/CD Integration     | ✅ Tests run before deploy   | `.github/workflows/deploy.yml`    |
+| Static Analysis       | ✅ Biome + ESLint boundaries | `biome.json`, `*/eslint.config.js`|
 | Web Component Tests   | ❌ None                      | —                                 |
 | E2E Tests             | ❌ None                      | —                                 |
 
@@ -415,6 +416,47 @@ The test environment uses these variables (from `wrangler.jsonc`):
 | `BETTER_AUTH_SECRET`              | `test-secret-...`       | Cookie signing (32+ chars)           |
 | `ALLOWED_EMAIL`                   | `test-a@example.com`    | Allowlist bypass for test user       |
 | `GOOGLE_CLIENT_ID`                | `test-google-client-id` | Dummy OAuth (not used in tests)      |
+
+---
+
+## Static Analysis
+
+### Biome (Formatting + Linting)
+
+Primary linter and formatter for the codebase:
+
+```bash
+pnpm lint        # Lint with auto-fix
+pnpm format      # Format with auto-fix
+pnpm check       # Both lint + format
+pnpm ci:lint     # CI mode (no auto-fix, fails on errors)
+```
+
+### ESLint Boundaries (Architecture Enforcement)
+
+Prevents cross-feature imports to maintain vertical slice isolation:
+
+```bash
+pnpm lint:boundaries   # Run on all packages
+```
+
+**Architecture rules enforced:**
+
+| Package | Rule |
+|---------|------|
+| `web` | Features can only import from same feature, `lib`, `components` |
+| `api` | Features can only import from same feature, `shared`, `db`, `lib`, `platform` |
+
+**Example violation:**
+
+```typescript
+// In features/batch/some-file.ts
+import { useAuth } from '../auth';  // ❌ Cross-feature import blocked
+```
+
+Config files:
+- `packages/web/eslint.config.js`
+- `packages/api/eslint.config.js`
 
 ---
 

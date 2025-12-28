@@ -34,6 +34,7 @@
 - Cloudflare-first: SPA on Pages + API on Workers (Hono) + D1 for relational storage.
 - Correctness: idempotent creates/accept/import; retry-safe jobs; conditional transitions; conflict detection for edits; soft deletes.
 - UI: calm-by-default feed (primary sense only) + explicit review surface for flagged items.
+- Code quality: Biome for formatting/linting + ESLint boundaries for feature isolation (`pnpm lint:boundaries`).
 
 ## Anti-patterns to avoid
 
