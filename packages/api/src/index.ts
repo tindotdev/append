@@ -5,10 +5,10 @@ import { createAuth } from './lib/auth';
 // Feature routes (vertical slice architecture)
 import { batchRoutes } from './features/batch/routes';
 import { bucketRoutes } from './features/bucket/routes';
+import { candidateRoutes } from './features/candidate/routes';
 import { suggestionsRoutes } from './features/suggestions/routes';
 import { acceptRoutes } from './features/accept/routes';
 // Legacy routes (not yet migrated)
-import { candidateRoutes } from './routes/candidate';
 import { exportRoutes } from './routes/export';
 
 type Bindings = {
@@ -154,10 +154,10 @@ app.get('/', (c) => c.json({ status: 'ok' }));
 // Feature routes (vertical slice architecture)
 app.route('/api/batch', batchRoutes);
 app.route('/api/bucket', bucketRoutes);
+app.route('/api/candidate', candidateRoutes);
 app.route('/api', suggestionsRoutes);
 app.route('/api', acceptRoutes);
 // Legacy routes (not yet migrated)
-app.route('/api/candidate', candidateRoutes);
 app.route('/api/export', exportRoutes);
 
 export default app;
