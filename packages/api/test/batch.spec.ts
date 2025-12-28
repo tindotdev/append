@@ -1403,10 +1403,12 @@ describe('POST /api/batch/:id/accept', () => {
 		const { id: batchId2 } = (await createRes2.json()) as any;
 
 		// Suggest second batch
-		await SELF.fetch(`https://example.com/api/batch/${batchId2}/suggest`, {
+		const suggestRes2 = await SELF.fetch(`https://example.com/api/batch/${batchId2}/suggest`, {
 			method: 'POST',
 			headers: { cookie: authCookie },
 		});
+		expect(suggestRes2.status).toBe(200);
+		await suggestRes2.text(); // Consume SSE stream to completion
 
 		// Set a different bucket for the conflicting candidate
 		const secondBatchCandidates = await (db.query as any).candidate.findMany({
