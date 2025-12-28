@@ -40,8 +40,8 @@ suggestionsRoutes.post('/batch/:id/suggest', async (c) => {
 	const { limit, regenerate } = parseResult.output;
 	const mode = regenerate ? 'regenerate' : 'fill-missing';
 
-	// Create LLM client
-	const llm = createLlmClient(c.env);
+	// Create LLM client (async due to Secrets Store)
+	const llm = await createLlmClient(c.env);
 	if (!llm) {
 		return apiError(c, 503, 'SERVICE_UNAVAILABLE', 'Suggestions are disabled');
 	}
