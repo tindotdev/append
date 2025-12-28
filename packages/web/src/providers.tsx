@@ -1,6 +1,12 @@
 import type React from 'react';
-import { AuthProvider } from './components/AuthProvider';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from './features/auth';
+import { queryClient } from './lib/query-client';
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-	return <AuthProvider>{children}</AuthProvider>;
+	return (
+		<QueryClientProvider client={queryClient}>
+			<AuthProvider>{children}</AuthProvider>
+		</QueryClientProvider>
+	);
 }

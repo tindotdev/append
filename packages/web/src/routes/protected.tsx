@@ -1,12 +1,9 @@
 import { type AnyRoute, createRoute, redirect } from '@tanstack/react-router';
 
-import { ProtectedLayout } from '../components/ProtectedLayout';
-import { BatchDetailPage } from '../pages/BatchDetailPage';
-import { BatchListPage } from '../pages/BatchListPage';
-import { BatchNewPage } from '../pages/BatchNewPage';
-import { BucketFeedPage } from '../pages/BucketFeedPage';
-import { ExportPage } from '../pages/ExportPage';
-import { SearchPage } from '../pages/SearchPage';
+import { ProtectedLayout } from '@/components/layouts/ProtectedLayout';
+import { BatchDetailPage, BatchListPage, BatchNewPage, SearchPage } from '@/features/batch';
+import { BucketFeedPage } from '@/features/bucket';
+import { ExportPage } from '@/features/export';
 
 export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: TParentRoute) {
 	const protectedRoute = createRoute({
