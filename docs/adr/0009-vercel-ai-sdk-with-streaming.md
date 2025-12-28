@@ -5,6 +5,10 @@ Date: 2025-12-27
 
 Supersedes: ADR 0006 (partially — LLM SDK choice and streaming posture)
 
+## Summary
+
+Adopt Vercel AI SDK with ai-gateway-provider for OpenAI `gpt-5-mini`, and add SSE progress streaming for batch suggestions while keeping model calls non-streaming.
+
 ## Context
 
 The current raw `fetch` implementation for LLM suggestions (per ADR 0006) has proven non-functional in production. Meanwhile, the experimental `ai-gateway-lab` package demonstrates a working pattern using:
@@ -19,57 +23,13 @@ Additionally, the current suggestion endpoint returns a complete JSON response a
 
 ### LLM SDK
 
-Adopt **Vercel AI SDK** as the primary LLM interface:
-
-```typescript
-import { generateText, Output } from 'ai';
-import { valibotSchema } from '@ai-sdk/valibot';
-import { createAiGateway } from 'ai-gateway-provider';
-import { createOpenAI } from 'ai-gateway-provider/providers/openai';
-
-const aigateway = createAiGateway({
-  accountId: env.CF_ACCOUNT_ID,
-  gateway: env.AI_GATEWAY_ID,
-  apiKey: env.CF_AIG_TOKEN,
-});
-
-const openai = createOpenAI();
-
-const response = await generateText({
-  model: aigateway(openai.chat('gpt-5-mini')),
-  system: SYSTEM_PROMPT,
-  prompt: term,
-  output: Output.object({
-    schema: valibotSchema(SuggestionSchema),
-  }),
-});
-```
-
-This replaces the raw `fetch` with `cf-aig-authorization` header from ADR 0006.
+Adopt **Vercel AI SDK** as the primary LLM interface. This replaces the raw `fetch`
+with `cf-aig-authorization` header from ADR 0006.
 
 ### Streaming for Progress Updates
 
-Allow **SSE (Server-Sent Events) streaming** for the suggestion endpoint to provide real-time progress feedback:
-
-```
-POST /api/batch/:id/suggest
-Content-Type: text/event-stream
-
-event: start
-data: {"batchId":"..."}
-
-event: stats
-data: {"total":50,"cached":10,"pending":40}
-
-event: candidate
-data: {"id":"...","term":"Docker","status":"running"}
-
-event: candidate
-data: {"id":"...","term":"Docker","status":"ok","suggestion":{"bucket":"dx-tooling","text":"..."}}
-
-event: done
-data: {"ok":38,"failed":2,"cached":10}
-```
+Allow **SSE (Server-Sent Events) streaming** for the suggestion endpoint to provide
+real-time progress feedback (e.g., `start` → `candidate` → `done` events).
 
 This does **not** stream the LLM response itself (the model call remains non-streaming). It streams the batch processing progress to the client.
 
@@ -92,7 +52,7 @@ Use valibot schemas for:
 1. **LLM output validation** (via `@ai-sdk/valibot`)
 2. **Request validation** (replacing manual validation code)
 
-This reduces ~60 lines of manual validation per endpoint to ~20 lines of schema definitions.
+This reduces manual validation per endpoint in favor of schemas.
 
 ## Consequences
 
@@ -113,16 +73,10 @@ This reduces ~60 lines of manual validation per endpoint to ~20 lines of schema 
 
 ### New Dependencies
 
-```json
-{
-  "dependencies": {
-    "ai": "^4.x",
-    "@ai-sdk/valibot": "^1.x",
-    "ai-gateway-provider": "^1.x",
-    "valibot": "^1.x"
-  }
-}
-```
+- `ai`
+- `@ai-sdk/valibot`
+- `ai-gateway-provider`
+- `valibot`
 
 ### Benefits
 
