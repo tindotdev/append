@@ -3,11 +3,11 @@ import { Link, useParams } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiRequestError } from '@/lib/api-client';
 import { getBatch } from '../api/get-batch';
-import { retrySuggestions } from '../api/retry-suggestions';
+import { generateSuggestions } from '../api/retry-suggestions';
 import { updateCandidate } from '../api/update-candidate';
 import { BatchHeader, BatchToast, CandidateList, EmptyState, ErrorState, LoadingState } from '../components';
 import { useCandidateRowStates } from '../hooks/use-candidate-row-states';
-import type { BatchError, BatchResponse, Candidate, UpdateCandidateRequest } from '../types';
+import type { BatchError, BatchResponse, Candidate, SuggestCandidateEvent, UpdateCandidateRequest } from '../types';
 
 const TOAST_TIMEOUT_MS = 5000;
 
@@ -37,6 +37,41 @@ function updateBatchCandidate(batch: BatchResponse | null, candidate: Candidate)
 	return {
 		...batch,
 		candidates: batch.candidates.map((item) => (item.id === candidate.id ? candidate : item)),
+	};
+}
+
+function applySseEventToCandidate(batch: BatchResponse | null, event: SuggestCandidateEvent): BatchResponse | null {
+	if (!batch) return batch;
+	return {
+		...batch,
+		candidates: batch.candidates.map((item) => {
+			if (item.id !== event.id) return item;
+
+			// Update candidate based on SSE event status
+			if (event.status === 'ok' || event.status === 'cached') {
+				return {
+					...item,
+					suggestedBucket: event.suggestion?.bucket ?? item.suggestedBucket,
+					suggestedText: event.suggestion?.text ?? item.suggestedText,
+					suggestionStatus: 'done',
+					suggestionError: null,
+				};
+			}
+			if (event.status === 'error') {
+				return {
+					...item,
+					suggestionStatus: 'error',
+					suggestionError: event.error ?? 'Unknown error',
+				};
+			}
+			if (event.status === 'running') {
+				return {
+					...item,
+					suggestionStatus: 'in_progress',
+				};
+			}
+			return item;
+		}),
 	};
 }
 
@@ -136,22 +171,37 @@ export function BatchDetailPage() {
 		[persistCandidate]
 	);
 
-	const handleRetryFailed = useCallback(async () => {
+	const handleGenerateSuggestions = useCallback(async () => {
 		setIsRetrying(true);
+		let successCount = 0;
+		let errorCount = 0;
+
 		try {
-			await retrySuggestions(batchId);
-			await fetchBatch();
-			setToast('Suggestions regenerated successfully');
-		} catch (err) {
-			if (err instanceof ApiRequestError) {
-				setToast(`Retry failed: ${err.message}`);
-			} else {
-				setToast('Failed to retry suggestions. Please try again.');
-			}
+			await generateSuggestions(batchId, {
+				onCandidate: (event) => {
+					setBatch((prev) => applySseEventToCandidate(prev, event));
+					if (event.status === 'ok' || event.status === 'cached') successCount++;
+					if (event.status === 'error') errorCount++;
+				},
+				onDone: () => {
+					if (errorCount > 0) {
+						setToast(`Generated ${successCount} suggestions, ${errorCount} failed`);
+					} else if (successCount > 0) {
+						setToast(`Generated ${successCount} suggestions`);
+					}
+				},
+				onError: (error) => {
+					setToast(`Generation failed: ${error}`);
+				},
+			});
+		} catch {
+			setToast('Failed to generate suggestions. Please try again.');
 		} finally {
 			setIsRetrying(false);
 		}
-	}, [batchId, fetchBatch]);
+	}, [batchId]);
+
+	const handleRetryFailed = handleGenerateSuggestions;
 
 	if (isLoading) {
 		return <LoadingState />;
@@ -181,7 +231,7 @@ export function BatchDetailPage() {
 	return (
 		<div className="max-w-4xl">
 			<BatchToast message={toast} />
-			<BatchHeader batch={batch} isRetrying={isRetrying} onRetryFailed={handleRetryFailed} />
+			<BatchHeader batch={batch} isRetrying={isRetrying} onRetryFailed={handleRetryFailed} onGenerateSuggestions={handleGenerateSuggestions} />
 			<CandidateList
 				candidates={batch.candidates}
 				rowStates={rowStates}

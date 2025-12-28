@@ -84,6 +84,34 @@ export interface RetrySuggestionsResponse {
 	};
 }
 
+// SSE Event Types (from backend generateSuggestions)
+export interface SuggestStartEvent {
+	batchId: string;
+	mode: 'fill-missing' | 'regenerate';
+	candidateCount: number;
+	eligibleCount: number;
+	limit: number;
+}
+
+export interface SuggestCandidateEvent {
+	id: string;
+	term: string;
+	status: 'running' | 'ok' | 'cached' | 'error' | 'skipped';
+	suggestion?: {
+		bucket: Bucket;
+		text: string;
+	};
+	error?: string;
+}
+
+export interface SuggestDoneEvent {
+	ok: number;
+	failed: number;
+	cached: number;
+	skippedAlreadySuggested: number;
+	errors: number;
+}
+
 // UI Types
 export type BatchError = { status: number; message: string };
 
