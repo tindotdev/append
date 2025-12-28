@@ -33,11 +33,14 @@ const key: CacheKey<OpenAIModel> = {
 	prompt: 'Cloudflare',
 };
 
-let response = findCachedResponse(key);
+const main = async () => {
+	let response = findCachedResponse(key);
 
-if (response) {
-	console.log('(cached)', response);
-} else {
+	if (response) {
+		console.log('(cached)', response);
+		return;
+	}
+
 	response = await generateText({
 		system,
 		model: aigateway(openai.chat(key.model)),
@@ -53,4 +56,6 @@ if (response) {
 	});
 	cacheResponse(key, response);
 	console.log(response);
-}
+};
+
+await main();
