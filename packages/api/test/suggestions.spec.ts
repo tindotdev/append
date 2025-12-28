@@ -365,11 +365,12 @@ describe('POST /api/batch/:id/suggest', () => {
 	it('regenerate mode re-suggests already-suggested candidates', async () => {
 		const batchId = await createBatch(authCookie, 20);
 
-		// First suggest call
-		await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
+		// First suggest call - must consume response to ensure D1 operations complete
+		const res1 = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
 			method: 'POST',
 			headers: { cookie: authCookie },
 		});
+		await res1.text();
 
 		// Second call with regenerate=1
 		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest?regenerate=1`, {
@@ -441,11 +442,12 @@ describe('POST /api/batch/:id/suggest', () => {
 		// Create first batch
 		const batchId1 = await createBatch(authCookie, 20);
 
-		// Suggest on first batch
-		await SELF.fetch(`https://example.com/api/batch/${batchId1}/suggest`, {
+		// Suggest on first batch - must consume response to ensure D1 operations complete
+		const res1 = await SELF.fetch(`https://example.com/api/batch/${batchId1}/suggest`, {
 			method: 'POST',
 			headers: { cookie: authCookie },
 		});
+		await res1.text(); // Consume SSE stream to ensure all writes complete
 
 		// Verify cache entry was created
 		const cacheEntries = await (db.query as any).suggestionCache.findMany();
@@ -479,11 +481,12 @@ describe('POST /api/batch/:id/suggest', () => {
 		});
 		const versionsBefore = candidatesBefore.map((c: any) => c.version);
 
-		// Suggest
-		await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
+		// Suggest - must consume response to ensure D1 operations complete
+		const suggestRes = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
 			method: 'POST',
 			headers: { cookie: authCookie },
 		});
+		await suggestRes.text();
 
 		// Get version after
 		const candidatesAfter = await (db.query as any).candidate.findMany({
@@ -526,11 +529,12 @@ describe('POST /api/batch/:id/suggest', () => {
 	it('returns suggestion fields in GET /api/batch/:id response', async () => {
 		const batchId = await createBatch(authCookie, 20);
 
-		// Suggest
-		await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
+		// Suggest - must consume response to ensure D1 operations complete
+		const suggestRes = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
 			method: 'POST',
 			headers: { cookie: authCookie },
 		});
+		await suggestRes.text();
 
 		// Get batch
 		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}`, {
@@ -563,11 +567,12 @@ describe('POST /api/batch/:id/suggest', () => {
 	it('stub provider generates deterministic buckets based on term hash', async () => {
 		const batchId = await createBatch(authCookie, 20);
 
-		// Suggest
-		await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
+		// Suggest - must consume response to ensure D1 operations complete
+		const suggestRes = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
 			method: 'POST',
 			headers: { cookie: authCookie },
 		});
+		await suggestRes.text();
 
 		// Get candidates
 		const candidates = await (db.query as any).candidate.findMany({
