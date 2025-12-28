@@ -19,3 +19,4 @@ Rules:
 - `0007-step-3-suggestions-on-candidate-plus-cache.md` — Step 3 suggestions stored on `candidate` + per-term cache
 - `0008-accept-all-idempotency-via-candidate-materialization-pointers.md` — Accept-all idempotency via candidate materialization pointers
 - `0009-vercel-ai-sdk-with-streaming.md` — Vercel AI SDK with SSE streaming for suggestions
+- `0010-openai-api-key-secrets-store.md` — OpenAI API key stored in Cloudflare Secrets Store

@@ -1,9 +1,10 @@
 # ADR 0009 — Vercel AI SDK with SSE Streaming for Suggestions
 
-Status: Accepted
+Status: Accepted (Superseded by ADR 0010 for secret management)
 Date: 2025-12-27
 
 Supersedes: ADR 0006 (partially — LLM SDK choice and streaming posture)
+Superseded by: ADR 0010 (secret management)
 
 ## Summary
 
@@ -35,15 +36,19 @@ This does **not** stream the LLM response itself (the model call remains non-str
 
 ### Configuration Changes
 
-New environment variables:
+New configuration:
 
 - `CF_ACCOUNT_ID` — Cloudflare account ID (previously derived from AI binding)
+- `OPENAI_API_KEY` — Secrets Store binding (account-level) for OpenAI API access
 
 Unchanged:
 
-- `CF_AIG_TOKEN` — Cloudflare API token for Unified Billing
 - `AI_GATEWAY_ID` — AI Gateway identifier
 - Model: `gpt-5-mini` (unchanged from ADR 0006)
+
+Removed:
+
+- `CF_AIG_TOKEN` — Cloudflare API token for Unified Billing
 
 ### Validation with Valibot
 
@@ -67,7 +72,7 @@ This reduces manual validation per endpoint in favor of schemas.
 ### Changed from ADR 0006
 
 - SDK: Vercel AI SDK (was: raw fetch)
-- Auth: `apiKey` via ai-gateway-provider (was: `cf-aig-authorization` header)
+- Auth: `apiKey` via ai-gateway-provider (now sourced from Secrets Store)
 - URL: Constructed by ai-gateway-provider (was: `env.AI.gateway().getUrl()`)
 - Response format: SSE stream with progress events (was: single JSON response)
 
