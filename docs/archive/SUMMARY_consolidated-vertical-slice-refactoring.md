@@ -18,11 +18,13 @@ Refactored `packages/api` from a monolithic architecture to vertical slice archi
 ## Final Outcomes
 
 ### Infrastructure Created
+
 - `platform/`: `env.ts`, `context.ts`, `sse.ts`
 - `shared/`: `crypto.ts`, `api-error.ts`, `validation/uuid.ts`, `idempotency/keys.ts`, `idempotency/encoding.ts`
 - LLM ports/adapters: `ports/llm.ts`, `adapters/llm.aigateway.ts`, `adapters/llm.stub.ts`
 
 ### Features Migrated (Complete)
+
 - `features/batch/` - captureTerms, listBatches, getBatch
 - `features/suggestions/` - generateSuggestions with SSE streaming
 - `features/accept/` - acceptAll with idempotency
@@ -31,6 +33,7 @@ Refactored `packages/api` from a monolithic architecture to vertical slice archi
 - `features/export/` - exportBucket as markdown
 
 ### Legacy Routes Removed
+
 - `routes/` directory deleted (was empty after final migration)
 
 ## Current Status
@@ -57,6 +60,7 @@ Refactored `packages/api` from a monolithic architecture to vertical slice archi
 ---
 
 **Files Changed** (Session 4 - export migration):
+
 - `packages/api/src/features/export/routes.ts` (new)
 - `packages/api/src/features/export/usecases/exportBucket.ts` (new)
 - `packages/api/src/index.ts` (modified - export import path, alphabetized)
