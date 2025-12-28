@@ -8,8 +8,8 @@
 import type { Bucket } from '@append/contracts/types';
 import { and, desc, eq, isNull, lt, or } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { term, termSense, type schema } from '../../../db';
-import { decodeCursor, encodeCursor, type BucketFeedCursor, type GetBucketFeedParams } from '../validation/getBucketFeed.schema';
+import { type schema, term, termSense } from '../../../db';
+import { type BucketFeedCursor, decodeCursor, encodeCursor, type GetBucketFeedParams } from '../validation/getBucketFeed.schema';
 
 /**
  * A single item in the bucket feed.
@@ -70,7 +70,7 @@ export async function getBucketFeed(
 	const baseConditions = and(eq(term.userId, userId), isNull(term.archivedAt), eq(termSense.bucket, bucket), isNull(termSense.archivedAt));
 
 	// Build the full WHERE clause with optional cursor pagination
-	let whereClause;
+	let whereClause: typeof baseConditions;
 	if (cursor) {
 		// Cursor pagination for DESC ordering:
 		// (created_at < cursorCreatedAt) OR (created_at = cursorCreatedAt AND term.id < cursorTermId)

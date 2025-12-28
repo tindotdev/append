@@ -38,7 +38,7 @@ export async function applyMigrations() {
 					.trim()
 			)
 			.filter((s) => s.length > 0)
-			.map((s) => s + ';');
+			.map((s) => `${s};`);
 
 		for (const statement of statements) {
 			try {

@@ -1,12 +1,23 @@
-import { BUCKET_TITLES, BUCKETS, isBucket, type Bucket } from '@append/contracts/types';
+import { BUCKET_TITLES, BUCKETS, type Bucket, isBucket } from '@append/contracts/types';
 import { useParams } from '@tanstack/react-router';
 import { useBucketFeed } from '../api/get-bucket-feed';
 
 export function BucketFeedPage() {
 	const { slug } = useParams({ from: '/protected/bucket/$slug' });
 
-	// Validate slug
-	if (!isBucket(slug)) {
+	// Validate slug and determine bucket
+	const isValidBucket = isBucket(slug);
+	// Use slug as bucket when valid, otherwise use first bucket as placeholder (query disabled)
+	const bucket: Bucket = isValidBucket ? slug : BUCKETS[0];
+	const title = isValidBucket ? BUCKET_TITLES[bucket] : '';
+
+	// Always call hook unconditionally to satisfy React rules
+	const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useBucketFeed(bucket, {
+		enabled: isValidBucket,
+	});
+
+	// Invalid bucket - show error
+	if (!isValidBucket) {
 		return (
 			<div className="max-w-4xl">
 				<div className="flex flex-col items-center justify-center py-12 text-center">
@@ -16,11 +27,6 @@ export function BucketFeedPage() {
 			</div>
 		);
 	}
-
-	const bucket: Bucket = slug;
-	const title = BUCKET_TITLES[bucket];
-
-	const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useBucketFeed(bucket);
 
 	// Flatten all pages into a single items array
 	const items = data?.pages.flatMap((page) => page.items) ?? [];
@@ -49,7 +55,11 @@ export function BucketFeedPage() {
 				<h2 className="text-xl font-semibold">{title}</h2>
 				<div className="flex flex-col items-center justify-center py-12 text-center">
 					<p className="text-zinc-400">{errorMessage}</p>
-					<button onClick={() => refetch()} className="mt-4 px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors">
+					<button
+						type="button"
+						onClick={() => refetch()}
+						className="mt-4 px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors"
+					>
 						Retry
 					</button>
 				</div>
@@ -92,6 +102,7 @@ export function BucketFeedPage() {
 			{hasNextPage && (
 				<div className="mt-6 flex justify-center">
 					<button
+						type="button"
 						onClick={() => fetchNextPage()}
 						disabled={isFetchingNextPage}
 						className="px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"

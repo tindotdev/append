@@ -1,5 +1,5 @@
 import type { Bucket } from '@append/contracts/types';
-import { useInfiniteQuery, type QueryFunctionContext } from '@tanstack/react-query';
+import { type QueryFunctionContext, useInfiniteQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api-client';
 import type { BucketFeedResponse, GetBucketFeedOptions } from '../types';
 
@@ -26,11 +26,12 @@ export async function getBucketFeed(slug: Bucket, options?: GetBucketFeedOptions
 }
 
 // React Query hook with infinite scroll support
-export function useBucketFeed(slug: Bucket) {
+export function useBucketFeed(slug: Bucket, options?: { enabled?: boolean }) {
 	return useInfiniteQuery({
 		queryKey: bucketKeys.feed(slug),
 		queryFn: ({ pageParam }: QueryFunctionContext) => getBucketFeed(slug, { cursor: pageParam as string | undefined }),
 		initialPageParam: undefined as string | undefined,
 		getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+		enabled: options?.enabled ?? true,
 	});
 }

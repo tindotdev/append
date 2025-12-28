@@ -2,17 +2,17 @@
  * Batch routes: capture, list, and get batches.
  */
 
-import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
+import { Hono } from 'hono';
 import * as v from 'valibot';
-import type { Bindings, Variables } from '../../platform/env';
 import { schema } from '../../db';
+import type { Bindings, Variables } from '../../platform/env';
 import { apiError } from '../../shared/api-error';
-import { CaptureTermsSchema, MAX_BODY_SIZE } from './validation/captureTerms.schema';
-import { ListBatchesSchema, DEFAULT_LIMIT } from './validation/listBatches.schema';
 import { captureTerms } from './usecases/captureTerms';
-import { listBatches } from './usecases/listBatches';
 import { getBatch } from './usecases/getBatch';
+import { listBatches } from './usecases/listBatches';
+import { CaptureTermsSchema, MAX_BODY_SIZE } from './validation/captureTerms.schema';
+import { ListBatchesSchema } from './validation/listBatches.schema';
 
 export const batchRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 

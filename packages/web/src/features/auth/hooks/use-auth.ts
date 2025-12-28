@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSession } from '../api/auth-client';
+import type { useSession } from '../api/auth-client';
 
 export type AuthContextType = ReturnType<typeof useSession>;
 

@@ -4,24 +4,23 @@
  * Implements idempotent accept with materialization pointers per ADR 0008.
  */
 
-import { and, eq, asc, sql } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { Bucket } from '@append/contracts/types';
+import { and, asc, eq, sql } from 'drizzle-orm';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import {
+	type BatchStatus,
 	batch,
 	candidate,
-	term,
-	termSense,
 	idempotencyKey,
 	normalize,
-	type BatchStatus,
-	type SuggestionStatus,
-	type TermSenseSource,
 	type schema,
+	type TermSenseSource,
+	term,
+	termSense,
 } from '../../../db';
 import { sha256Hex } from '../../../shared/crypto';
+import { fromBase64Url, toBase64Url } from '../../../shared/idempotency/encoding';
 import { checkIdempotencyKey } from '../../../shared/idempotency/keys';
-import { toBase64Url, fromBase64Url } from '../../../shared/idempotency/encoding';
 import type { AcceptAllInput, AcceptSummary } from '../validation/acceptAll.schema';
 
 /**
@@ -266,12 +265,16 @@ export async function acceptAll(
 
 	for (const cand of unmaterializedCandidates) {
 		const canonical = normalize(cand.term);
-		const termId = canonicalToTermId.get(canonical)!;
+		const termId = canonicalToTermId.get(canonical);
+		if (!termId) throw new Error(`Internal error: missing termId for canonical "${canonical}"`);
 		const termSenseId = `term_sense:${cand.id}`;
 
 		// Effective fields (already validated non-null)
-		const effectiveBucket = cand.effectiveBucket!;
-		const effectiveText = cand.effectiveText!;
+		const effectiveBucket = cand.effectiveBucket;
+		const effectiveText = cand.effectiveText;
+		if (!effectiveBucket || !effectiveText) {
+			throw new Error(`Internal error: missing effective fields for candidate ${cand.id}`);
+		}
 
 		// Determine if this candidate creates a new term
 		if (termCreatorCandidateIds.has(cand.id)) {

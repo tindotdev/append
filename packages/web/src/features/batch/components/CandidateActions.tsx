@@ -12,6 +12,7 @@ export function CandidateActions({
 	return (
 		<div className="flex gap-2">
 			<button
+				type="button"
 				onClick={onSave}
 				disabled={isSaveDisabled}
 				className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
@@ -20,6 +21,7 @@ export function CandidateActions({
 				Save
 			</button>
 			<button
+				type="button"
 				onClick={onClear}
 				disabled={isSaving}
 				className="px-3 py-1.5 bg-zinc-700 text-zinc-200 text-sm rounded hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

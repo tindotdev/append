@@ -286,16 +286,16 @@ describe('POST /api/batch/:id/suggest', () => {
 		const done = getDoneEvent(events);
 
 		expect(start).not.toBeNull();
-		expect(start!.batchId).toBe(batchId);
-		expect(start!.mode).toBe('fill-missing');
-		expect(start!.candidateCount).toBe(20);
-		expect(start!.eligibleCount).toBe(20);
+		expect(start?.batchId).toBe(batchId);
+		expect(start?.mode).toBe('fill-missing');
+		expect(start?.candidateCount).toBe(20);
+		expect(start?.eligibleCount).toBe(20);
 
 		expect(done).not.toBeNull();
-		expect(done!.ok).toBe(20);
-		expect(done!.cached).toBe(0);
-		expect(done!.skippedAlreadySuggested).toBe(0);
-		expect(done!.errors).toBe(0);
+		expect(done?.ok).toBe(20);
+		expect(done?.cached).toBe(0);
+		expect(done?.skippedAlreadySuggested).toBe(0);
+		expect(done?.errors).toBe(0);
 
 		// Verify suggestions are stored in DB
 		const candidates = await (db.query as any).candidate.findMany({
@@ -329,7 +329,7 @@ describe('POST /api/batch/:id/suggest', () => {
 		const text1 = await res1.text();
 		const events1 = parseSSEResponse(text1);
 		const done1 = getDoneEvent(events1);
-		expect(done1!.ok).toBe(20);
+		expect(done1?.ok).toBe(20);
 
 		// Get a candidate's suggested values to verify they don't change
 		const candidatesBefore = await (db.query as any).candidate.findMany({
@@ -348,9 +348,9 @@ describe('POST /api/batch/:id/suggest', () => {
 		const events2 = parseSSEResponse(text2);
 		const done2 = getDoneEvent(events2);
 
-		expect(done2!.ok).toBe(0);
-		expect(done2!.skippedAlreadySuggested).toBe(20);
-		expect(done2!.cached).toBe(0);
+		expect(done2?.ok).toBe(0);
+		expect(done2?.skippedAlreadySuggested).toBe(20);
+		expect(done2?.cached).toBe(0);
 
 		// Verify values didn't change
 		const candidatesAfter = await (db.query as any).candidate.findMany({
@@ -384,9 +384,9 @@ describe('POST /api/batch/:id/suggest', () => {
 		const start = getStartEvent(events);
 		const done = getDoneEvent(events);
 
-		expect(start!.mode).toBe('regenerate');
-		expect(done!.ok).toBe(20);
-		expect(done!.skippedAlreadySuggested).toBe(0);
+		expect(start?.mode).toBe('regenerate');
+		expect(done?.ok).toBe(20);
+		expect(done?.skippedAlreadySuggested).toBe(0);
 	});
 
 	it('uses cache for duplicate terms within batch', async () => {
@@ -424,8 +424,8 @@ describe('POST /api/batch/:id/suggest', () => {
 		const done = getDoneEvent(events);
 
 		// One of the duplicates should be cached (within-batch cache)
-		expect(done!.ok + done!.cached).toBe(20);
-		expect(done!.cached).toBeGreaterThanOrEqual(1);
+		expect(done?.ok + done?.cached).toBe(20);
+		expect(done?.cached).toBeGreaterThanOrEqual(1);
 
 		// Verify both duplicates have the same suggestion
 		const candidates = await (db.query as any).candidate.findMany({
@@ -468,8 +468,8 @@ describe('POST /api/batch/:id/suggest', () => {
 		const done = getDoneEvent(events);
 
 		// All should be cached
-		expect(done!.cached).toBe(20);
-		expect(done!.ok).toBe(0);
+		expect(done?.cached).toBe(20);
+		expect(done?.ok).toBe(0);
 	});
 
 	it('does not increment candidate version when suggesting', async () => {
@@ -513,9 +513,9 @@ describe('POST /api/batch/:id/suggest', () => {
 		const start = getStartEvent(events);
 		const done = getDoneEvent(events);
 
-		expect(start!.limit).toBe(10);
-		expect(start!.eligibleCount).toBe(10);
-		expect(done!.ok).toBeLessThanOrEqual(10);
+		expect(start?.limit).toBe(10);
+		expect(start?.eligibleCount).toBe(10);
+		expect(done?.ok).toBeLessThanOrEqual(10);
 
 		// Verify only 10 candidates were suggested
 		const candidates = await (db.query as any).candidate.findMany({

@@ -4,9 +4,9 @@
  * Creates a batch with candidate rows for each term, with idempotency handling.
  */
 
-import { count, and, eq } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { batch, candidate, idempotencyKey, normalize, type BatchStatus, type schema } from '../../../db';
+import { type BatchStatus, batch, candidate, idempotencyKey, normalize, type schema } from '../../../db';
 import { generateUUID, sha256Hex } from '../../../shared/crypto';
 import { checkIdempotencyKey } from '../../../shared/idempotency/keys';
 import type { CaptureTermsInput } from '../validation/captureTerms.schema';

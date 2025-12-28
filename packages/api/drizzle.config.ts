@@ -26,6 +26,6 @@ export default defineConfig({
 	schema: './src/db/index.ts',
 	out: './drizzle',
 	dbCredentials: {
-		url: getLocalD1DB()!,
+		url: getLocalD1DB() ?? '',
 	},
 });

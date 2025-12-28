@@ -5,7 +5,8 @@ import { routeTree } from './routes';
 export const router = createRouter({
 	routeTree,
 	context: {
-		auth: undefined!, // Set after wrapping in AuthProvider
+		// biome-ignore lint/suspicious/noExplicitAny: Initial context set in AuthProvider
+		auth: undefined as any, // Set after wrapping in AuthProvider
 	},
 	defaultPreload: 'intent',
 	scrollRestoration: true,

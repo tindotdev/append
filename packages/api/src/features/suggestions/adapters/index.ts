@@ -48,5 +48,5 @@ export async function createLlmClient(env: Bindings): Promise<LlmClient | null> 
 	}
 }
 
-export { SUGGESTION_MODEL, PROMPT_VERSION } from './llm.aigateway';
+export { PROMPT_VERSION, SUGGESTION_MODEL } from './llm.aigateway';
 export { generateStubSuggestion } from './llm.stub';

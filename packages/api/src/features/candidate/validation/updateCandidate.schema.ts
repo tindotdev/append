@@ -2,8 +2,8 @@
  * Valibot schema for PUT /api/candidate/:id request body.
  */
 
-import * as v from 'valibot';
 import { BUCKETS } from '@append/contracts/types';
+import * as v from 'valibot';
 
 /**
  * Maximum length for chosen text.

@@ -18,7 +18,7 @@ const parseIntTransform = v.pipe(
 	v.string(),
 	v.rawTransform(({ dataset, addIssue, NEVER }) => {
 		const parsed = parseInt(dataset.value, 10);
-		if (isNaN(parsed)) {
+		if (Number.isNaN(parsed)) {
 			addIssue({ message: 'limit must be an integer' });
 			return NEVER;
 		}

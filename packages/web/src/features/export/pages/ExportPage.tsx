@@ -82,6 +82,7 @@ export function ExportPage() {
 			{/* Download All button */}
 			<div className="mt-6">
 				<button
+					type="button"
 					onClick={downloadAll}
 					disabled={state.isDownloading}
 					className="w-full px-4 py-3 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
@@ -137,6 +138,7 @@ export function ExportPage() {
 								)}
 							</div>
 							<button
+								type="button"
 								onClick={() => downloadSingle(bucket)}
 								disabled={state.isDownloading}
 								className="px-3 py-1.5 text-sm bg-zinc-800 text-white rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"

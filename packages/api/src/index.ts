@@ -1,7 +1,5 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { apiError } from './shared/api-error';
-import { createAuth } from './lib/auth';
 // Feature routes (vertical slice architecture)
 import { acceptRoutes } from './features/accept/routes';
 import { batchRoutes } from './features/batch/routes';
@@ -9,6 +7,8 @@ import { bucketRoutes } from './features/bucket/routes';
 import { candidateRoutes } from './features/candidate/routes';
 import { exportRoutes } from './features/export/routes';
 import { suggestionsRoutes } from './features/suggestions/routes';
+import { createAuth } from './lib/auth';
+import { apiError } from './shared/api-error';
 
 type Bindings = {
 	DB: D1Database;

@@ -73,7 +73,7 @@ function generateUUID(): string {
 /**
  * Encode a cursor payload to base64url (no padding).
  */
-function encodeCursor(payload: { createdAt: number; termId: string }): string {
+function _encodeCursor(payload: { createdAt: number; termId: string }): string {
 	const json = JSON.stringify(payload);
 	const bytes = new TextEncoder().encode(json);
 	const base64 = btoa(String.fromCharCode(...bytes));

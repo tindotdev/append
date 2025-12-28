@@ -6,7 +6,7 @@
 
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { suggestionCache, type schema } from '../../../db';
+import { type schema, suggestionCache } from '../../../db';
 import { generateUUID } from '../../../shared/crypto';
 import type { Suggestion } from '../ports/llm';
 

@@ -1,7 +1,7 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect } from 'react';
-import { useAuth } from '../hooks/use-auth';
 import { signIn } from '../api/auth-client';
+import { useAuth } from '../hooks/use-auth';
 
 export function SignInPage() {
 	const { data: session, isPending } = useAuth();
