@@ -10,6 +10,7 @@
 	},
 	"dependencies": {
 		"@append/contracts": "workspace:*",
+		"@tanstack/react-query": "^5.90.12",
 		"@tanstack/react-router": "^1.132.0",
 		"better-auth": "^1.4.7",
 		"react": "^19.2.0",

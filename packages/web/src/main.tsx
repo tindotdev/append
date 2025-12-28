@@ -3,7 +3,7 @@ import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 
 import './main.css';
-import { useAuth } from './components/AuthProvider';
+import { useAuth } from './features/auth';
 import { AppProvider } from './providers';
 import { router } from './router';
 
