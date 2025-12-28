@@ -3,7 +3,7 @@ export { getBatch, useBatch, batchKeys } from './api/get-batch';
 export { listBatches, useBatches } from './api/list-batches';
 export { createBatch, useCreateBatch } from './api/create-batch';
 export { updateCandidate, useUpdateCandidate } from './api/update-candidate';
-export { retrySuggestions, useRetrySuggestions } from './api/retry-suggestions';
+export { generateSuggestions, type GenerateSuggestionsCallbacks } from './api/retry-suggestions';
 
 // Hooks
 export { useCandidateRowStates } from './hooks/use-candidate-row-states';

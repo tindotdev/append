@@ -1,24 +1,51 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/api-client';
-import type { RetrySuggestionsResponse } from '../types';
-import { batchKeys } from './get-batch';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
+import { API_URL } from '@/lib/api-client';
+import type { SuggestStartEvent, SuggestCandidateEvent, SuggestDoneEvent } from '../types';
 
-// Fetcher function
-export async function retrySuggestions(batchId: string): Promise<RetrySuggestionsResponse> {
-	return apiRequest<RetrySuggestionsResponse>(`/api/batch/${batchId}/suggest`, {
-		method: 'POST',
-	});
+export interface GenerateSuggestionsCallbacks {
+	onStart?: (event: SuggestStartEvent) => void;
+	onCandidate?: (event: SuggestCandidateEvent) => void;
+	onDone?: (event: SuggestDoneEvent) => void;
+	onError?: (error: string) => void;
 }
 
-// React Query mutation hook
-export function useRetrySuggestions(batchId: string) {
-	const queryClient = useQueryClient();
+/**
+ * Generate suggestions for a batch using SSE streaming.
+ * Updates are delivered via callbacks as they arrive.
+ */
+export async function generateSuggestions(batchId: string, callbacks: GenerateSuggestionsCallbacks): Promise<void> {
+	const { onStart, onCandidate, onDone, onError } = callbacks;
 
-	return useMutation({
-		mutationFn: () => retrySuggestions(batchId),
-		onSuccess: () => {
-			// Invalidate the specific batch to refetch
-			queryClient.invalidateQueries({ queryKey: batchKeys.detail(batchId) });
+	await fetchEventSource(`${API_URL}/api/batch/${batchId}/suggest`, {
+		method: 'POST',
+		credentials: 'include',
+		onmessage(ev) {
+			if (!ev.data) return;
+
+			try {
+				const data = JSON.parse(ev.data);
+
+				switch (ev.event) {
+					case 'start':
+						onStart?.(data as SuggestStartEvent);
+						break;
+					case 'candidate':
+						onCandidate?.(data as SuggestCandidateEvent);
+						break;
+					case 'done':
+						onDone?.(data as SuggestDoneEvent);
+						break;
+					case 'error':
+						onError?.(data.error || 'Unknown error');
+						break;
+				}
+			} catch {
+				// Ignore parse errors for malformed events
+			}
+		},
+		onerror(err) {
+			onError?.(err instanceof Error ? err.message : 'Connection error');
+			throw err; // Stop retrying
 		},
 	});
 }
