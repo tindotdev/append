@@ -24,7 +24,7 @@
 - **Term (input)**: a word/phrase you want to learn (what you paste/type).
 - **Capture batch**: a group of Term (input) captured together.
 - **Candidate**: a Term (input) inside a batch with optional suggestions/edits, not yet accepted.
-- **Suggestion**: AI-proposed one-liner + bucket for a Candidate (stored on `Candidate` for Step 3; ADR 0007).
+- **Suggestion**: AI-proposed one-liner + bucket for a Candidate (stored on `Candidate` for Step 3; see `docs/adr/README.md`).
 - **Bucket**: one of `foundations | backend | frontend | dx-tooling | deep-concepts` (stable slug values used in DB + API + URLs; source of truth: `packages/contracts/src/types/index.ts`).
 - **Term (entity)**: the canonical concept keyed by the normalized term (`canonical`).
 - **Sense**: an append-only meaning/usage note for a Term (entity) (one-liner, analogy, etc).
@@ -109,15 +109,15 @@
 
 - Atomicity boundary:
   - `CaptureTerms`: batch + candidates in one atomic D1 batch write.
-  - `AcceptAll`: may partially succeed; retries are safe and resume using per-candidate materialization pointers (ADR 0008).
+  - `AcceptAll`: may partially succeed; retries are safe and resume using per-candidate materialization pointers (see `docs/adr/README.md`).
 - Idempotency:
   - capture/accept/import must record a result ref keyed by `(user_id, scope, client_request_id)`.
 - Accept-all idempotency:
-  - accept-all is safe to retry (even with a different request id) by recording per-candidate materialization pointers (ADR 0008).
+  - accept-all is safe to retry (even with a different request id) by recording per-candidate materialization pointers (see `docs/adr/README.md`).
 - Concurrency:
   - Use optimistic locking: `EditCandidate` requires `expected_version`; conflict returns 409 with latest state.
 - “No overwrites” rule:
-  - suggestions never overwrite user-chosen fields; they are stored separately from `chosen_*` fields (ADR 0007).
+  - suggestions never overwrite user-chosen fields; they are stored separately from `chosen_*` fields (see `docs/adr/README.md`).
 
 ## Phase 5 — Storage & indexing (Cloudflare-first)
 
@@ -137,9 +137,9 @@
 - SPA UI (capture/edit/accept/search)
 - Worker API (Hono)
 - D1 (canonical store)
-- LLM provider (suggestions + later “feedback” grading): OpenAI `gpt-5-mini` via Cloudflare AI Gateway (ADR 0006)
+- LLM provider (suggestions + later “feedback” grading): OpenAI `gpt-5-mini` via Cloudflare AI Gateway (see `docs/adr/README.md`)
 - Google OAuth (SSO)
-  - Fail closed if neither `ALLOWED_SUB` nor `ALLOWED_EMAIL` is configured (ADR 0001)
+  - Fail closed if neither `ALLOWED_SUB` nor `ALLOWED_EMAIL` is configured (see `docs/adr/README.md`)
 
 ### Import/export
 
