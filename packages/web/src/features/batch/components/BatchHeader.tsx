@@ -4,14 +4,28 @@ import { getSuggestionFlags } from './suggestions';
 interface BatchHeaderProps {
 	batch: BatchResponse;
 	isRetrying?: boolean;
+	isAccepting?: boolean;
 	onRetryFailed?: () => void;
 	onGenerateSuggestions?: () => void;
+	onAcceptAll?: () => void;
 }
 
-export function BatchHeader({ batch, isRetrying, onRetryFailed, onGenerateSuggestions }: BatchHeaderProps) {
+export function BatchHeader({ batch, isRetrying, isAccepting, onRetryFailed, onGenerateSuggestions, onAcceptAll }: BatchHeaderProps) {
 	const failedCount = batch.candidates.filter((c) => c.suggestionStatus === 'error').length;
 	const inProgressCount = batch.candidates.filter((c) => c.suggestionStatus === 'in_progress').length;
 	const pendingCount = batch.candidates.filter((c) => getSuggestionFlags(c).isSuggestionPending).length;
+
+	// Check if batch is ready for accept:
+	// - No suggestions in progress
+	// - All candidates have effective bucket and text (chosen or suggested)
+	const isReadyForAccept =
+		batch.status !== 'accepted' &&
+		inProgressCount === 0 &&
+		batch.candidates.every((c) => {
+			const effectiveBucket = c.chosenBucket ?? c.suggestedBucket;
+			const effectiveText = c.chosenText ?? c.suggestedText;
+			return effectiveBucket !== null && effectiveText !== null;
+		});
 
 	return (
 		<>
@@ -66,6 +80,27 @@ export function BatchHeader({ batch, isRetrying, onRetryFailed, onGenerateSugges
 							)}
 						</>
 					)}
+				</div>
+			)}
+			{/* Accept All button - shown when batch is ready */}
+			{isReadyForAccept && onAcceptAll && (
+				<div className="mt-4">
+					<button
+						type="button"
+						onClick={onAcceptAll}
+						disabled={isAccepting}
+						className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+					>
+						{isAccepting ? 'Accepting...' : 'Accept All'}
+					</button>
+					<p className="mt-1 text-xs text-zinc-500">This will save all {batch.candidateCount} terms to your vocabulary.</p>
+				</div>
+			)}
+			{/* Show accepted status */}
+			{batch.status === 'accepted' && (
+				<div className="mt-4 p-3 bg-green-900/20 border border-green-800 rounded">
+					<p className="text-green-400 text-sm font-medium">All terms have been accepted!</p>
+					<p className="text-green-500/70 text-xs mt-1">View your terms in the bucket pages.</p>
 				</div>
 			)}
 		</>

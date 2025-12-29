@@ -3,7 +3,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { ApiRequestError } from '@/lib/api-client';
 import { createBatch } from '../api/create-batch';
 
-const TERM_MIN = 20;
+const TERM_MIN = 1;
 const TERM_MAX = 200;
 
 function parseTerms(input: string): string[] {

@@ -2,6 +2,7 @@ import { BUCKETS } from '@append/contracts/types';
 import { Link, useParams } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiRequestError } from '@/lib/api-client';
+import { acceptBatch } from '../api/accept-batch';
 import { getBatch } from '../api/get-batch';
 import { generateSuggestions } from '../api/retry-suggestions';
 import { updateCandidate } from '../api/update-candidate';
@@ -82,6 +83,7 @@ export function BatchDetailPage() {
 	const [error, setError] = useState<BatchError | null>(null);
 	const [toast, setToast] = useState<string | null>(null);
 	const [isRetrying, setIsRetrying] = useState(false);
+	const [isAccepting, setIsAccepting] = useState(false);
 	const { rowStates, initialize, updateDraft, markSaving, markError, applyCandidate } = useCandidateRowStates();
 
 	const fetchBatch = useCallback(async () => {
@@ -203,6 +205,35 @@ export function BatchDetailPage() {
 
 	const handleRetryFailed = handleGenerateSuggestions;
 
+	const handleAcceptAll = useCallback(async () => {
+		setIsAccepting(true);
+		try {
+			const summary = await acceptBatch(batchId);
+			setToast(`Accepted ${summary.acceptedCount} terms (${summary.termCreatedCount} new terms created)`);
+			// Refetch to update batch status
+			await fetchBatch();
+		} catch (err) {
+			if (err instanceof ApiRequestError) {
+				if (err.status === 409) {
+					const reason = err.details?.reason as string | undefined;
+					if (reason === 'SUGGESTIONS_IN_PROGRESS') {
+						setToast('Cannot accept: some suggestions are still being generated.');
+					} else if (reason === 'MISSING_EFFECTIVE_FIELDS') {
+						setToast('Cannot accept: some candidates are missing bucket or text.');
+					} else {
+						setToast('Cannot accept: please refresh and try again.');
+					}
+				} else {
+					setToast('Accept failed. Please try again.');
+				}
+			} else {
+				setToast('Accept failed. Please try again.');
+			}
+		} finally {
+			setIsAccepting(false);
+		}
+	}, [batchId, fetchBatch]);
+
 	if (isLoading) {
 		return <LoadingState />;
 	}
@@ -231,7 +262,14 @@ export function BatchDetailPage() {
 	return (
 		<div className="max-w-4xl">
 			<BatchToast message={toast} />
-			<BatchHeader batch={batch} isRetrying={isRetrying} onRetryFailed={handleRetryFailed} onGenerateSuggestions={handleGenerateSuggestions} />
+			<BatchHeader
+				batch={batch}
+				isRetrying={isRetrying}
+				isAccepting={isAccepting}
+				onRetryFailed={handleRetryFailed}
+				onGenerateSuggestions={handleGenerateSuggestions}
+				onAcceptAll={handleAcceptAll}
+			/>
 			<CandidateList
 				candidates={batch.candidates}
 				rowStates={rowStates}

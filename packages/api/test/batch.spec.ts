@@ -159,7 +159,7 @@ describe('POST /api/batch', () => {
 		expect(body.error.code).toBe('VALIDATION_ERROR');
 	});
 
-	it('returns 400 for fewer than 20 terms', async () => {
+	it('returns 400 for empty terms', async () => {
 		const res = await SELF.fetch('https://example.com/api/batch', {
 			method: 'POST',
 			headers: {
@@ -167,7 +167,7 @@ describe('POST /api/batch', () => {
 				cookie: authCookie,
 			},
 			body: JSON.stringify({
-				terms: generateTerms(19),
+				terms: '', // Empty string
 				clientRequestId: generateUUID(),
 			}),
 		});
@@ -175,7 +175,7 @@ describe('POST /api/batch', () => {
 		expect(res.status).toBe(400);
 		const body = (await res.json()) as any;
 		expect(body.error.code).toBe('VALIDATION_ERROR');
-		expect(body.error.message).toContain('20');
+		expect(body.error.message).toContain('1'); // At least 1 term required
 	});
 
 	it('returns 400 for more than 200 terms', async () => {
