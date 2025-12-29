@@ -33,13 +33,14 @@ export async function createLlmClient(env: Bindings): Promise<LlmClient | null> 
 				throw new Error('OpenAI provider requires CF_ACCOUNT_ID, AI_GATEWAY_ID, and OPENAI_API_KEY');
 			}
 
-			// Retrieve API key from Secrets Store (async)
-			const apiKey = await env.OPENAI_API_KEY.get();
+			// Retrieve OpenAI API key from Secrets Store (async)
+			const openaiApiKey = await env.OPENAI_API_KEY.get();
 
 			return makeAIGatewayClient({
 				accountId: env.CF_ACCOUNT_ID,
 				gatewayId: env.AI_GATEWAY_ID,
-				apiKey,
+				gatewayToken: env.CF_AIG_TOKEN,
+				openaiApiKey,
 			});
 		}
 

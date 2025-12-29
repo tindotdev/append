@@ -19,7 +19,8 @@ import type { LlmClient, Suggestion } from '../ports/llm';
 export interface AIGatewayConfig {
 	accountId: string;
 	gatewayId: string;
-	apiKey: string;
+	gatewayToken?: string;
+	openaiApiKey: string;
 }
 
 /**
@@ -72,10 +73,12 @@ export function makeLlmClient(config: AIGatewayConfig): LlmClient {
 	const aigateway = createAiGateway({
 		accountId: config.accountId,
 		gateway: config.gatewayId,
-		apiKey: config.apiKey,
+		apiKey: config.gatewayToken,
 	});
 
-	const openai = createOpenAI();
+	const openai = createOpenAI({
+		apiKey: config.openaiApiKey,
+	});
 
 	return {
 		async suggestOne(term: string): Promise<Suggestion> {
