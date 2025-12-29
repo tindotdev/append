@@ -10,3 +10,6 @@ output/
 
 # LLM response cache
 .llm-cache/
+
+# Parallel test results
+.parallel-test-results.json
