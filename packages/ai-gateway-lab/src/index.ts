@@ -1,6 +1,7 @@
 import { formatEvent, processBatch } from './batch-processor';
 import { type CacheKey, cacheResponse, findCachedResponse } from './cache';
 import type { OpenAIModel } from './gateway';
+import { runParallelTest } from './parallel-test';
 import { MODEL, suggestOne } from './suggest-one';
 import { TEST_TERMS } from './terms';
 
@@ -25,8 +26,12 @@ const runBatch = async () => {
 };
 
 const main = async () => {
+	const parallelTest = process.env.PARALLEL_TEST === '1';
 	const batchMode = process.env.BATCH_MODE === '1';
-	if (batchMode) {
+
+	if (parallelTest) {
+		await runParallelTest();
+	} else if (batchMode) {
 		await runBatch();
 	} else {
 		await runSingle();
