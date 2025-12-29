@@ -19,10 +19,11 @@ export default [
 					pattern: 'features/*',
 					capture: ['featureName'],
 				},
-				// Shared layers - match folder and all files within
+				// Shared UI components - only src/components/, not features/*/components/
 				{
 					type: 'components',
-					pattern: 'components',
+					pattern: 'src/components/**/*',
+					mode: 'full',
 				},
 				{
 					type: 'lib',
@@ -61,10 +62,10 @@ export default [
 								'components',
 							],
 						},
-						// Components can import from lib and features (for AuthProvider context)
+						// Components can import from lib, features (for AuthProvider context), and other components (UI primitives compose)
 						{
 							from: ['components'],
-							allow: ['lib', 'feature'],
+							allow: ['lib', 'feature', 'components'],
 						},
 						// Lib has no internal dependencies
 						{
