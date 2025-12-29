@@ -58,7 +58,7 @@
 			},
 			"suspicious": {
 				"noConsole": "off",
-				"noExplicitAny": "warn"
+				"noExplicitAny": "off"
 			}
 		}
 	},

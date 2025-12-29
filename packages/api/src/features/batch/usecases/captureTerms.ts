@@ -39,6 +39,7 @@ export type CaptureTermsError = { type: 'idempotency_conflict'; message: string 
  * @param input - Validated input with terms and clientRequestId
  * @returns Result with batch ID and candidate count, or an error
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: orchestrates batch creation with idempotency
 export async function captureTerms(
 	db: DrizzleD1Database<typeof schema>,
 	rawDb: D1Database,

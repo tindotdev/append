@@ -139,6 +139,7 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 					// Check sub on account creation (for ALLOWED_SUB)
 					account: {
 						create: {
+							// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-provider allowlist checks
 							before: async (account) => {
 								assertAllowlistConfigured(env);
 

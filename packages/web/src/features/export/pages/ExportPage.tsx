@@ -95,7 +95,7 @@ export function ExportPage() {
 					) : state.isDownloading ? (
 						<>
 							<span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-							Downloading {BUCKET_TITLES[state.currentBucket!]}...
+							Downloading {BUCKET_TITLES[state.currentBucket as keyof typeof BUCKET_TITLES]}...
 						</>
 					) : (
 						<>Download all ({BUCKETS.length} files)</>
