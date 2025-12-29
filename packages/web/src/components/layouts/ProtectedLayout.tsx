@@ -1,15 +1,22 @@
 import { Link, Outlet, useNavigate } from '@tanstack/react-router';
-import { useEffect, useMemo, useRef } from 'react';
+import { ChevronDown, Menu } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
 import { signOut, useAuth } from '@/features/auth';
 import { BUCKETS, CAPTURE_NAV, HEADER_NAV, NAV_LINKS } from '@/lib/navigation';
 import { NavLink } from '../NavLink';
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 
 export function ProtectedLayout() {
 	// Use AuthProvider (reactive); router context isn't reactive when RouterProvider context changes.
 	const { data: session, isPending } = useAuth();
 	const navigate = useNavigate();
-	const bucketMenuRef = useRef<HTMLDetailsElement | null>(null);
-	const mobileMenuRef = useRef<HTMLDetailsElement | null>(null);
 
 	const isAuthenticated = !!session;
 	const email = session?.user?.email ?? null;
@@ -57,80 +64,51 @@ export function ProtectedLayout() {
 						</Link>
 
 						<div className="sm:hidden">
-							<details ref={mobileMenuRef} className="relative">
-								<summary className="list-none rounded-md px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-900/60 hover:text-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200/40">
+							<DropdownMenu>
+								<DropdownMenuTrigger className="rounded-md px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-900/60 hover:text-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200/40">
 									<span className="inline-flex items-center gap-2">
+										<Menu className="size-4" />
 										Menu
-										<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="text-zinc-500">
-											<path
-												fillRule="evenodd"
-												d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.25a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08Z"
-												clipRule="evenodd"
-											/>
-										</svg>
+										<ChevronDown className="size-3 text-zinc-500" />
 									</span>
-								</summary>
-								<div className="absolute left-0 mt-2 w-64 rounded-lg border border-zinc-800 bg-zinc-950 shadow-lg shadow-black/30">
-									<div className="p-1">
-										{NAV_LINKS.map((link) => (
-											<Link
-												key={link.to}
-												to={link.to}
-												onClick={() => mobileMenuRef.current?.removeAttribute('open')}
-												className="block rounded-md px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200/40"
-											>
-												{link.label}
-											</Link>
-										))}
-									</div>
-									<div className="border-t border-zinc-800 p-1">
-										<p className="px-3 py-2 text-xs text-zinc-500">Buckets</p>
-										{BUCKETS.map((b) => (
-											<Link
-												key={b.slug}
-												to="/bucket/$slug"
-												params={{ slug: b.slug }}
-												onClick={() => mobileMenuRef.current?.removeAttribute('open')}
-												className="block rounded-md px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200/40"
-											>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="start" className="w-64">
+									{NAV_LINKS.map((link) => (
+										<DropdownMenuItem key={link.to} asChild>
+											<Link to={link.to}>{link.label}</Link>
+										</DropdownMenuItem>
+									))}
+									<DropdownMenuSeparator />
+									<DropdownMenuLabel className="text-xs text-zinc-500">Buckets</DropdownMenuLabel>
+									{BUCKETS.map((b) => (
+										<DropdownMenuItem key={b.slug} asChild>
+											<Link to="/bucket/$slug" params={{ slug: b.slug }}>
 												{b.label}
 											</Link>
-										))}
-									</div>
-								</div>
-							</details>
+										</DropdownMenuItem>
+									))}
+								</DropdownMenuContent>
+							</DropdownMenu>
 						</div>
 
 						<div className="hidden sm:flex items-center gap-1">
-							<details ref={bucketMenuRef} className="relative">
-								<summary className="list-none rounded-md px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-900/60 hover:text-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200/40">
+							<DropdownMenu>
+								<DropdownMenuTrigger className="rounded-md px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-900/60 hover:text-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200/40">
 									<span className="inline-flex items-center gap-2">
 										Buckets
-										<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="text-zinc-500">
-											<path
-												fillRule="evenodd"
-												d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.25a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08Z"
-												clipRule="evenodd"
-											/>
-										</svg>
+										<ChevronDown className="size-3 text-zinc-500" />
 									</span>
-								</summary>
-								<div className="absolute left-0 mt-2 w-56 rounded-lg border border-zinc-800 bg-zinc-950 shadow-lg shadow-black/30">
-									<div className="p-1">
-										{BUCKETS.map((b) => (
-											<Link
-												key={b.slug}
-												to="/bucket/$slug"
-												params={{ slug: b.slug }}
-												onClick={() => bucketMenuRef.current?.removeAttribute('open')}
-												className="block rounded-md px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200/40"
-											>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="start" className="w-56">
+									{BUCKETS.map((b) => (
+										<DropdownMenuItem key={b.slug} asChild>
+											<Link to="/bucket/$slug" params={{ slug: b.slug }}>
 												{b.label}
 											</Link>
-										))}
-									</div>
-								</div>
-							</details>
+										</DropdownMenuItem>
+									))}
+								</DropdownMenuContent>
+							</DropdownMenu>
 
 							{HEADER_NAV.map((link) => (
 								<NavLink key={link.to} to={link.to}>

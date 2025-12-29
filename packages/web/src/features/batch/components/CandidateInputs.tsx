@@ -1,4 +1,7 @@
 import type { Bucket } from '@append/contracts/types';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { CandidateDraft } from '../types';
 
 export function CandidateInputs({
@@ -14,30 +17,28 @@ export function CandidateInputs({
 }) {
 	return (
 		<div className="flex flex-wrap gap-3">
-			<div className="flex flex-col gap-1">
-				<label htmlFor="candidate-bucket" className="text-xs text-zinc-500">
-					Bucket
-				</label>
-				<select
-					id="candidate-bucket"
+			<Field>
+				<FieldLabel htmlFor="candidate-bucket">Bucket</FieldLabel>
+				<Select
 					value={draft.bucket ?? ''}
-					onChange={(event) => onDraftChange({ bucket: event.target.value ? (event.target.value as Bucket) : null })}
+					onValueChange={(value) => onDraftChange({ bucket: value ? (value as Bucket) : null })}
 					disabled={isSaving}
-					className="px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-white text-sm disabled:opacity-50"
 				>
-					<option value="">Select bucket...</option>
-					{buckets.map((bucket) => (
-						<option key={bucket} value={bucket}>
-							{bucket}
-						</option>
-					))}
-				</select>
-			</div>
-			<div className="flex flex-col gap-1 flex-1 min-w-[200px]">
-				<label htmlFor="candidate-definition" className="text-xs text-zinc-500">
-					Definition
-				</label>
-				<input
+					<SelectTrigger id="candidate-bucket" size="sm" className="min-w-[140px]">
+						<SelectValue placeholder="Select bucket..." />
+					</SelectTrigger>
+					<SelectContent>
+						{buckets.map((bucket) => (
+							<SelectItem key={bucket} value={bucket}>
+								{bucket}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			</Field>
+			<Field className="flex-1 min-w-[200px]">
+				<FieldLabel htmlFor="candidate-definition">Definition</FieldLabel>
+				<Input
 					id="candidate-definition"
 					type="text"
 					value={draft.text}
@@ -45,9 +46,8 @@ export function CandidateInputs({
 					disabled={isSaving}
 					maxLength={500}
 					placeholder="Enter definition..."
-					className="px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-white text-sm disabled:opacity-50 w-full"
 				/>
-			</div>
+			</Field>
 		</div>
 	);
 }
