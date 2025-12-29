@@ -17,24 +17,54 @@ export function CandidateList({
 	onSave: (candidate: Candidate) => void;
 	onClear: (candidate: Candidate) => void;
 }) {
+	// Separate pending and accepted candidates
+	const pendingCandidates = candidates.filter((c) => c.status !== 'accepted');
+	const acceptedCandidates = candidates.filter((c) => c.status === 'accepted');
+
 	return (
-		<div className="mt-6 border border-zinc-800 rounded-lg divide-y divide-zinc-800">
-			{candidates.map((candidate, index) => {
-				const rowState = rowStates[candidate.id];
-				if (!rowState) return null;
-				return (
-					<CandidateRow
-						key={candidate.id}
-						candidate={candidate}
-						index={index}
-						rowState={rowState}
-						buckets={buckets}
-						onDraftChange={onDraftChange}
-						onSave={onSave}
-						onClear={onClear}
-					/>
-				);
-			})}
+		<div className="mt-6">
+			{/* Active candidates */}
+			{pendingCandidates.length > 0 && (
+				<div className="border border-zinc-800 rounded-lg divide-y divide-zinc-800">
+					{pendingCandidates.map((candidate, index) => {
+						const rowState = rowStates[candidate.id];
+						if (!rowState) return null;
+						return (
+							<CandidateRow
+								key={candidate.id}
+								candidate={candidate}
+								index={index}
+								rowState={rowState}
+								buckets={buckets}
+								onDraftChange={onDraftChange}
+								onSave={onSave}
+								onClear={onClear}
+							/>
+						);
+					})}
+				</div>
+			)}
+
+			{/* Accepted candidates - collapsed by default */}
+			{acceptedCandidates.length > 0 && (
+				<details className="mt-4">
+					<summary className="cursor-pointer text-sm text-zinc-500 hover:text-zinc-400 py-2">
+						{acceptedCandidates.length} accepted term{acceptedCandidates.length !== 1 ? 's' : ''} (click to show)
+					</summary>
+					<div className="mt-2 border border-zinc-800/50 rounded-lg divide-y divide-zinc-800/50 opacity-60">
+						{acceptedCandidates.map((candidate) => (
+							<div key={candidate.id} className="p-3">
+								<div className="flex items-center gap-2">
+									<span className="text-green-400 text-xs">✓</span>
+									<span className="font-medium">{candidate.term}</span>
+									<span className="text-xs text-zinc-500">→ {candidate.chosenBucket ?? candidate.suggestedBucket}</span>
+								</div>
+								<p className="text-sm text-zinc-500 mt-1 truncate">{candidate.chosenText ?? candidate.suggestedText}</p>
+							</div>
+						))}
+					</div>
+				</details>
+			)}
 		</div>
 	);
 }

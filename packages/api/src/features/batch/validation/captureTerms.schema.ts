@@ -7,7 +7,7 @@ import * as v from 'valibot';
 /**
  * Constants for term validation.
  */
-export const MIN_TERMS = 20;
+export const MIN_TERMS = 1;
 export const MAX_TERMS = 200;
 export const MAX_TERM_LENGTH = 200;
 export const MAX_BODY_SIZE = 64 * 1024; // 64 KiB

@@ -8,13 +8,15 @@ export interface ApiError {
 
 export interface ApiErrorResponse {
 	error: ApiError;
+	details?: Record<string, unknown>;
 }
 
 export class ApiRequestError extends Error {
 	constructor(
 		public status: number,
 		public code: string,
-		message: string
+		message: string,
+		public details?: Record<string, unknown>
 	) {
 		super(message);
 		this.name = 'ApiRequestError';
@@ -28,7 +30,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 	if (!response.ok) {
 		if (isJson) {
 			const errorBody = (await response.json()) as ApiErrorResponse;
-			throw new ApiRequestError(response.status, errorBody.error.code, errorBody.error.message);
+			throw new ApiRequestError(response.status, errorBody.error.code, errorBody.error.message, errorBody.details);
 		}
 		throw new ApiRequestError(response.status, 'UNKNOWN_ERROR', response.statusText);
 	}

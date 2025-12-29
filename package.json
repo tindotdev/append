@@ -17,6 +17,8 @@
 		"test": "pnpm -r --if-present test",
 		"test:api": "pnpm --filter @append/api test",
 		"deploy:api": "pnpm --filter @append/api run deploy",
+		"deploy:web": "pnpm --filter @append/web run deploy",
+		"deploy": "pnpm deploy:api && pnpm deploy:web",
 		"lab": "pnpm --filter @append/ai-gateway-lab lab",
 		"prepare": "simple-git-hooks",
 		"cf-typegen": "pnpm -r --if-present wrangler types"

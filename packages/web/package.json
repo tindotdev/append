@@ -7,7 +7,8 @@
 		"build": "vite build && tsc",
 		"preview": "vite preview",
 		"typecheck": "tsc --noEmit",
-		"lint:boundaries": "eslint src --no-warn-ignored"
+		"lint:boundaries": "eslint src --no-warn-ignored",
+		"deploy": "vite build && wrangler pages deploy dist"
 	},
 	"dependencies": {
 		"@append/contracts": "workspace:*",
