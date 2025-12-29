@@ -110,6 +110,7 @@ export function BatchDetailPage() {
 	}, [toast]);
 
 	const persistCandidate = useCallback(
+		// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: handles optimistic updates with conflict resolution
 		async (candidate: Candidate, request: UpdateCandidateRequest, messages: PersistMessages) => {
 			const rowState = rowStates[candidate.id];
 			if (!rowState || rowState.isSaving) return;
@@ -205,6 +206,7 @@ export function BatchDetailPage() {
 
 	const handleRetryFailed = handleGenerateSuggestions;
 
+	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: handles accept-all with error handling and refetch
 	const handleAcceptAll = useCallback(async () => {
 		setIsAccepting(true);
 		try {

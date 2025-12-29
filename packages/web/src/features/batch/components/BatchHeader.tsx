@@ -10,6 +10,7 @@ interface BatchHeaderProps {
 	onAcceptAll?: () => void;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: conditional UI based on batch state
 export function BatchHeader({ batch, isRetrying, isAccepting, onRetryFailed, onGenerateSuggestions, onAcceptAll }: BatchHeaderProps) {
 	const failedCount = batch.candidates.filter((c) => c.suggestionStatus === 'error').length;
 	const inProgressCount = batch.candidates.filter((c) => c.suggestionStatus === 'in_progress').length;

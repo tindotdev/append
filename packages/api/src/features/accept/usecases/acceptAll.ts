@@ -49,6 +49,7 @@ export type AcceptAllError =
  * @param input - Validated input with clientRequestId
  * @returns Accept summary or error
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: orchestrates batch accept with conflict detection
 export async function acceptAll(
 	db: DrizzleD1Database<typeof schema>,
 	rawDb: D1Database,
