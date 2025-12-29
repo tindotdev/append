@@ -44,10 +44,9 @@
 	"vars": {
 		"BETTER_AUTH_URL": "https://api.append.tindev.dev",
 		// AI Gateway configuration for OpenAI routing (Step 3)
-		// AI_GATEWAY_ID should be set in .dev.vars for local dev and via wrangler vars:set for production
-		// The AI binding provides automatic account ID injection
 		"SUGGESTIONS_PROVIDER": "openai",
-		"AI_GATEWAY_ID": "append-gateway"
+		"AI_GATEWAY_ID": "append-gateway",
+		"CF_ACCOUNT_ID": "d1d83d0040d3dea7df64d58cdbebe5a9"
 	},
 	/**
 	 * Static Assets

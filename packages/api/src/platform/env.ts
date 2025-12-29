@@ -17,6 +17,7 @@ export type Bindings = {
 	// AI Gateway
 	CF_ACCOUNT_ID: string;
 	AI_GATEWAY_ID: string;
+	CF_AIG_TOKEN?: string;
 
 	// Secrets Store (async secrets)
 	OPENAI_API_KEY: SecretsStoreSecret;
