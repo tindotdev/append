@@ -3,14 +3,74 @@ name: Deploy
 on:
   push:
     branches: ["main"]
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches: ["main"]
 
 concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  # Only proceed if CI passed (when triggered by workflow_run)
+  check-ci:
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run'
+    steps:
+      - name: Check CI status
+        if: github.event.workflow_run.conclusion != 'success'
+        run: |
+          echo "CI workflow failed or was cancelled"
+          exit 1
+
+  deploy-api:
+    runs-on: ubuntu-latest
+    # Run after CI check (if applicable) or directly on push
+    needs: [check-ci]
+    if: always() && (needs.check-ci.result == 'success' || needs.check-ci.result == 'skipped')
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: "package.json"
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply D1 migrations
+        working-directory: packages/api
+        run: pnpm exec wrangler d1 migrations apply append-db --remote --config wrangler.jsonc
+
+      - name: Deploy Worker API
+        working-directory: packages/api
+        run: pnpm run deploy -- --config wrangler.jsonc
+
+  deploy-web:
+    runs-on: ubuntu-latest
+    # Run after CI check (if applicable) or directly on push
+    needs: [check-ci]
+    if: always() && (needs.check-ci.result == 'success' || needs.check-ci.result == 'skipped')
     permissions:
       contents: read
     env:
@@ -26,28 +86,19 @@ jobs:
 
       - uses: pnpm/action-setup@v4
 
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Lint (Biome)
-        run: pnpm ci:lint
-
-      - name: Lint (Boundaries)
-        run: pnpm lint:boundaries
-
-      - name: Run tests
-        run: pnpm test
-
-      - name: Apply D1 migrations
-        working-directory: packages/api
-        run: pnpm exec wrangler d1 migrations apply append-db --remote --config wrangler.jsonc
-
-      - name: Deploy Worker API
-        working-directory: packages/api
-        run: pnpm run deploy -- --config wrangler.jsonc
 
       - name: Build web
         working-directory: packages/web
