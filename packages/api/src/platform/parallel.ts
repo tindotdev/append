@@ -71,7 +71,8 @@ export async function* parallelStream<T, R>(
 	// Yield results as they complete
 	while (completedCount < items.length) {
 		if (resultQueue.length > 0) {
-			yield resultQueue.shift()!;
+			const result = resultQueue.shift();
+			if (result) yield result;
 		} else {
 			// Wait for the next result
 			await new Promise<void>((resolve) => {
@@ -82,6 +83,7 @@ export async function* parallelStream<T, R>(
 
 	// Drain any remaining results in the queue
 	while (resultQueue.length > 0) {
-		yield resultQueue.shift()!;
+		const result = resultQueue.shift();
+		if (result) yield result;
 	}
 }

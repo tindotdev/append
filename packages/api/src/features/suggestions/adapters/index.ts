@@ -4,7 +4,7 @@
  * Creates the appropriate LLM client based on the configured provider.
  */
 
-import { getSecretValue, type Bindings } from '../../../platform/env';
+import { type Bindings, getSecretValue } from '../../../platform/env';
 import type { LlmClient, SuggestionProvider } from '../ports/llm';
 import { makeLlmClient as makeAIGatewayClient } from './llm.aigateway';
 import { makeStubLlmClient } from './llm.stub';

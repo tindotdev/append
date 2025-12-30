@@ -143,16 +143,15 @@ export async function* generateSuggestions(
 		errors: 0,
 	};
 
-	// Track terms we've already processed in this run (for within-batch cache hits)
-	// Note: With parallel processing, there's a small race window where duplicate
-	// terms might both trigger LLM calls. This is acceptable as the D1 cache will
-	// deduplicate on subsequent batches.
-	const processedTerms = new Map<string, Suggestion>();
+	// Track in-flight LLM calls by term to prevent duplicate work
+	// When processing in parallel, if two candidates have the same term, the first one
+	// will create a Promise that the second one can await.
+	const inFlightTerms = new Map<string, Promise<Suggestion>>();
 
 	// Process candidates in parallel with concurrency limit (ADR 0011)
 	for await (const result of parallelStream(
 		candidatesToProcess,
-		(cand) => processCandidate(db, userId, batchId, cand, llm, isRegenerate, processedTerms, results),
+		(cand) => processCandidate(db, userId, batchId, cand, llm, isRegenerate, inFlightTerms, results),
 		DEFAULT_CONCURRENCY
 	)) {
 		// parallelStream yields PromiseSettledResult, but processCandidate handles its own errors
@@ -185,33 +184,12 @@ async function processCandidate(
 	cand: CandidateRecord,
 	llm: LlmClient,
 	isRegenerate: boolean,
-	processedTerms: Map<string, Suggestion>,
+	inFlightTerms: Map<string, Promise<Suggestion>>,
 	results: { ok: number; failed: number; cached: number; skippedAlreadySuggested: number; errors: number }
 ): Promise<SuggestCandidateEvent> {
 	const now = new Date();
 
-	// Check if we already processed this term in this batch run
-	const inBatchCached = processedTerms.get(cand.normalizedTerm);
-	if (inBatchCached && !isRegenerate) {
-		// Use cached result from this batch run
-		await db
-			.update(candidate)
-			.set({
-				suggestedBucket: inBatchCached.bucket,
-				suggestedText: inBatchCached.text,
-				suggestionStatus: 'done' as SuggestionStatus,
-				suggestionError: null,
-				suggestionUpdatedAt: now,
-				status: 'suggested' as BatchStatus,
-				updatedAt: now,
-			})
-			.where(eq(candidate.id, cand.id));
-
-		results.cached++;
-		return { id: cand.id, term: cand.term, status: 'cached', suggestion: inBatchCached };
-	}
-
-	// Check D1 cache (fill-missing mode only)
+	// Check D1 cache first (fill-missing mode only)
 	if (!isRegenerate) {
 		const cachedSuggestion = await findCachedSuggestion(db, userId, cand.normalizedTerm, SUGGESTION_MODEL, PROMPT_VERSION);
 
@@ -230,79 +208,163 @@ async function processCandidate(
 				})
 				.where(eq(candidate.id, cand.id));
 
-			// Add to in-batch cache
-			processedTerms.set(cand.normalizedTerm, cachedSuggestion);
-
 			results.cached++;
 			return { id: cand.id, term: cand.term, status: 'cached', suggestion: cachedSuggestion };
 		}
 	}
 
-	// Claim the candidate with conditional update
-	const claimResult = await db
-		.update(candidate)
-		.set({
-			suggestionStatus: 'in_progress' as SuggestionStatus,
-			suggestionAttempts: sql`${candidate.suggestionAttempts} + 1`,
-			suggestionUpdatedAt: now,
-			updatedAt: now,
-		})
-		.where(
-			and(
-				eq(candidate.id, cand.id),
-				or(isNull(candidate.suggestionStatus), eq(candidate.suggestionStatus, 'done'), eq(candidate.suggestionStatus, 'error')),
-				lt(candidate.suggestionAttempts, MAX_SUGGESTION_ATTEMPTS)
-			)
-		)
-		.returning({ id: candidate.id });
+	// Atomically check-and-register for in-flight deduplication (fill-missing mode only)
+	// If another candidate with the same term is already being processed, wait for its result
+	let llmPromise: Promise<Suggestion>;
+	let isLeader = false;
 
-	if (claimResult.length === 0) {
-		// Failed to claim - someone else is processing or max attempts reached
-		// Don't count this in results as it's a race condition edge case
-		return { id: cand.id, term: cand.term, status: 'skipped' };
+	if (!isRegenerate) {
+		const existingPromise = inFlightTerms.get(cand.normalizedTerm);
+		if (existingPromise) {
+			// Another candidate is already processing this term - wait for it
+			llmPromise = existingPromise;
+		} else {
+			// We're the first - create the promise and register it
+			isLeader = true;
+			llmPromise = (async () => {
+				// Claim the candidate with conditional update
+				const claimResult = await db
+					.update(candidate)
+					.set({
+						suggestionStatus: 'in_progress' as SuggestionStatus,
+						suggestionAttempts: sql`${candidate.suggestionAttempts} + 1`,
+						suggestionUpdatedAt: now,
+						updatedAt: now,
+					})
+					.where(
+						and(
+							eq(candidate.id, cand.id),
+							or(isNull(candidate.suggestionStatus), eq(candidate.suggestionStatus, 'done'), eq(candidate.suggestionStatus, 'error')),
+							lt(candidate.suggestionAttempts, MAX_SUGGESTION_ATTEMPTS)
+						)
+					)
+					.returning({ id: candidate.id });
+
+				if (claimResult.length === 0) {
+					// Failed to claim - this shouldn't happen for the leader
+					throw new Error('Failed to claim candidate');
+				}
+
+				// Generate suggestion
+				const suggestion = await llm.suggestOne(cand.term);
+
+				// Update candidate with result
+				await db
+					.update(candidate)
+					.set({
+						suggestedBucket: suggestion.bucket,
+						suggestedText: suggestion.text,
+						suggestionStatus: 'done' as SuggestionStatus,
+						suggestionError: null,
+						suggestionUpdatedAt: new Date(),
+						status: 'suggested' as BatchStatus,
+						updatedAt: new Date(),
+					})
+					.where(eq(candidate.id, cand.id));
+
+				// Save to D1 cache
+				await cacheSuggestion(db, userId, cand.normalizedTerm, SUGGESTION_MODEL, PROMPT_VERSION, suggestion);
+
+				return suggestion;
+			})();
+
+			// Register the promise immediately
+			inFlightTerms.set(cand.normalizedTerm, llmPromise);
+		}
+	} else {
+		// Regenerate mode - no deduplication, always generate fresh
+		llmPromise = (async () => {
+			// Claim the candidate
+			const claimResult = await db
+				.update(candidate)
+				.set({
+					suggestionStatus: 'in_progress' as SuggestionStatus,
+					suggestionAttempts: sql`${candidate.suggestionAttempts} + 1`,
+					suggestionUpdatedAt: now,
+					updatedAt: now,
+				})
+				.where(
+					and(
+						eq(candidate.id, cand.id),
+						or(isNull(candidate.suggestionStatus), eq(candidate.suggestionStatus, 'done'), eq(candidate.suggestionStatus, 'error')),
+						lt(candidate.suggestionAttempts, MAX_SUGGESTION_ATTEMPTS)
+					)
+				)
+				.returning({ id: candidate.id });
+
+			if (claimResult.length === 0) {
+				throw new Error('Failed to claim candidate');
+			}
+
+			// Generate suggestion
+			const suggestion = await llm.suggestOne(cand.term);
+
+			// Update candidate with result
+			await db
+				.update(candidate)
+				.set({
+					suggestedBucket: suggestion.bucket,
+					suggestedText: suggestion.text,
+					suggestionStatus: 'done' as SuggestionStatus,
+					suggestionError: null,
+					suggestionUpdatedAt: new Date(),
+					status: 'suggested' as BatchStatus,
+					updatedAt: new Date(),
+				})
+				.where(eq(candidate.id, cand.id));
+
+			return suggestion;
+		})();
+		isLeader = true;
 	}
 
-	// Generate suggestion using LLM
+	// Wait for the LLM call to complete
 	try {
-		const suggestion = await llm.suggestOne(cand.term);
+		const suggestion = await llmPromise;
 
-		// Update candidate with result
-		await db
-			.update(candidate)
-			.set({
-				suggestedBucket: suggestion.bucket,
-				suggestedText: suggestion.text,
-				suggestionStatus: 'done' as SuggestionStatus,
-				suggestionError: null,
-				suggestionUpdatedAt: new Date(),
-				status: 'suggested' as BatchStatus,
-				updatedAt: new Date(),
-			})
-			.where(eq(candidate.id, cand.id));
+		// If we're a follower (not the leader), update our candidate with the shared result
+		if (!isLeader) {
+			await db
+				.update(candidate)
+				.set({
+					suggestedBucket: suggestion.bucket,
+					suggestedText: suggestion.text,
+					suggestionStatus: 'done' as SuggestionStatus,
+					suggestionError: null,
+					suggestionUpdatedAt: new Date(),
+					status: 'suggested' as BatchStatus,
+					updatedAt: new Date(),
+				})
+				.where(eq(candidate.id, cand.id));
 
-		// Add to in-batch cache
-		processedTerms.set(cand.normalizedTerm, suggestion);
-
-		// Save to D1 cache (fill-missing mode only)
-		if (!isRegenerate) {
-			await cacheSuggestion(db, userId, cand.normalizedTerm, SUGGESTION_MODEL, PROMPT_VERSION, suggestion);
+			results.cached++;
+			return { id: cand.id, term: cand.term, status: 'cached', suggestion };
 		}
 
+		// Leader case
 		results.ok++;
 		return { id: cand.id, term: cand.term, status: 'ok', suggestion };
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-		await db
-			.update(candidate)
-			.set({
-				suggestionStatus: 'error' as SuggestionStatus,
-				suggestionError: errorMessage,
-				suggestionUpdatedAt: new Date(),
-				status: 'suggested' as BatchStatus,
-				updatedAt: new Date(),
-			})
-			.where(eq(candidate.id, cand.id));
+		// If we're a follower and the leader failed, we need to mark ourselves as failed too
+		if (!isLeader) {
+			await db
+				.update(candidate)
+				.set({
+					suggestionStatus: 'error' as SuggestionStatus,
+					suggestionError: errorMessage,
+					suggestionUpdatedAt: new Date(),
+					status: 'suggested' as BatchStatus,
+					updatedAt: new Date(),
+				})
+				.where(eq(candidate.id, cand.id));
+		}
 
 		results.failed++;
 		return { id: cand.id, term: cand.term, status: 'error', error: errorMessage };
