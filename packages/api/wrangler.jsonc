@@ -24,14 +24,8 @@
 	 * databases, object storage, AI inference, real-time communication and more.
 	 * https://developers.cloudflare.com/workers/runtime-apis/bindings/
 	 */
-	/**
-	 * AI Gateway Binding (Step 3 - Suggestions)
-	 * https://developers.cloudflare.com/ai-gateway/integrations/worker-binding-methods/
-	 */
-	"ai": {
-		"binding": "AI",
-		"remote": true
-	},
+	// Note: AI Gateway is accessed via ai-gateway-provider (HTTP calls),
+	// not through the Workers AI binding. No "ai" binding needed.
 	/**
 	 * Environment Variables
 	 * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
@@ -66,27 +60,34 @@
 			"migrations_dir": "drizzle"
 		}
 	],
+	// Note: Secrets Store binding is in "production" env only.
+	// Local dev uses OPENAI_API_KEY from .dev.vars (plain string).
 	/**
-	 * Secrets Store Bindings
-	 * https://developers.cloudflare.com/secrets-store/integrations/workers/
-	 */
-	"secrets_store_secrets": [
-		{
-			"binding": "OPENAI_API_KEY",
-			"store_id": "1a34ec9e145b4a4982a9880acc18e698",
-			"secret_name": "append-gateway_openai_default"
-		}
-	],
-	/**
-	 * Test environment (§5.2)
-	 * - Enables email/password auth for testing
-	 * - Uses localhost-only URL guard for safety
+	 * Environments
 	 */
 	"env": {
+		/**
+		 * Production environment
+		 * - Uses Secrets Store for OPENAI_API_KEY
+		 * - Deploy with: wrangler deploy -e production
+		 */
+		"production": {
+			"name": "append-api",
+			"secrets_store_secrets": [
+				{
+					"binding": "OPENAI_API_KEY",
+					"store_id": "1a34ec9e145b4a4982a9880acc18e698",
+					"secret_name": "append-gateway_openai_default"
+				}
+			]
+		},
+		/**
+		 * Test environment (§5.2)
+		 * - Enables email/password auth for testing
+		 * - Uses localhost-only URL guard for safety
+		 * - Uses stub provider (no Secrets Store needed)
+		 */
 		"test": {
-			"ai": {
-				"binding": "AI"
-			},
 			"vars": {
 				"ENABLE_TEST_EMAIL_PASSWORD_AUTH": "1",
 				"BETTER_AUTH_URL": "http://localhost:8787",
@@ -97,15 +98,6 @@
 				"SUGGESTIONS_PROVIDER": "stub",
 				"AI_GATEWAY_ID": "test-gateway"
 			},
-			// Secrets Store binding must be explicitly declared in env (not inherited)
-			// Tests use stub provider, so the binding is not accessed but must be present
-			"secrets_store_secrets": [
-				{
-					"binding": "OPENAI_API_KEY",
-					"store_id": "1a34ec9e145b4a4982a9880acc18e698",
-					"secret_name": "append-gateway_openai_default"
-				}
-			],
 			"d1_databases": [
 				{
 					"binding": "DB",
