@@ -87,8 +87,8 @@ async function suggestWithMetrics(term: string): Promise<RequestResult> {
 		const durationMs = Math.round(performance.now() - start);
 
 		// Access experimental response headers if available (may not be typed)
-		// biome-ignore lint/suspicious/noExplicitAny: accessing experimental API
-		const experimental = (response as any).experimental_providerMetadata?.openai?.headers as Headers | undefined;
+		const experimental = (response as { experimental_providerMetadata?: { openai?: { headers?: Headers } } }).experimental_providerMetadata
+			?.openai?.headers;
 		const rateLimits = experimental ? parseRateLimitHeaders(experimental) : undefined;
 
 		const suggestion = response.output as { bucket: string; text: string };
@@ -231,7 +231,7 @@ export async function runParallelTest(): Promise<void> {
 	}
 
 	// Summary
-	console.log('\n' + '='.repeat(60));
+	console.log(`\n${'='.repeat(60)}`);
 	console.log('Summary');
 	console.log('='.repeat(60));
 	console.log('\nConcurrency | Total Time | Avg Request | Success | Rate Limits');
@@ -239,7 +239,7 @@ export async function runParallelTest(): Promise<void> {
 
 	for (const r of results) {
 		console.log(
-			`${r.concurrency.toString().padStart(11)} | ${(r.totalDurationMs + 'ms').padStart(10)} | ${(r.avgRequestDurationMs + 'ms').padStart(11)} | ${(r.successCount + '/' + r.termCount).padStart(7)} | ${r.rateLimitHits}`
+			`${r.concurrency.toString().padStart(11)} | ${`${r.totalDurationMs}ms`.padStart(10)} | ${`${r.avgRequestDurationMs}ms`.padStart(11)} | ${`${r.successCount}/${r.termCount}`.padStart(7)} | ${r.rateLimitHits}`
 		);
 	}
 
