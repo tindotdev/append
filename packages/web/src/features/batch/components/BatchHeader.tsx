@@ -1,17 +1,31 @@
 import type { BatchResponse } from '../types';
 import { getSuggestionFlags } from './suggestions';
 
+interface GenerationProgress {
+	completed: number;
+	total: number;
+}
+
 interface BatchHeaderProps {
 	batch: BatchResponse;
 	isRetrying?: boolean;
 	isAccepting?: boolean;
+	generationProgress?: GenerationProgress | null;
 	onRetryFailed?: () => void;
 	onGenerateSuggestions?: () => void;
 	onAcceptAll?: () => void;
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: conditional UI based on batch state
-export function BatchHeader({ batch, isRetrying, isAccepting, onRetryFailed, onGenerateSuggestions, onAcceptAll }: BatchHeaderProps) {
+export function BatchHeader({
+	batch,
+	isRetrying,
+	isAccepting,
+	generationProgress,
+	onRetryFailed,
+	onGenerateSuggestions,
+	onAcceptAll,
+}: BatchHeaderProps) {
 	const failedCount = batch.candidates.filter((c) => c.suggestionStatus === 'error').length;
 	const inProgressCount = batch.candidates.filter((c) => c.suggestionStatus === 'in_progress').length;
 	const pendingCount = batch.candidates.filter((c) => getSuggestionFlags(c).isSuggestionPending).length;
@@ -59,9 +73,11 @@ export function BatchHeader({ batch, isRetrying, isAccepting, onRetryFailed, onG
 							)}
 						</>
 					)}
-					{inProgressCount > 0 && (
+					{(inProgressCount > 0 || generationProgress) && (
 						<span className="text-sm text-blue-400">
-							{inProgressCount} suggestion{inProgressCount !== 1 ? 's' : ''} generating...
+							{generationProgress
+								? `Generating ${generationProgress.completed}/${generationProgress.total}...`
+								: `${inProgressCount} suggestion${inProgressCount !== 1 ? 's' : ''} generating...`}
 						</span>
 					)}
 					{failedCount > 0 && (

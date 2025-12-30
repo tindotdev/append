@@ -1,6 +1,6 @@
 import { BUCKETS } from '@append/contracts/types';
 import { Link, useParams } from '@tanstack/react-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiRequestError } from '@/lib/api-client';
 import { acceptBatch } from '../api/accept-batch';
 import { getBatch } from '../api/get-batch';
@@ -15,6 +15,11 @@ const TOAST_TIMEOUT_MS = 5000;
 interface PersistMessages {
 	failure: string;
 	invalid?: (err: ApiRequestError) => string;
+}
+
+interface GenerationProgress {
+	completed: number;
+	total: number;
 }
 
 function getBatchError(err: unknown): BatchError {
@@ -84,6 +89,8 @@ export function BatchDetailPage() {
 	const [toast, setToast] = useState<string | null>(null);
 	const [isRetrying, setIsRetrying] = useState(false);
 	const [isAccepting, setIsAccepting] = useState(false);
+	const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
+	const generationInFlightRef = useRef(false);
 	const { rowStates, initialize, updateDraft, markSaving, markError, applyCandidate } = useCandidateRowStates();
 
 	const fetchBatch = useCallback(async () => {
@@ -175,18 +182,29 @@ export function BatchDetailPage() {
 	);
 
 	const handleGenerateSuggestions = useCallback(async () => {
+		// Guard against duplicate calls (React StrictMode, double-clicks)
+		if (generationInFlightRef.current) return;
+		generationInFlightRef.current = true;
+
 		setIsRetrying(true);
 		let successCount = 0;
 		let errorCount = 0;
+		let completedCount = 0;
 
 		try {
 			await generateSuggestions(batchId, {
+				onStart: (event) => {
+					setGenerationProgress({ completed: 0, total: event.eligibleCount });
+				},
 				onCandidate: (event) => {
 					setBatch((prev) => applySseEventToCandidate(prev, event));
 					if (event.status === 'ok' || event.status === 'cached') successCount++;
 					if (event.status === 'error') errorCount++;
+					completedCount++;
+					setGenerationProgress((prev) => (prev ? { ...prev, completed: completedCount } : null));
 				},
 				onDone: () => {
+					setGenerationProgress(null);
 					if (errorCount > 0) {
 						setToast(`Generated ${successCount} suggestions, ${errorCount} failed`);
 					} else if (successCount > 0) {
@@ -194,12 +212,15 @@ export function BatchDetailPage() {
 					}
 				},
 				onError: (error) => {
+					setGenerationProgress(null);
 					setToast(`Generation failed: ${error}`);
 				},
 			});
 		} catch {
+			setGenerationProgress(null);
 			setToast('Failed to generate suggestions. Please try again.');
 		} finally {
+			generationInFlightRef.current = false;
 			setIsRetrying(false);
 		}
 	}, [batchId]);
@@ -268,6 +289,7 @@ export function BatchDetailPage() {
 				batch={batch}
 				isRetrying={isRetrying}
 				isAccepting={isAccepting}
+				generationProgress={generationProgress}
 				onRetryFailed={handleRetryFailed}
 				onGenerateSuggestions={handleGenerateSuggestions}
 				onAcceptAll={handleAcceptAll}
