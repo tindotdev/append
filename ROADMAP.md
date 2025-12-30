@@ -13,12 +13,12 @@ Phase 1: Critical Bug Fix       [██████████] 100% COMPLETE
 Phase 2: Quick UX Wins          [██████████] 100% COMPLETE
 Phase 3: Add shadcn/ui          [██████████] 100% COMPLETE
 Phase 3.5: Rate Limit Research  [██████████] 100% COMPLETE
-Phase 4: Parallel Suggestions   [░░░░░░░░░░]   0% Pending
+Phase 4: Parallel Suggestions   [██████████] 100% COMPLETE
 Phase 5: Custom Buckets         [░░░░░░░░░░]   0% Pending
 Phase 6: Documentation          [░░░░░░░░░░]   0% Pending
 ```
 
-**We are currently at**: Ready for Phase 4 — implementing parallel suggestions (concurrency=10, see ADR 0011)
+**We are currently at**: Ready for Phase 5 — implementing custom buckets (limit 20)
 
 ---
 
@@ -27,8 +27,8 @@ Phase 6: Documentation          [░░░░░░░░░░]   0% Pending
 | #   | Issue                                | Impact   | Status                                   |
 | --- | ------------------------------------ | -------- | ---------------------------------------- |
 | 1   | 20 terms minimum is too restrictive  | High     | **FIXED** (TERM_MIN=1)                   |
-| 2   | Suggestions UX during generation     | Medium   | Pending (Phase 4)                        |
-| 3   | Suggestions generated sequentially   | High     | Pending (Phase 3.5 → 4)                  |
+| 2   | Suggestions UX during generation     | Medium   | **FIXED** (progress indicator in Phase 4) |
+| 3   | Suggestions generated sequentially   | High     | **FIXED** (parallel with concurrency=10) |
 | 4   | Dropdown doesn't close on click away | Low      | **FIXED** (shadcn DropdownMenu)          |
 | 5   | Accepted terms should vanish         | Medium   | **FIXED** (collapsed in details section) |
 | 6   | No items in bucket page              | Critical | **FIXED** (Accept All button added)      |
@@ -123,13 +123,19 @@ Phase 6: Documentation          [░░░░░░░░░░]   0% Pending
 
 ---
 
-## Phase 4: Parallel Suggestions ⏳ Pending
+## Phase 4: Parallel Suggestions ✅ COMPLETE
 
-| Task                       | File(s)                  | Description                              |
-| -------------------------- | ------------------------ | ---------------------------------------- |
-| 4.1 Parallel LLM calls     | `generateSuggestions.ts` | `Promise.all` with concurrency limit (5) |
-| 4.2 Update SSE streaming   | Same file                | Handle out-of-order completions          |
-| 4.3 Add progress indicator | `BatchDetailPage.tsx`    | Show "5/20 completed" during generation  |
+| Task                       | Status  | File(s)                                           | Description                                 |
+| -------------------------- | ------- | ------------------------------------------------- | ------------------------------------------- |
+| 4.1 Parallel LLM calls     | ✅ Done | `generateSuggestions.ts`, `platform/parallel.ts`  | `parallelStream` with concurrency limit=10  |
+| 4.2 Update SSE streaming   | ✅ Done | Same file                                         | Results stream as they complete (out-of-order) |
+| 4.3 Add progress indicator | ✅ Done | `BatchDetailPage.tsx`, `BatchHeader.tsx`          | Shows "Generating 5/20..." during generation |
+
+**Files Changed**:
+- `packages/api/src/platform/parallel.ts` (new - parallel streaming utility)
+- `packages/api/src/features/suggestions/usecases/generateSuggestions.ts` (parallel processing)
+- `packages/web/src/features/batch/pages/BatchDetailPage.tsx` (progress state)
+- `packages/web/src/features/batch/components/BatchHeader.tsx` (progress display)
 
 ---
 

@@ -8,6 +8,7 @@ import type { Bucket } from '@append/contracts/types';
 import { and, asc, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type BatchStatus, batch, candidate, type SuggestionStatus, type schema } from '../../../db';
+import { DEFAULT_CONCURRENCY, parallelStream } from '../../../platform/parallel';
 import { sseEvent } from '../../../platform/sse';
 import { PROMPT_VERSION, SUGGESTION_MODEL } from '../adapters/llm.aigateway';
 import { cacheSuggestion, findCachedSuggestion } from '../data/suggestion-cache';
@@ -143,12 +144,22 @@ export async function* generateSuggestions(
 	};
 
 	// Track terms we've already processed in this run (for within-batch cache hits)
+	// Note: With parallel processing, there's a small race window where duplicate
+	// terms might both trigger LLM calls. This is acceptable as the D1 cache will
+	// deduplicate on subsequent batches.
 	const processedTerms = new Map<string, Suggestion>();
 
-	// Process candidates sequentially
-	for (const cand of candidatesToProcess) {
-		const event = await processCandidate(db, userId, batchId, cand, llm, isRegenerate, processedTerms, results);
-		yield sseEvent('candidate', event);
+	// Process candidates in parallel with concurrency limit (ADR 0011)
+	for await (const result of parallelStream(
+		candidatesToProcess,
+		(cand) => processCandidate(db, userId, batchId, cand, llm, isRegenerate, processedTerms, results),
+		DEFAULT_CONCURRENCY
+	)) {
+		// parallelStream yields PromiseSettledResult, but processCandidate handles its own errors
+		// so we always get fulfilled results with the event inside
+		if (result.status === 'fulfilled') {
+			yield sseEvent('candidate', result.value);
+		}
 	}
 
 	// Update batch status to 'suggested'
