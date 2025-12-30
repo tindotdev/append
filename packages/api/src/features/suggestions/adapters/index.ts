@@ -4,7 +4,7 @@
  * Creates the appropriate LLM client based on the configured provider.
  */
 
-import type { Bindings } from '../../../platform/env';
+import { getSecretValue, type Bindings } from '../../../platform/env';
 import type { LlmClient, SuggestionProvider } from '../ports/llm';
 import { makeLlmClient as makeAIGatewayClient } from './llm.aigateway';
 import { makeStubLlmClient } from './llm.stub';
@@ -12,7 +12,9 @@ import { makeStubLlmClient } from './llm.stub';
 /**
  * Create an LLM client based on environment configuration.
  *
- * Uses Cloudflare Secrets Store for API keys (async retrieval).
+ * Supports both:
+ * - Plain string API keys from .dev.vars (local development)
+ * - Cloudflare Secrets Store bindings (production)
  *
  * @param env - Cloudflare Worker bindings
  * @returns LLM client instance, or null if suggestions are disabled
@@ -29,12 +31,12 @@ export async function createLlmClient(env: Bindings): Promise<LlmClient | null> 
 			return makeStubLlmClient();
 
 		case 'openai': {
-			if (!env.CF_ACCOUNT_ID || !env.AI_GATEWAY_ID || !env.OPENAI_API_KEY) {
+			// Get API key - works with both plain strings (.dev.vars) and Secrets Store (production)
+			const openaiApiKey = await getSecretValue(env.OPENAI_API_KEY);
+
+			if (!env.CF_ACCOUNT_ID || !env.AI_GATEWAY_ID || !openaiApiKey) {
 				throw new Error('OpenAI provider requires CF_ACCOUNT_ID, AI_GATEWAY_ID, and OPENAI_API_KEY');
 			}
-
-			// Retrieve OpenAI API key from Secrets Store (async)
-			const openaiApiKey = await env.OPENAI_API_KEY.get();
 
 			return makeAIGatewayClient({
 				accountId: env.CF_ACCOUNT_ID,

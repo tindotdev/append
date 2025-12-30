@@ -4,7 +4,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"deploy": "wrangler deploy",
+		"deploy": "wrangler deploy -e production",
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"test": "vitest",
