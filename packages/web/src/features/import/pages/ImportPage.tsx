@@ -2,7 +2,13 @@
  * Import page with state machine: idle → uploading → preview → committing → done
  */
 
+import { CheckCircleIcon, Loader2, XCircleIcon } from 'lucide-react';
 import { useState } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type BucketMapping, type CommitResult, commitImport } from '../api/commit-import';
 import { type PreviewResult, previewImport } from '../api/preview-import';
 import { FileUploader } from '../components/FileUploader';
@@ -92,136 +98,141 @@ export function ImportPage() {
 
 			{/* Loading preview */}
 			{state.step === 'loading-preview' && (
-				<div className="mt-6 p-4 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center gap-3">
-					<span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-					<span className="text-zinc-400">Parsing uploaded files...</span>
-				</div>
+				<Card className="mt-6">
+					<CardContent className="flex items-center gap-3 py-4">
+						<Loader2 className="size-4 animate-spin text-muted-foreground" />
+						<span className="text-muted-foreground">Parsing uploaded files...</span>
+					</CardContent>
+				</Card>
 			)}
 
 			{/* Preview state */}
 			{state.step === 'preview' && (
 				<div className="mt-6 space-y-6">
 					{/* Stats summary */}
-					<div className="p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
-						<h3 className="text-sm font-medium text-zinc-300 mb-3">Preview Summary</h3>
-						<div className="grid grid-cols-2 gap-4 text-sm">
-							<div>
-								<span className="text-zinc-500">Total entries:</span> <span className="text-white">{state.preview.stats.totalEntries}</span>
+					<Card>
+						<CardHeader className="pb-3">
+							<CardTitle className="text-sm">Preview Summary</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<div className="grid grid-cols-2 gap-4 text-sm">
+								<div>
+									<span className="text-muted-foreground">Total entries:</span>{' '}
+									<span className="text-foreground">{state.preview.stats.totalEntries}</span>
+								</div>
+								<div>
+									<span className="text-muted-foreground">With definitions:</span>{' '}
+									<span className="text-foreground">{state.preview.stats.entriesWithDefinition}</span>
+								</div>
+								<div>
+									<span className="text-muted-foreground">Inbox (skipped):</span>{' '}
+									<span className="text-muted-foreground">{state.preview.stats.inboxEntries}</span>
+								</div>
+								<div className="flex items-center gap-2">
+									<span className="text-muted-foreground">New terms:</span>
+									<Badge variant="success">{state.preview.stats.newTerms}</Badge>
+								</div>
+								<div className="flex items-center gap-2">
+									<span className="text-muted-foreground">Existing terms:</span>
+									<Badge variant="warning">{state.preview.stats.existingTerms}</Badge>
+								</div>
 							</div>
-							<div>
-								<span className="text-zinc-500">With definitions:</span>{' '}
-								<span className="text-white">{state.preview.stats.entriesWithDefinition}</span>
-							</div>
-							<div>
-								<span className="text-zinc-500">Inbox (skipped):</span> <span className="text-zinc-400">{state.preview.stats.inboxEntries}</span>
-							</div>
-							<div>
-								<span className="text-zinc-500">New terms:</span> <span className="text-green-400">{state.preview.stats.newTerms}</span>
-							</div>
-							<div>
-								<span className="text-zinc-500">Existing terms:</span> <span className="text-yellow-400">{state.preview.stats.existingTerms}</span>
-							</div>
-						</div>
-					</div>
+						</CardContent>
+					</Card>
 
 					{/* File-to-bucket mapping */}
-					<div className="border border-zinc-800 rounded-lg divide-y divide-zinc-800">
-						<div className="p-4 bg-zinc-900/50">
-							<h3 className="text-sm font-medium text-zinc-300">Map files to buckets</h3>
-							<p className="text-xs text-zinc-500 mt-1">Select which bucket each file's terms should be imported into.</p>
-						</div>
-						{state.preview.parsedFiles.map((file) => (
-							<div key={file.r2Key} className="p-4 flex items-center justify-between">
-								<div className="flex-1">
-									<p className="text-white font-medium">{file.filename}</p>
-									<p className="text-zinc-500 text-sm">
-										{file.entries.filter((e) => !e.isInbox).length} terms
-										{file.warnings.length > 0 && <span className="text-yellow-500 ml-2">({file.warnings.length} warnings)</span>}
-									</p>
+					<Card>
+						<CardHeader className="pb-3">
+							<CardTitle className="text-sm">Map files to buckets</CardTitle>
+							<CardDescription>Select which bucket each file's terms should be imported into.</CardDescription>
+						</CardHeader>
+						<CardContent className="divide-y divide-border">
+							{state.preview.parsedFiles.map((file) => (
+								<div key={file.r2Key} className="py-4 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
+									<div className="flex-1 min-w-0">
+										<p className="text-foreground font-medium truncate">{file.filename}</p>
+										<div className="flex items-center gap-2 text-sm">
+											<span className="text-muted-foreground">{file.entries.filter((e) => !e.isInbox).length} terms</span>
+											{file.warnings.length > 0 && <Badge variant="warning">{file.warnings.length} warnings</Badge>}
+										</div>
+									</div>
+									<Select value={state.bucketSelections[file.r2Key] || ''} onValueChange={(value) => handleBucketChange(file.r2Key, value)}>
+										<SelectTrigger className="w-[180px]">
+											<SelectValue placeholder="Select bucket..." />
+										</SelectTrigger>
+										<SelectContent>
+											{state.preview.existingBuckets.map((bucket) => (
+												<SelectItem key={bucket.id} value={bucket.id}>
+													{bucket.name}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
 								</div>
-								<select
-									value={state.bucketSelections[file.r2Key] || ''}
-									onChange={(e) => handleBucketChange(file.r2Key, e.target.value)}
-									className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-								>
-									<option value="">Select bucket...</option>
-									{state.preview.existingBuckets.map((bucket) => (
-										<option key={bucket.id} value={bucket.id}>
-											{bucket.name}
-										</option>
-									))}
-								</select>
-							</div>
-						))}
-					</div>
+							))}
+						</CardContent>
+					</Card>
 
 					{/* Action buttons */}
 					<div className="flex gap-3">
-						<button
-							type="button"
+						<Button
 							onClick={handleCommit}
 							disabled={Object.values(state.bucketSelections).filter((id) => id !== '').length === 0}
-							className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+							className="flex-1"
 						>
 							Import {state.preview.stats.entriesWithDefinition} terms
-						</button>
-						<button
-							type="button"
-							onClick={handleReset}
-							className="px-4 py-3 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors"
-						>
+						</Button>
+						<Button variant="secondary" onClick={handleReset}>
 							Cancel
-						</button>
+						</Button>
 					</div>
 				</div>
 			)}
 
 			{/* Committing state */}
 			{state.step === 'committing' && (
-				<div className="mt-6 p-4 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center gap-3">
-					<span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-					<span className="text-zinc-400">Importing terms...</span>
-				</div>
+				<Card className="mt-6">
+					<CardContent className="flex items-center gap-3 py-4">
+						<Loader2 className="size-4 animate-spin text-muted-foreground" />
+						<span className="text-muted-foreground">Importing terms...</span>
+					</CardContent>
+				</Card>
 			)}
 
 			{/* Done state */}
 			{state.step === 'done' && (
 				<div className="mt-6 space-y-4">
-					<div className="p-4 bg-green-900/30 border border-green-800 rounded-lg">
-						<h3 className="text-green-400 font-medium">Import complete</h3>
-						<div className="mt-2 text-sm space-y-1">
-							<p className="text-zinc-300">Created {state.result.stats.termCreatedCount} new terms</p>
-							<p className="text-zinc-300">Added {state.result.stats.termSenseCreatedCount} senses</p>
+					<Alert className="bg-green-900/20 border-green-800">
+						<CheckCircleIcon className="size-4 text-green-400" />
+						<AlertTitle className="text-green-400">Import complete</AlertTitle>
+						<AlertDescription className="text-muted-foreground space-y-1">
+							<p>Created {state.result.stats.termCreatedCount} new terms</p>
+							<p>Added {state.result.stats.termSenseCreatedCount} senses</p>
 							{state.result.stats.flaggedCount > 0 && (
 								<p className="text-yellow-400">{state.result.stats.flaggedCount} entries flagged for bucket conflict</p>
 							)}
-							{state.result.stats.skippedCount > 0 && <p className="text-zinc-500">{state.result.stats.skippedCount} duplicates skipped</p>}
-						</div>
-					</div>
-					<button
-						type="button"
-						onClick={handleReset}
-						className="w-full px-4 py-3 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors"
-					>
+							{state.result.stats.skippedCount > 0 && (
+								<p className="text-muted-foreground">{state.result.stats.skippedCount} duplicates skipped</p>
+							)}
+						</AlertDescription>
+					</Alert>
+					<Button variant="secondary" onClick={handleReset} className="w-full">
 						Import more files
-					</button>
+					</Button>
 				</div>
 			)}
 
 			{/* Error state */}
 			{state.step === 'error' && (
 				<div className="mt-6 space-y-4">
-					<div className="p-4 bg-red-900/30 border border-red-800 rounded-lg">
-						<h3 className="text-red-400 font-medium">Import failed</h3>
-						<p className="mt-1 text-sm text-zinc-300">{state.message}</p>
-					</div>
-					<button
-						type="button"
-						onClick={handleReset}
-						className="w-full px-4 py-3 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors"
-					>
+					<Alert variant="destructive">
+						<XCircleIcon className="size-4" />
+						<AlertTitle>Import failed</AlertTitle>
+						<AlertDescription>{state.message}</AlertDescription>
+					</Alert>
+					<Button variant="secondary" onClick={handleReset} className="w-full">
 						Try again
-					</button>
+					</Button>
 				</div>
 			)}
 		</div>

@@ -1,10 +1,12 @@
 import { Link, Outlet, useNavigate } from '@tanstack/react-router';
-import { ChevronDown, Menu } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import { ChevronDown, FolderOpen, Menu, Plus, Search, Settings } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { signOut, useAuth } from '@/features/auth';
 import { useUserBuckets } from '@/features/settings';
 import { CAPTURE_NAV, HEADER_NAV, NAV_LINKS } from '@/lib/navigation';
 import { NavLink } from '../NavLink';
+import { Button } from '../ui/button';
+import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '../ui/command';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -13,11 +15,13 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
+import { Kbd } from '../ui/kbd';
 
 export function ProtectedLayout() {
 	// Use AuthProvider (reactive); router context isn't reactive when RouterProvider context changes.
 	const { data: session, isPending } = useAuth();
 	const navigate = useNavigate();
+	const [commandOpen, setCommandOpen] = useState(false);
 
 	const isAuthenticated = !!session;
 	const email = session?.user?.email ?? null;
@@ -39,6 +43,18 @@ export function ProtectedLayout() {
 			navigate({ to: '/sign-in' });
 		}
 	}, [isPending, isAuthenticated, navigate]);
+
+	// Global Cmd+K keyboard shortcut
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+				e.preventDefault();
+				setCommandOpen((open) => !open);
+			}
+		};
+		document.addEventListener('keydown', handleKeyDown);
+		return () => document.removeEventListener('keydown', handleKeyDown);
+	}, []);
 
 	// Show loading while auth is pending or redirecting
 	if (isPending || !isAuthenticated) {
@@ -132,15 +148,16 @@ export function ProtectedLayout() {
 					</div>
 
 					<div className="flex items-center gap-3">
+						<Button variant="outline" size="sm" onClick={() => setCommandOpen(true)} className="hidden sm:flex items-center gap-2">
+							<Search className="size-3.5" />
+							<span>Search</span>
+							<Kbd>⌘K</Kbd>
+						</Button>
 						<NavLink to={CAPTURE_NAV.to}>{CAPTURE_NAV.label}</NavLink>
 						{shortEmail && <span className="hidden sm:inline text-xs text-zinc-500">{shortEmail}</span>}
-						<button
-							type="button"
-							onClick={() => signOut()}
-							className="rounded-md bg-zinc-900 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-200/40"
-						>
+						<Button variant="secondary" size="sm" onClick={() => signOut()}>
 							Sign out
-						</button>
+						</Button>
 					</div>
 				</div>
 			</header>
@@ -150,6 +167,62 @@ export function ProtectedLayout() {
 					<Outlet />
 				</div>
 			</main>
+
+			{/* Command palette (Cmd+K) */}
+			<CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
+				<CommandInput placeholder="Type to search..." />
+				<CommandList>
+					<CommandEmpty>No results found.</CommandEmpty>
+					<CommandGroup heading="Navigation">
+						<CommandItem
+							onSelect={() => {
+								navigate({ to: '/' });
+								setCommandOpen(false);
+							}}
+						>
+							<Plus className="mr-2 size-4" />
+							Capture
+						</CommandItem>
+						<CommandItem
+							onSelect={() => {
+								navigate({ to: '/search' });
+								setCommandOpen(false);
+							}}
+						>
+							<Search className="mr-2 size-4" />
+							Search
+						</CommandItem>
+						<CommandItem
+							onSelect={() => {
+								navigate({ to: '/settings' });
+								setCommandOpen(false);
+							}}
+						>
+							<Settings className="mr-2 size-4" />
+							Settings
+						</CommandItem>
+					</CommandGroup>
+					{buckets.length > 0 && (
+						<>
+							<CommandSeparator />
+							<CommandGroup heading="Buckets">
+								{buckets.map((bucket) => (
+									<CommandItem
+										key={bucket.id}
+										onSelect={() => {
+											navigate({ to: '/bucket/$slug', params: { slug: bucket.slug } });
+											setCommandOpen(false);
+										}}
+									>
+										<FolderOpen className="mr-2 size-4" />
+										{bucket.name}
+									</CommandItem>
+								))}
+							</CommandGroup>
+						</>
+					)}
+				</CommandList>
+			</CommandDialog>
 		</div>
 	);
 }

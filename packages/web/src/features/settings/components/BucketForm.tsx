@@ -3,10 +3,12 @@
  */
 
 import { useForm } from '@tanstack/react-form';
+import { HelpCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { UserBucket } from '../api/user-bucket';
 
 // Slug validation regex: lowercase alphanumeric with hyphens
@@ -113,7 +115,17 @@ export function BucketForm({ bucket, onSubmit, onCancel, isPending }: BucketForm
 			>
 				{(field) => (
 					<Field>
-						<FieldLabel htmlFor="bucket-slug">Slug</FieldLabel>
+						<div className="flex items-center gap-1.5">
+							<FieldLabel htmlFor="bucket-slug">Slug</FieldLabel>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<HelpCircle className="size-3.5 text-zinc-500 cursor-help" />
+								</TooltipTrigger>
+								<TooltipContent>
+									<p>A URL-friendly identifier. Cannot be changed after creation.</p>
+								</TooltipContent>
+							</Tooltip>
+						</div>
 						<Input
 							id="bucket-slug"
 							type="text"

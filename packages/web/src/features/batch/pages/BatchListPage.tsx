@@ -1,4 +1,8 @@
 import { Link } from '@tanstack/react-router';
+import { Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useBatches } from '../api/list-batches';
 import type { BatchListItem } from '../types';
 
@@ -24,15 +28,27 @@ function formatRelativeTime(timestamp: number): string {
 	return 'just now';
 }
 
-/** Get status badge styling */
-function getStatusBadge(status: BatchListItem['status']): { label: string; className: string } {
+/** Get status badge variant */
+function getStatusBadgeVariant(status: BatchListItem['status']): 'secondary' | 'info' | 'success' {
 	switch (status) {
 		case 'captured':
-			return { label: 'Captured', className: 'bg-zinc-700 text-zinc-300' };
+			return 'secondary';
 		case 'suggested':
-			return { label: 'Suggested', className: 'bg-blue-900/50 text-blue-300' };
+			return 'info';
 		case 'accepted':
-			return { label: 'Accepted', className: 'bg-green-900/50 text-green-300' };
+			return 'success';
+	}
+}
+
+/** Get status label */
+function getStatusLabel(status: BatchListItem['status']): string {
+	switch (status) {
+		case 'captured':
+			return 'Captured';
+		case 'suggested':
+			return 'Suggested';
+		case 'accepted':
+			return 'Accepted';
 	}
 }
 
@@ -46,9 +62,17 @@ export function BatchListPage() {
 	if (isLoading) {
 		return (
 			<div className="max-w-4xl">
-				<h2 className="text-xl font-semibold">My Batches</h2>
-				<div className="flex items-center justify-center py-12">
-					<span className="text-zinc-400">Loading...</span>
+				<Skeleton className="h-7 w-32 mb-6" />
+				<div className="border border-zinc-800 rounded-lg divide-y divide-zinc-800">
+					{[1, 2, 3].map((i) => (
+						<div key={i} className="p-4 flex justify-between">
+							<div className="flex items-center gap-3">
+								<Skeleton className="h-5 w-20" />
+								<Skeleton className="h-5 w-16" />
+							</div>
+							<Skeleton className="h-5 w-24" />
+						</div>
+					))}
 				</div>
 			</div>
 		);
@@ -61,13 +85,9 @@ export function BatchListPage() {
 				<h2 className="text-xl font-semibold">My Batches</h2>
 				<div className="flex flex-col items-center justify-center py-12 text-center">
 					<p className="text-zinc-400">Something went wrong. Please try again.</p>
-					<button
-						type="button"
-						onClick={() => refetch()}
-						className="mt-4 px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors"
-					>
+					<Button variant="secondary" onClick={() => refetch()} className="mt-4">
 						Retry
-					</button>
+					</Button>
 				</div>
 			</div>
 		);
@@ -80,9 +100,9 @@ export function BatchListPage() {
 				<h2 className="text-xl font-semibold">My Batches</h2>
 				<div className="flex flex-col items-center justify-center py-12 text-center">
 					<p className="text-zinc-400">No batches yet.</p>
-					<Link to="/batch/new" className="mt-4 px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors">
-						Create your first batch
-					</Link>
+					<Button asChild variant="secondary" className="mt-4">
+						<Link to="/batch/new">Create your first batch</Link>
+					</Button>
 				</div>
 			</div>
 		);
@@ -99,43 +119,35 @@ export function BatchListPage() {
 						{hasNextPage ? ' (more available)' : ''}
 					</p>
 				</div>
-				<Link to="/batch/new" className="px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors">
-					New batch
-				</Link>
+				<Button asChild variant="secondary">
+					<Link to="/batch/new">New batch</Link>
+				</Button>
 			</div>
 
 			{/* Batches list */}
 			<div className="mt-6 border border-zinc-800 rounded-lg divide-y divide-zinc-800">
-				{batches.map((batch) => {
-					const statusBadge = getStatusBadge(batch.status);
-					return (
-						<Link key={batch.id} to="/batch/$batchId" params={{ batchId: batch.id }} className="block p-4 hover:bg-zinc-900/50 transition-colors">
-							<div className="flex items-center justify-between">
-								<div className="flex items-center gap-3">
-									<span className={`text-xs px-2 py-0.5 rounded ${statusBadge.className}`}>{statusBadge.label}</span>
-									<span className="text-white">
-										{batch.candidateCount} term{batch.candidateCount !== 1 ? 's' : ''}
-									</span>
-								</div>
-								<span className="text-zinc-500 text-sm">{formatRelativeTime(batch.createdAt)}</span>
+				{batches.map((batch) => (
+					<Link key={batch.id} to="/batch/$batchId" params={{ batchId: batch.id }} className="block p-4 hover:bg-zinc-900/50 transition-colors">
+						<div className="flex items-center justify-between">
+							<div className="flex items-center gap-3">
+								<Badge variant={getStatusBadgeVariant(batch.status)}>{getStatusLabel(batch.status)}</Badge>
+								<span className="text-white">
+									{batch.candidateCount} term{batch.candidateCount !== 1 ? 's' : ''}
+								</span>
 							</div>
-						</Link>
-					);
-				})}
+							<span className="text-zinc-500 text-sm">{formatRelativeTime(batch.createdAt)}</span>
+						</div>
+					</Link>
+				))}
 			</div>
 
 			{/* Load more button */}
 			{hasNextPage && (
 				<div className="mt-6 flex justify-center">
-					<button
-						type="button"
-						onClick={() => fetchNextPage()}
-						disabled={isFetchingNextPage}
-						className="px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-					>
-						{isFetchingNextPage && <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />}
+					<Button variant="secondary" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+						{isFetchingNextPage && <Loader2 className="size-4 animate-spin" />}
 						Load more
-					</button>
+					</Button>
 				</div>
 			)}
 		</div>

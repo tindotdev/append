@@ -4,21 +4,31 @@
 
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { type UserBucket, useCreateBucket, useDeleteBucket, useReorderBuckets, useUpdateBucket, useUserBuckets } from '../api/user-bucket';
 import { BucketForm, type BucketFormData } from './BucketForm';
 import { BucketList } from './BucketList';
 
-type ViewState =
-	| { mode: 'list' }
-	| { mode: 'create' }
-	| { mode: 'edit'; bucket: UserBucket }
-	| { mode: 'confirm-delete'; bucket: UserBucket };
+type ViewState = { mode: 'list' } | { mode: 'create' } | { mode: 'edit'; bucket: UserBucket };
 
 function BucketLoadingState() {
 	return (
-		<div className="flex items-center justify-center py-12">
-			<span className="text-zinc-400">Loading buckets...</span>
+		<div className="space-y-6">
+			<div className="flex items-center justify-between">
+				<div className="space-y-2">
+					<Skeleton className="h-6 w-24" />
+					<Skeleton className="h-4 w-48" />
+				</div>
+				<Skeleton className="h-10 w-28" />
+			</div>
+			<div className="space-y-2">
+				{[1, 2, 3].map((i) => (
+					<Skeleton key={i} className="h-16 w-full" />
+				))}
+			</div>
 		</div>
 	);
 }
@@ -30,46 +40,6 @@ function BucketErrorState({ onRetry }: { onRetry: () => void }) {
 			<Button type="button" variant="ghost" onClick={onRetry} className="mt-4">
 				Retry
 			</Button>
-		</div>
-	);
-}
-
-function BucketDeleteConfirmation({
-	bucket,
-	error,
-	isPending,
-	onConfirm,
-	onCancel,
-}: {
-	bucket: UserBucket;
-	error: string | null;
-	isPending: boolean;
-	onConfirm: () => void;
-	onCancel: () => void;
-}) {
-	return (
-		<div className="space-y-6">
-			<div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6">
-				<h3 className="text-lg font-medium text-zinc-100">Delete Bucket</h3>
-				<p className="text-zinc-400 mt-2">
-					Are you sure you want to delete <strong className="text-zinc-200">{bucket.name}</strong>?
-				</p>
-				{bucket.senseCount > 0 && (
-					<p className="text-amber-500 mt-2">
-						This bucket contains {bucket.senseCount} item{bucket.senseCount !== 1 ? 's' : ''}. You must move or delete all items before deleting
-						the bucket.
-					</p>
-				)}
-				{error && <p className="text-red-400 mt-4">{error}</p>}
-				<div className="flex items-center justify-end gap-3 mt-6">
-					<Button type="button" variant="ghost" onClick={onCancel} disabled={isPending}>
-						Cancel
-					</Button>
-					<Button type="button" variant="destructive" onClick={onConfirm} disabled={isPending || bucket.senseCount > 0}>
-						{isPending ? 'Deleting...' : 'Delete Bucket'}
-					</Button>
-				</div>
-			</div>
 		</div>
 	);
 }
@@ -99,9 +69,9 @@ function BucketFormView({
 			</div>
 
 			{error && (
-				<div className="rounded-lg border border-red-900/50 bg-red-950/30 p-3">
-					<p className="text-sm text-red-400">{error}</p>
-				</div>
+				<Alert variant="destructive">
+					<AlertDescription>{error}</AlertDescription>
+				</Alert>
 			)}
 
 			<div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6">
@@ -147,9 +117,9 @@ function BucketListView({
 			</div>
 
 			{error && (
-				<div className="rounded-lg border border-red-900/50 bg-red-950/30 p-3">
-					<p className="text-sm text-red-400">{error}</p>
-				</div>
+				<Alert variant="destructive">
+					<AlertDescription>{error}</AlertDescription>
+				</Alert>
 			)}
 
 			<BucketList buckets={buckets} onReorder={onReorder} onEdit={onEdit} onDelete={onDelete} isReordering={isReordering} />
@@ -157,9 +127,12 @@ function BucketListView({
 	);
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: CRUD orchestrator with create/update/delete flows
 export function BucketManager() {
 	const [viewState, setViewState] = useState<ViewState>({ mode: 'list' });
 	const [error, setError] = useState<string | null>(null);
+	const [deleteTarget, setDeleteTarget] = useState<UserBucket | null>(null);
+	const [deleteError, setDeleteError] = useState<string | null>(null);
 
 	const { data, isLoading, isError, refetch } = useUserBuckets();
 	const createMutation = useCreateBucket();
@@ -199,14 +172,14 @@ export function BucketManager() {
 	};
 
 	const handleDelete = async () => {
-		if (viewState.mode !== 'confirm-delete') return;
+		if (!deleteTarget) return;
 
 		try {
-			setError(null);
-			await deleteMutation.mutateAsync(viewState.bucket.id);
-			setViewState({ mode: 'list' });
+			setDeleteError(null);
+			await deleteMutation.mutateAsync(deleteTarget.id);
+			setDeleteTarget(null);
 		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Failed to delete bucket');
+			setDeleteError(err instanceof Error ? err.message : 'Failed to delete bucket');
 		}
 	};
 
@@ -218,49 +191,77 @@ export function BucketManager() {
 		});
 	};
 
+	const closeDeleteDialog = () => {
+		setDeleteTarget(null);
+		setDeleteError(null);
+	};
+
 	if (isLoading) return <BucketLoadingState />;
 	if (isError) return <BucketErrorState onRetry={refetch} />;
 
-	if (viewState.mode === 'confirm-delete') {
-		return (
-			<BucketDeleteConfirmation
-				bucket={viewState.bucket}
-				error={error}
-				isPending={deleteMutation.isPending}
-				onConfirm={handleDelete}
-				onCancel={() => {
-					setError(null);
-					setViewState({ mode: 'list' });
-				}}
-			/>
-		);
-	}
-
-	if (viewState.mode === 'create' || viewState.mode === 'edit') {
-		return (
-			<BucketFormView
-				mode={viewState.mode}
-				bucket={viewState.mode === 'edit' ? viewState.bucket : undefined}
-				error={error}
-				isPending={createMutation.isPending || updateMutation.isPending}
-				onSubmit={viewState.mode === 'create' ? handleCreate : handleUpdate}
-				onCancel={() => {
-					setError(null);
-					setViewState({ mode: 'list' });
-				}}
-			/>
-		);
-	}
-
 	return (
-		<BucketListView
-			buckets={buckets}
-			error={error}
-			isReordering={reorderMutation.isPending}
-			onCreateClick={() => setViewState({ mode: 'create' })}
-			onReorder={handleReorder}
-			onEdit={(bucket) => setViewState({ mode: 'edit', bucket })}
-			onDelete={(bucket) => setViewState({ mode: 'confirm-delete', bucket })}
-		/>
+		<>
+			{viewState.mode === 'create' || viewState.mode === 'edit' ? (
+				<BucketFormView
+					mode={viewState.mode}
+					bucket={viewState.mode === 'edit' ? viewState.bucket : undefined}
+					error={error}
+					isPending={createMutation.isPending || updateMutation.isPending}
+					onSubmit={viewState.mode === 'create' ? handleCreate : handleUpdate}
+					onCancel={() => {
+						setError(null);
+						setViewState({ mode: 'list' });
+					}}
+				/>
+			) : (
+				<BucketListView
+					buckets={buckets}
+					error={error}
+					isReordering={reorderMutation.isPending}
+					onCreateClick={() => setViewState({ mode: 'create' })}
+					onReorder={handleReorder}
+					onEdit={(bucket) => setViewState({ mode: 'edit', bucket })}
+					onDelete={(bucket) => setDeleteTarget(bucket)}
+				/>
+			)}
+
+			{/* Delete confirmation dialog */}
+			<Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && closeDeleteDialog()}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Delete Bucket</DialogTitle>
+						<DialogDescription>
+							Are you sure you want to delete <strong className="text-foreground">{deleteTarget?.name}</strong>?
+						</DialogDescription>
+					</DialogHeader>
+
+					{deleteTarget && deleteTarget.senseCount > 0 && (
+						<Alert className="bg-yellow-900/20 border-yellow-800">
+							<AlertDescription className="text-yellow-300">
+								This bucket contains {deleteTarget.senseCount} item{deleteTarget.senseCount !== 1 ? 's' : ''}. You must move or delete all items
+								before deleting the bucket.
+							</AlertDescription>
+						</Alert>
+					)}
+
+					{deleteError && (
+						<Alert variant="destructive">
+							<AlertDescription>{deleteError}</AlertDescription>
+						</Alert>
+					)}
+
+					<DialogFooter>
+						<DialogClose asChild>
+							<Button variant="ghost" disabled={deleteMutation.isPending}>
+								Cancel
+							</Button>
+						</DialogClose>
+						<Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending || (deleteTarget?.senseCount ?? 0) > 0}>
+							{deleteMutation.isPending ? 'Deleting...' : 'Delete Bucket'}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</>
 	);
 }
