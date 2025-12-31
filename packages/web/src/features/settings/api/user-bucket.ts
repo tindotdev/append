@@ -7,7 +7,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiRequestError, api, type InferResponseType } from '@/lib/api-rpc';
 
 // Re-export shared types and hooks from lib
-export { userBucketKeys, useUserBuckets, type ListBucketsResponse, type UserBucket } from '@/lib/user-buckets';
+export { type ListBucketsResponse, type UserBucket, userBucketKeys, useUserBuckets } from '@/lib/user-buckets';
 
 type CreateBucketFullResponse = InferResponseType<(typeof api.api)['user-bucket']['$post']>;
 export type CreateBucketResponse = Extract<CreateBucketFullResponse, { id: string }>;

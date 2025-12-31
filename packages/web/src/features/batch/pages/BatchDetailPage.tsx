@@ -1,7 +1,7 @@
 import { Link, useParams } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useUserBuckets } from '@/lib/user-buckets';
 import { ApiRequestError } from '@/lib/api-rpc';
+import { useUserBuckets } from '@/lib/user-buckets';
 import { acceptBatch } from '../api/accept-batch';
 import { getBatch } from '../api/get-batch';
 import { generateSuggestions } from '../api/retry-suggestions';
