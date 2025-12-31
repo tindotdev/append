@@ -25,8 +25,8 @@ export async function applyMigrations() {
 		const sql = migrations[filePath];
 		const fileName = filePath.split('/').pop();
 
-		// Remove Drizzle's statement-breakpoint comments
-		const cleanedSql = sql.replace(/--> statement-breakpoint/g, '');
+		// Remove Drizzle's statement-breakpoint comments and SQL comments
+		const cleanedSql = sql.replace(/--> statement-breakpoint/g, '').replace(/--[^\n]*/g, '');
 
 		// Split by semicolons, collapse to single line, execute individually
 		const statements = cleanedSql
