@@ -5,8 +5,7 @@
  * Use this adapter in tests and local development without LLM costs.
  */
 
-import { BUCKETS, type Bucket } from '@append/contracts/types';
-import type { LlmClient, Suggestion } from '../ports/llm';
+import type { BucketInfo, LlmClient, Suggestion } from '../ports/llm';
 
 /**
  * Simple hash function for deterministic bucket selection.
@@ -25,11 +24,12 @@ function simpleHash(str: string): number {
  * Generate a deterministic suggestion for a term.
  *
  * @param normalizedTerm - The normalized term to generate a suggestion for
+ * @param buckets - The user's buckets to select from
  * @returns A deterministic suggestion based on the term hash
  */
-export function generateStubSuggestion(normalizedTerm: string): Suggestion {
-	const bucketIndex = simpleHash(normalizedTerm) % BUCKETS.length;
-	const bucket: Bucket = BUCKETS[bucketIndex];
+export function generateStubSuggestion(normalizedTerm: string, buckets: BucketInfo[]): Suggestion {
+	const bucketIndex = simpleHash(normalizedTerm) % buckets.length;
+	const bucket = buckets[bucketIndex].slug;
 	const text = `One-liner for: ${normalizedTerm}`;
 
 	return { bucket, text };
@@ -40,10 +40,10 @@ export function generateStubSuggestion(normalizedTerm: string): Suggestion {
  */
 export function makeStubLlmClient(): LlmClient {
 	return {
-		async suggestOne(term: string): Promise<Suggestion> {
+		async suggestOne(term: string, buckets: BucketInfo[]): Promise<Suggestion> {
 			// Normalize the term for consistent results
 			const normalized = term.trim().toLowerCase().replace(/\s+/g, ' ');
-			return generateStubSuggestion(normalized);
+			return generateStubSuggestion(normalized, buckets);
 		},
 	};
 }

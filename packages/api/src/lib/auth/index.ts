@@ -5,7 +5,8 @@ import { APIError } from 'better-auth/api';
 import { withCloudflare } from 'better-auth-cloudflare';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
-import { schema, type user } from '../../db';
+import { bucket, schema, type user } from '../../db';
+import { DEFAULT_BUCKETS } from '../../db/default-buckets';
 
 type Env = {
 	DB: D1Database;
@@ -133,6 +134,20 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 										});
 									}
 								}
+							},
+							// Seed default buckets after user creation (Phase 5B)
+							after: async (user) => {
+								const bucketValues = DEFAULT_BUCKETS.map((b) => ({
+									id: crypto.randomUUID(),
+									userId: user.id,
+									slug: b.slug,
+									name: b.name,
+									description: b.description,
+									color: null,
+									order: b.order,
+								}));
+
+								await db.insert(bucket).values(bucketValues);
 							},
 						},
 					},

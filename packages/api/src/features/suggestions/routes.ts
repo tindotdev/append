@@ -6,7 +6,7 @@ import { vValidator } from '@hono/valibot-validator';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
-import { batch, schema } from '../../db';
+import { batch, bucket, schema } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
 import { sseHeaders } from '../../platform/sse';
 import { apiError, validationHook } from '../../shared/api-error';
@@ -52,12 +52,23 @@ export const suggestionsRoutes = app.post('/batch/:id/suggest', vValidator('quer
 		return apiError(c, 403, 'FORBIDDEN', 'Access denied');
 	}
 
+	// Fetch user's buckets for dynamic prompt (Phase 5C)
+	const userBuckets = await db
+		.select({ slug: bucket.slug, description: bucket.description })
+		.from(bucket)
+		.where(eq(bucket.userId, userId))
+		.orderBy(bucket.order);
+
+	if (userBuckets.length === 0) {
+		return apiError(c, 400, 'VALIDATION_ERROR', 'No buckets configured. Please add at least one bucket.');
+	}
+
 	// Create SSE stream
 	const encoder = new TextEncoder();
 	const stream = new ReadableStream<Uint8Array>({
 		async start(controller) {
 			try {
-				const generator = generateSuggestions(db, userId, batchId, llm, mode, limit);
+				const generator = generateSuggestions(db, userId, batchId, llm, mode, limit, userBuckets);
 
 				for await (const chunk of generator) {
 					controller.enqueue(encoder.encode(chunk));

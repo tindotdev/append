@@ -4,7 +4,6 @@
  * Implements idempotent accept with materialization pointers per ADR 0008.
  */
 
-import type { Bucket } from '@append/contracts/types';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import {
@@ -145,7 +144,7 @@ export async function acceptAll(
 
 	// Compute effective fields and check for missing
 	type CandidateWithEffective = (typeof allCandidates)[number] & {
-		effectiveBucket: Bucket | null;
+		effectiveBucket: string | null;
 		effectiveText: string | null;
 	};
 
@@ -210,7 +209,7 @@ export async function acceptAll(
 	// Pre-fetch primary sense buckets for existing terms with primary senses
 	const primarySenseIds = existingTerms.map((t) => t.primarySenseId).filter((id): id is string => id !== null);
 
-	type PrimarySenseRow = { id: string; bucket: Bucket };
+	type PrimarySenseRow = { id: string; bucket: string };
 	let primarySenses: PrimarySenseRow[] = [];
 	if (primarySenseIds.length > 0) {
 		primarySenses = await db
@@ -228,7 +227,7 @@ export async function acceptAll(
 	}
 
 	// Build map of primary sense buckets
-	const primarySenseBucketMap = new Map<string, Bucket>();
+	const primarySenseBucketMap = new Map<string, string>();
 	for (const ps of primarySenses) {
 		primarySenseBucketMap.set(ps.id, ps.bucket);
 	}

@@ -2,7 +2,6 @@
  * Use case: Update a candidate's chosen bucket/text with optimistic locking.
  */
 
-import type { Bucket } from '@append/contracts/types';
 import { eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { batch, candidate, type schema } from '../../../db';
@@ -17,9 +16,9 @@ export interface CandidateResult {
 	term: string;
 	normalizedTerm: string;
 	status: string;
-	chosenBucket: Bucket | null;
+	chosenBucket: string | null;
 	chosenText: string | null;
-	suggestedBucket: Bucket | null;
+	suggestedBucket: string | null;
 	suggestedText: string | null;
 	suggestionStatus: string | null;
 	suggestionError: string | null;

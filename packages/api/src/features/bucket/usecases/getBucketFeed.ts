@@ -5,7 +5,6 @@
  * ordered by sense creation date (DESC) with cursor pagination.
  */
 
-import type { Bucket } from '@append/contracts/types';
 import { and, desc, eq, isNull, lt, or } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type schema, term, termSense } from '../../../db';
@@ -20,7 +19,7 @@ export interface BucketFeedItem {
 	canonical: string;
 	primarySense: {
 		id: string;
-		bucket: Bucket;
+		bucket: string;
 		text: string;
 		createdAt: number;
 	};
@@ -30,7 +29,7 @@ export interface BucketFeedItem {
  * Response from getBucketFeed.
  */
 export interface BucketFeedResponse {
-	bucket: Bucket;
+	bucket: string;
 	items: BucketFeedItem[];
 	nextCursor: string | null;
 }
@@ -46,7 +45,7 @@ export type GetBucketFeedError = { type: 'invalid_cursor' };
 export async function getBucketFeed(
 	db: DrizzleD1Database<typeof schema>,
 	userId: string,
-	bucket: Bucket,
+	bucket: string,
 	params: GetBucketFeedParams
 ): Promise<{ success: true; result: BucketFeedResponse } | { success: false; error: GetBucketFeedError }> {
 	// Parse cursor if provided
