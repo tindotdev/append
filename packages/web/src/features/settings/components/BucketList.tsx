@@ -8,6 +8,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { UserBucket } from '../api/user-bucket';
 
 interface BucketListProps {
@@ -51,19 +52,29 @@ function SortableBucketItem({ bucket, onEdit, onDelete }: { bucket: UserBucket; 
 			</div>
 
 			<div className="flex items-center gap-2">
-				<Button type="button" variant="ghost" size="sm" onClick={onEdit} aria-label={`Edit ${bucket.name}`}>
-					<Pencil className="size-4" />
-				</Button>
-				<Button
-					type="button"
-					variant="ghost"
-					size="sm"
-					onClick={onDelete}
-					aria-label={`Delete ${bucket.name}`}
-					disabled={bucket.senseCount > 0}
-				>
-					<Trash2 className="size-4" />
-				</Button>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button type="button" variant="ghost" size="sm" onClick={onEdit} aria-label={`Edit ${bucket.name}`}>
+							<Pencil className="size-4" />
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent>Edit bucket</TooltipContent>
+				</Tooltip>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							onClick={onDelete}
+							aria-label={`Delete ${bucket.name}`}
+							disabled={bucket.senseCount > 0}
+						>
+							<Trash2 className="size-4" />
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent>{bucket.senseCount > 0 ? `Remove all ${bucket.senseCount} items first` : 'Delete bucket'}</TooltipContent>
+				</Tooltip>
 			</div>
 		</div>
 	);

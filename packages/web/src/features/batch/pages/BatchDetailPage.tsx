@@ -1,16 +1,15 @@
 import { Link, useParams } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { ApiRequestError } from '@/lib/api-rpc';
 import { useUserBuckets } from '@/lib/user-buckets';
 import { acceptBatch } from '../api/accept-batch';
 import { getBatch } from '../api/get-batch';
 import { generateSuggestions } from '../api/retry-suggestions';
 import { updateCandidate } from '../api/update-candidate';
-import { BatchHeader, BatchToast, CandidateList, EmptyState, ErrorState, LoadingState } from '../components';
+import { BatchHeader, CandidateList, EmptyState, ErrorState, LoadingState } from '../components';
 import { useCandidateRowStates } from '../hooks/use-candidate-row-states';
 import type { BatchError, BatchResponse, Candidate, SuggestCandidateEvent, UpdateCandidateRequest } from '../types';
-
-const TOAST_TIMEOUT_MS = 5000;
 
 interface PersistMessages {
 	failure: string;
@@ -86,7 +85,6 @@ export function BatchDetailPage() {
 	const [batch, setBatch] = useState<BatchResponse | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<BatchError | null>(null);
-	const [toast, setToast] = useState<string | null>(null);
 	const [isRetrying, setIsRetrying] = useState(false);
 	const [isAccepting, setIsAccepting] = useState(false);
 	const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
@@ -114,12 +112,6 @@ export function BatchDetailPage() {
 		fetchBatch();
 	}, [fetchBatch]);
 
-	useEffect(() => {
-		if (!toast) return;
-		const timer = window.setTimeout(() => setToast(null), TOAST_TIMEOUT_MS);
-		return () => window.clearTimeout(timer);
-	}, [toast]);
-
 	const persistCandidate = useCallback(
 		// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: handles optimistic updates with conflict resolution
 		async (candidate: Candidate, request: UpdateCandidateRequest, messages: PersistMessages) => {
@@ -135,7 +127,7 @@ export function BatchDetailPage() {
 			} catch (err) {
 				if (err instanceof ApiRequestError) {
 					if (err.status === 409) {
-						setToast('This row was modified elsewhere. Your changes were not saved.');
+						toast.warning('This row was modified elsewhere. Your changes were not saved.');
 						await fetchBatch();
 						return;
 					}
@@ -210,19 +202,19 @@ export function BatchDetailPage() {
 				onDone: () => {
 					setGenerationProgress(null);
 					if (errorCount > 0) {
-						setToast(`Generated ${successCount} suggestions, ${errorCount} failed`);
+						toast.warning(`Generated ${successCount} suggestions, ${errorCount} failed`);
 					} else if (successCount > 0) {
-						setToast(`Generated ${successCount} suggestions`);
+						toast.success(`Generated ${successCount} suggestions`);
 					}
 				},
-				onError: (error) => {
+				onError: (err) => {
 					setGenerationProgress(null);
-					setToast(`Generation failed: ${error}`);
+					toast.error(`Generation failed: ${err}`);
 				},
 			});
 		} catch {
 			setGenerationProgress(null);
-			setToast('Failed to generate suggestions. Please try again.');
+			toast.error('Failed to generate suggestions. Please try again.');
 		} finally {
 			generationInFlightRef.current = false;
 			setIsRetrying(false);
@@ -236,7 +228,7 @@ export function BatchDetailPage() {
 		setIsAccepting(true);
 		try {
 			const summary = await acceptBatch(batchId);
-			setToast(`Accepted ${summary.acceptedCount} terms (${summary.termCreatedCount} new terms created)`);
+			toast.success(`Accepted ${summary.acceptedCount} terms (${summary.termCreatedCount} new terms created)`);
 			// Refetch to update batch status
 			await fetchBatch();
 		} catch (err) {
@@ -244,17 +236,17 @@ export function BatchDetailPage() {
 				if (err.status === 409) {
 					const reason = err.details?.reason as string | undefined;
 					if (reason === 'SUGGESTIONS_IN_PROGRESS') {
-						setToast('Cannot accept: some suggestions are still being generated.');
+						toast.error('Cannot accept: some suggestions are still being generated.');
 					} else if (reason === 'MISSING_EFFECTIVE_FIELDS') {
-						setToast('Cannot accept: some candidates are missing bucket or text.');
+						toast.error('Cannot accept: some candidates are missing bucket or text.');
 					} else {
-						setToast('Cannot accept: please refresh and try again.');
+						toast.error('Cannot accept: please refresh and try again.');
 					}
 				} else {
-					setToast('Accept failed. Please try again.');
+					toast.error('Accept failed. Please try again.');
 				}
 			} else {
-				setToast('Accept failed. Please try again.');
+				toast.error('Accept failed. Please try again.');
 			}
 		} finally {
 			setIsAccepting(false);
@@ -288,7 +280,6 @@ export function BatchDetailPage() {
 
 	return (
 		<div className="max-w-4xl">
-			<BatchToast message={toast} />
 			<BatchHeader
 				batch={batch}
 				isRetrying={isRetrying}

@@ -1,3 +1,6 @@
+import { ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { Candidate, CandidateDraft, RowStateMap } from '../types';
 import type { BucketOption } from './CandidateInputs';
 import { CandidateRow } from './CandidateRow';
@@ -17,6 +20,8 @@ export function CandidateList({
 	onSave: (candidate: Candidate) => void;
 	onClear: (candidate: Candidate) => void;
 }) {
+	const [isAcceptedOpen, setIsAcceptedOpen] = useState(false);
+
 	// Separate pending and accepted candidates
 	const pendingCandidates = candidates.filter((c) => c.status !== 'accepted');
 	const acceptedCandidates = candidates.filter((c) => c.status === 'accepted');
@@ -47,11 +52,12 @@ export function CandidateList({
 
 			{/* Accepted candidates - collapsed by default */}
 			{acceptedCandidates.length > 0 && (
-				<details className="mt-4">
-					<summary className="cursor-pointer text-sm text-zinc-500 hover:text-zinc-400 py-2">
-						{acceptedCandidates.length} accepted term{acceptedCandidates.length !== 1 ? 's' : ''} (click to show)
-					</summary>
-					<div className="mt-2 border border-zinc-800/50 rounded-lg divide-y divide-zinc-800/50 opacity-60">
+				<Collapsible open={isAcceptedOpen} onOpenChange={setIsAcceptedOpen} className="mt-4">
+					<CollapsibleTrigger className="flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-400 py-2 cursor-pointer">
+						<ChevronRight className={`size-4 transition-transform duration-200 ${isAcceptedOpen ? 'rotate-90' : ''}`} />
+						{acceptedCandidates.length} accepted term{acceptedCandidates.length !== 1 ? 's' : ''}
+					</CollapsibleTrigger>
+					<CollapsibleContent className="mt-2 border border-zinc-800/50 rounded-lg divide-y divide-zinc-800/50 opacity-60">
 						{acceptedCandidates.map((candidate) => (
 							<div key={candidate.id} className="p-3">
 								<div className="flex items-center gap-2">
@@ -62,8 +68,8 @@ export function CandidateList({
 								<p className="text-sm text-zinc-500 mt-1 truncate">{candidate.chosenText ?? candidate.suggestedText}</p>
 							</div>
 						))}
-					</div>
-				</details>
+					</CollapsibleContent>
+				</Collapsible>
 			)}
 		</div>
 	);

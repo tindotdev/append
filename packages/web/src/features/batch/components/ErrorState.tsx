@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router';
+import { Button } from '@/components/ui/button';
 import type { BatchError } from '../types';
 
 export function ErrorState({ error, onRetry }: { error: BatchError; onRetry: () => void }) {
@@ -6,14 +7,14 @@ export function ErrorState({ error, onRetry }: { error: BatchError; onRetry: () 
 	return (
 		<div className="max-w-4xl">
 			<div className="flex flex-col items-center justify-center py-12 text-center">
-				<p className="text-zinc-400">{error.message}</p>
+				<p className="text-muted-foreground">{error.message}</p>
 				{is5xx && (
-					<button type="button" onClick={onRetry} className="mt-4 px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors">
+					<Button variant="secondary" onClick={onRetry} className="mt-4">
 						Retry
-					</button>
+					</Button>
 				)}
 			</div>
-			<Link to="/batch/new" className="mt-4 inline-block text-zinc-400 hover:text-white transition-colors">
+			<Link to="/batch/new" className="mt-4 inline-block text-muted-foreground hover:text-foreground transition-colors">
 				&larr; Create new batch
 			</Link>
 		</div>

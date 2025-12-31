@@ -1,3 +1,8 @@
+import { CheckCircleIcon } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import type { BatchResponse } from '../types';
 import { getSuggestionFlags } from './suggestions';
 
@@ -51,7 +56,9 @@ export function BatchHeader({
 				</span>
 			</div>
 			<div className="mt-2 flex items-center gap-3 text-sm text-zinc-500">
-				<span className="px-2 py-0.5 bg-zinc-800 rounded text-xs uppercase tracking-wide">{batch.status}</span>
+				<Badge variant="outline" className="uppercase tracking-wide">
+					{batch.status}
+				</Badge>
 				<span>Created {new Date(batch.createdAt).toLocaleDateString()}</span>
 			</div>
 			{(pendingCount > 0 || failedCount > 0 || inProgressCount > 0) && (
@@ -62,23 +69,22 @@ export function BatchHeader({
 								{pendingCount} pending suggestion{pendingCount !== 1 ? 's' : ''}
 							</span>
 							{onGenerateSuggestions && (
-								<button
-									type="button"
-									onClick={onGenerateSuggestions}
-									disabled={isRetrying}
-									className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-								>
+								<Button size="sm" onClick={onGenerateSuggestions} disabled={isRetrying}>
 									{isRetrying ? 'Generating...' : 'Generate suggestions'}
-								</button>
+								</Button>
 							)}
 						</>
 					)}
 					{(inProgressCount > 0 || generationProgress) && (
-						<span className="text-sm text-blue-400">
-							{generationProgress
-								? `Generating ${generationProgress.completed}/${generationProgress.total}...`
-								: `${inProgressCount} suggestion${inProgressCount !== 1 ? 's' : ''} generating...`}
-						</span>
+						<div className="flex items-center gap-3 flex-1">
+							<Progress
+								value={generationProgress ? (generationProgress.completed / generationProgress.total) * 100 : 0}
+								className="h-2 flex-1 max-w-32"
+							/>
+							<span className="text-sm text-blue-400">
+								{generationProgress ? `${generationProgress.completed}/${generationProgress.total}` : `${inProgressCount} generating...`}
+							</span>
+						</div>
 					)}
 					{failedCount > 0 && (
 						<>
@@ -86,14 +92,9 @@ export function BatchHeader({
 								{failedCount} suggestion{failedCount !== 1 ? 's' : ''} failed
 							</span>
 							{onRetryFailed && (
-								<button
-									type="button"
-									onClick={onRetryFailed}
-									disabled={isRetrying}
-									className="px-2 py-1 text-xs bg-zinc-700 hover:bg-zinc-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-								>
+								<Button size="sm" variant="secondary" onClick={onRetryFailed} disabled={isRetrying}>
 									{isRetrying ? 'Retrying...' : 'Retry failed'}
-								</button>
+								</Button>
 							)}
 						</>
 					)}
@@ -102,23 +103,19 @@ export function BatchHeader({
 			{/* Accept All button - shown when batch is ready */}
 			{isReadyForAccept && onAcceptAll && (
 				<div className="mt-4">
-					<button
-						type="button"
-						onClick={onAcceptAll}
-						disabled={isAccepting}
-						className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-					>
+					<Button onClick={onAcceptAll} disabled={isAccepting} className="bg-green-600 hover:bg-green-500">
 						{isAccepting ? 'Accepting...' : 'Accept All'}
-					</button>
+					</Button>
 					<p className="mt-1 text-xs text-zinc-500">This will save all {batch.candidateCount} terms to your vocabulary.</p>
 				</div>
 			)}
 			{/* Show accepted status */}
 			{batch.status === 'accepted' && (
-				<div className="mt-4 p-3 bg-green-900/20 border border-green-800 rounded">
-					<p className="text-green-400 text-sm font-medium">All terms have been accepted!</p>
-					<p className="text-green-500/70 text-xs mt-1">View your terms in the bucket pages.</p>
-				</div>
+				<Alert className="mt-4 bg-green-900/20 border-green-800">
+					<CheckCircleIcon className="size-4 text-green-400" />
+					<AlertTitle className="text-green-400">All terms have been accepted!</AlertTitle>
+					<AlertDescription className="text-green-500/70">View your terms in the bucket pages.</AlertDescription>
+				</Alert>
 			)}
 		</>
 	);
