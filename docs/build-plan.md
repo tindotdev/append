@@ -3,7 +3,8 @@
 ## Current stage
 
 - Vertical slice steps 1–7 are complete and archived (see `docs/archive/vertical-slice.md`).
-- Focus now: review all slices, refresh UI, and refactor where needed.
+- **Phase 5 (Custom Buckets + Hono RPC)**: Phases 5A–5D complete. Remaining: 5E (testing + docs).
+- Next: Milestone 5 (Explain It Myself feedback loop).
 
 ## Milestone 1 — Canonical log entries (no AI, no import)
 
@@ -37,6 +38,17 @@
 - LLM grader feedback (correct/unclear/wrong + brief guidance).
 - Track iterations as append-only explanation attempts.
 
+## Phase 5 — Custom Buckets + Hono RPC (infrastructure)
+
+- **5A**: Hono RPC setup (type-safe API client via `hc<AppType>`). ✅
+- **5B**: Bucket table schema + migration. ✅
+- **5C**: Bucket CRUD API (list, create, update, delete, reorder). ✅
+- **5D**: Bucket Manager UI (settings page, drag-drop reorder). ✅
+- **5E**: Testing + docs (user-bucket tests, documentation refresh). In progress.
+
+See ADRs: `0012-custom-user-buckets.md`, `0013-hono-rpc-type-sharing.md`.
+
 ## Implementation note
 
 - Stack: SPA (React + TanStack Router) hosted on Cloudflare Pages + Hono API on Cloudflare Workers (ADR: `docs/adr/0004-spa-hono-workers.md`).
+- Type sharing: Hono RPC for end-to-end type safety (ADR: `docs/adr/0013-hono-rpc-type-sharing.md`).

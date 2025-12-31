@@ -21,7 +21,7 @@ Ensure new functionality doesn't break existing foundations as the project evolv
 
 | Area                  | Status                       | Location                          |
 | --------------------- | ---------------------------- | --------------------------------- |
-| API Integration Tests | ✅ 20 tests                  | `packages/api/test/*.spec.ts`     |
+| API Integration Tests | ✅ 20+ tests                 | `packages/api/test/*.spec.ts`     |
 | Test Utilities        | ✅ Auth, generators, cleanup | `packages/api/test/batch.spec.ts` |
 | D1 Test Environment   | ✅ Migrations auto-apply     | `packages/api/test/setup.ts`      |
 | CI/CD Integration     | ✅ Tests run before deploy   | `.github/workflows/deploy.yml`    |
@@ -106,13 +106,17 @@ Consistent test structure across all routes.
 
 ```
 packages/api/test/
-├── setup.ts           # Shared: migrations, DB init
-├── helpers.ts         # Shared: auth, generators, assertions (NEW)
-├── index.spec.ts      # Health check
-├── batch.spec.ts      # POST/GET /api/batch (Step 2)
-├── terms.spec.ts      # Term CRUD (Milestone 1)
+├── setup.ts            # Shared: migrations, DB init
+├── helpers.ts          # Shared: auth, generators, assertions (NEW)
+├── index.spec.ts       # Health check
+├── batch.spec.ts       # POST/GET /api/batch (Step 2)
+├── candidate.spec.ts   # Candidate CRUD
+├── bucket.spec.ts      # Bucket feed
 ├── suggestions.spec.ts # AI suggestions (Milestone 3)
-└── import.spec.ts     # Markdown import (Milestone 4)
+├── export.spec.ts      # Markdown export
+├── user-bucket.spec.ts # Bucket CRUD (Phase 5) — planned
+├── terms.spec.ts       # Term CRUD (Milestone 1) — planned
+└── import.spec.ts      # Markdown import (Milestone 4) — planned
 ```
 
 ### Shared Test Helpers (`helpers.ts`)
@@ -274,6 +278,17 @@ Already covered in Step 2, extend for:
 | `POST /api/term/:id/explain/:id/grade` | LLM grader feedback  |
 | N/A                                    | Append-only attempts |
 
+### Phase 5: Custom Buckets + Hono RPC
+
+| Route                         | Tests to Add                                |
+| ----------------------------- | ------------------------------------------- |
+| `GET /api/user-bucket`        | List buckets (ordered)                      |
+| `POST /api/user-bucket`       | Create bucket, validation, 20-bucket limit  |
+| `PUT /api/user-bucket/:id`    | Update bucket, ownership check              |
+| `DELETE /api/user-bucket/:id` | Delete bucket, ownership check              |
+| `PUT /api/user-bucket/reorder`| Bulk reorder                                |
+| N/A                           | Suggestion uses dynamic buckets             |
+
 ---
 
 ## Phase 4: Web Component Tests (Optional)
@@ -379,6 +394,7 @@ Manual testing is sufficient until the app stabilizes.
 - [ ] Add tests for Milestone 3 AI suggestions
 - [ ] Add tests for Milestone 4 import
 - [ ] Add tests for Milestone 5 explanations
+- [ ] Add tests for Phase 5 bucket CRUD (`user-bucket.spec.ts`)
 
 ### Phase 4-5: Future (When Needed)
 

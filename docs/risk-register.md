@@ -11,7 +11,9 @@
 - Refactor regressions while consolidating slice flows (accept/suggest/edit contracts drift).
   - Mitigation: re-run vertical-slice checks, keep API contracts in `docs/archive/vertical-slice.md` in sync, add targeted tests for edits/accept-all.
 - Import ambiguity (non-bullets, multi-line bullets, malformed markdown).
-  - Mitigation: preview step + explicit “skip/convert” rules.
+  - Mitigation: preview step + explicit "skip/convert" rules.
+- LLM returns invalid bucket slug (not in user's bucket list).
+  - Mitigation: server validates suggested_bucket against user's bucket slugs; fallback to first bucket if invalid.
 
 ## Complexity risks
 
