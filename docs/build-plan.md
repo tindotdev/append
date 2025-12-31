@@ -4,6 +4,7 @@
 
 - Vertical slice steps 1–7 are complete and archived (see `docs/archive/vertical-slice.md`).
 - **Phase 5 (Custom Buckets + Hono RPC)**: Phases 5A–5D complete. Remaining: 5E (testing + docs).
+- **Milestone 4 (Import ENG-LOG)**: Complete. See `docs/qa-import-checklist.md` for QA results.
 - Next: Milestone 5 (Explain It Myself feedback loop).
 
 ## Milestone 1 — Canonical log entries (no AI, no import)
@@ -26,11 +27,13 @@
 - Per-item accept/edit; accept-all.
 - Cost controls (batch size limits, caching by normalized term).
 
-## Milestone 4 — Import ENG-LOG markdown (migration)
+## Milestone 4 — Import ENG-LOG markdown (migration) ✅
 
-- Upload/paste the five markdown files.
-- Parse → preview (diff/stats) → commit import (idempotent).
-- Dedupe policy: exact duplicates attach as new senses and are flagged if bucket differs.
+- Upload/paste markdown files via FilePond drag-drop. ✅
+- Parse → preview (diff/stats) → commit import (idempotent). ✅
+- Dedupe policy: exact duplicates attach as new senses and are flagged if bucket differs. ✅
+- Files stored in Cloudflare R2 for audit trail. ✅
+- **Deferred**: Import history UI (list past imports) — see backlog.
 
 ## Milestone 5 — “Explain it myself” feedback loop (Case 2)
 

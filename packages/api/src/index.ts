@@ -6,6 +6,7 @@ import { batchRoutes } from './features/batch/routes';
 import { bucketRoutes } from './features/bucket/routes';
 import { candidateRoutes } from './features/candidate/routes';
 import { exportRoutes } from './features/export/routes';
+import { importRoutes } from './features/import/routes';
 import { suggestionsRoutes } from './features/suggestions/routes';
 import { userBucketRoutes } from './features/user-bucket/routes';
 import { createAuth } from './lib/auth';
@@ -84,7 +85,7 @@ app.use(
 	cors({
 		origin: ['http://localhost:5173', 'https://append.tindev.dev'],
 		allowMethods: ['POST', 'GET', 'PUT', 'DELETE', 'OPTIONS'],
-		allowHeaders: ['Content-Type'],
+		allowHeaders: ['Content-Type', 'X-Import-Id'],
 		credentials: true,
 	})
 );
@@ -159,6 +160,7 @@ const apiRoutes = app
 	.route('/api/bucket', bucketRoutes)
 	.route('/api/candidate', candidateRoutes)
 	.route('/api/export', exportRoutes)
+	.route('/api/import', importRoutes)
 	.route('/api', suggestionsRoutes)
 	.route('/api/user-bucket', userBucketRoutes);
 

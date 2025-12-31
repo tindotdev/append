@@ -27,7 +27,8 @@
 ## Current stage
 
 - Vertical slice step 7 is complete and archived.
-- Focus: review all 7 slices, refresh UI, and refactor where needed.
+- Milestone 4 (Import ENG-LOG) is complete.
+- Focus: Milestone 5 (Explain It Myself feedback loop).
 
 ## Engineering defaults (unless an ADR says otherwise)
 
