@@ -1,5 +1,5 @@
 import { type QueryFunctionContext, useInfiniteQuery } from '@tanstack/react-query';
-import { api, ApiRequestError, type InferResponseType } from '@/lib/api-rpc';
+import { ApiRequestError, api, type InferResponseType } from '@/lib/api-rpc';
 
 // Query key factory
 export const bucketKeys = {

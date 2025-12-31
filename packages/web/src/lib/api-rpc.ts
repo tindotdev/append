@@ -6,7 +6,7 @@
  */
 
 import type { AppType } from '@append/api';
-import { hc, type InferResponseType, type InferRequestType } from 'hono/client';
+import { hc, type InferRequestType, type InferResponseType } from 'hono/client';
 
 // API URL - local dev or production
 // Exported for use by SSE streaming and blob download functions that can't use RPC

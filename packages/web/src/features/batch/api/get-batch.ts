@@ -1,5 +1,5 @@
 import { queryOptions, useQuery } from '@tanstack/react-query';
-import { api, ApiRequestError } from '@/lib/api-rpc';
+import { ApiRequestError, api } from '@/lib/api-rpc';
 import type { BatchResponse } from '../types';
 
 // Query key factory
