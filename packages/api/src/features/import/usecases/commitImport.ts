@@ -6,7 +6,7 @@
 
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { bucket as bucketTable, idempotencyKey, normalize, type schema, term, termSense, type TermSenseSource } from '../../../db';
+import { bucket as bucketTable, idempotencyKey, normalize, type schema, type TermSenseSource, term, termSense } from '../../../db';
 import { sha256Hex } from '../../../shared/crypto';
 import { fromBase64Url, toBase64Url } from '../../../shared/idempotency/encoding';
 import { checkIdempotencyKey } from '../../../shared/idempotency/keys';

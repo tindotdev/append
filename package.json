@@ -12,6 +12,7 @@
 		"lint": "biome lint --write .",
 		"format": "biome format --write .",
 		"check": "biome check --write .",
+		"check:unsafe": "biome check --write --unsafe .",
 		"ci:lint": "biome ci .",
 		"lint:boundaries": "pnpm --filter @append/web --filter @append/api lint:boundaries",
 		"test": "pnpm -r --if-present test",

@@ -1,8 +1,7 @@
 import { env, SELF } from 'cloudflare:test';
-import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { bucket, idempotencyKey, schema, term, termSense, user } from '../src/db';
+import { idempotencyKey, schema, term, termSense } from '../src/db';
 import { parseMarkdown } from '../src/features/import/parser/parseMarkdown';
 import { suggestBucketSlug } from '../src/features/import/parser/suggestBucket';
 import { applyMigrations } from './setup';

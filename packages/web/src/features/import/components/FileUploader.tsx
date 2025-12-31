@@ -3,9 +3,9 @@
  */
 import FilePondPluginFileValidateSize from 'filepond-plugin-file-validate-size';
 import FilePondPluginFileValidateType from 'filepond-plugin-file-validate-type';
-import { API_URL } from '@/lib/api-rpc';
+import { useCallback, useRef } from 'react';
 import { FilePond, registerPlugin } from 'react-filepond';
-import { useRef, useCallback } from 'react';
+import { API_URL } from '@/lib/api-rpc';
 
 // Import FilePond styles
 import 'filepond/dist/filepond.min.css';

@@ -3,9 +3,9 @@
  */
 
 import { useState } from 'react';
+import { type BucketMapping, type CommitResult, commitImport } from '../api/commit-import';
+import { type PreviewResult, previewImport } from '../api/preview-import';
 import { FileUploader } from '../components/FileUploader';
-import { commitImport, type BucketMapping, type CommitResult } from '../api/commit-import';
-import { previewImport, type PreviewResult, type ExistingBucket } from '../api/preview-import';
 
 type ImportState =
 	| { step: 'idle' }
