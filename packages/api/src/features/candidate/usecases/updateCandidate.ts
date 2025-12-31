@@ -2,9 +2,9 @@
  * Use case: Update a candidate's chosen bucket/text with optimistic locking.
  */
 
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { batch, candidate, type schema } from '../../../db';
+import { batch, bucket, candidate, type schema } from '../../../db';
 import type { UpdateCandidateInput } from '../validation/updateCandidate.schema';
 
 /**
@@ -33,7 +33,11 @@ export interface CandidateResult {
 /**
  * Possible errors from updateCandidate.
  */
-export type UpdateCandidateError = { type: 'not_found' } | { type: 'forbidden' } | { type: 'version_conflict'; currentVersion: number };
+export type UpdateCandidateError =
+	| { type: 'not_found' }
+	| { type: 'forbidden' }
+	| { type: 'invalid_bucket'; slug: string }
+	| { type: 'version_conflict'; currentVersion: number };
 
 /**
  * Update a candidate's chosen bucket/text with optimistic locking.
@@ -68,7 +72,19 @@ export async function updateCandidate(
 		return { success: false, error: { type: 'forbidden' } };
 	}
 
-	// 2. Build update set (partial update semantics)
+	// 2. Validate bucket exists for user (if provided)
+	if (chosenBucket) {
+		const bucketRow = await db.query.bucket.findFirst({
+			where: and(eq(bucket.userId, userId), eq(bucket.slug, chosenBucket)),
+			columns: { id: true },
+		});
+
+		if (!bucketRow) {
+			return { success: false, error: { type: 'invalid_bucket', slug: chosenBucket } };
+		}
+	}
+
+	// 4. Build update set (partial update semantics)
 	const updateSet: Record<string, unknown> = {
 		version: sql`${candidate.version} + 1`,
 		updatedAt: new Date(),
@@ -81,7 +97,7 @@ export async function updateCandidate(
 		updateSet.chosenText = chosenText;
 	}
 
-	// 3. Atomic conditional update with optimistic locking
+	// 5. Atomic conditional update with optimistic locking
 	const updateResult = await db
 		.update(candidate)
 		.set(updateSet)
@@ -106,7 +122,7 @@ export async function updateCandidate(
 			updatedAt: candidate.updatedAt,
 		});
 
-	// 4. Handle conflict or success
+	// 6. Handle conflict or success
 	if (updateResult.length === 0) {
 		// Re-SELECT to get current version
 		const currentCandidate = await db.query.candidate.findFirst({
