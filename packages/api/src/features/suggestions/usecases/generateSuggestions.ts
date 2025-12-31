@@ -353,19 +353,18 @@ async function processCandidate(
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-		// If we're a follower and the leader failed, we need to mark ourselves as failed too
-		if (!isLeader) {
-			await db
-				.update(candidate)
-				.set({
-					suggestionStatus: 'error' as SuggestionStatus,
-					suggestionError: errorMessage,
-					suggestionUpdatedAt: new Date(),
-					status: 'suggested' as BatchStatus,
-					updatedAt: new Date(),
-				})
-				.where(eq(candidate.id, cand.id));
-		}
+		// Update candidate to error state (both leader and follower)
+		// Leader: claimed it with in_progress but LLM call failed
+		// Follower: inheriting the leader's failure
+		await db
+			.update(candidate)
+			.set({
+				suggestionStatus: 'error' as SuggestionStatus,
+				suggestionError: errorMessage,
+				suggestionUpdatedAt: new Date(),
+				updatedAt: new Date(),
+			})
+			.where(eq(candidate.id, cand.id));
 
 		results.failed++;
 		return { id: cand.id, term: cand.term, status: 'error', error: errorMessage };

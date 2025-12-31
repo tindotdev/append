@@ -73,6 +73,20 @@
 		 */
 		"production": {
 			"name": "append-api",
+			"vars": {
+				"BETTER_AUTH_URL": "https://api.append.tindev.dev",
+				"SUGGESTIONS_PROVIDER": "openai",
+				"AI_GATEWAY_ID": "append-gateway",
+				"CF_ACCOUNT_ID": "d1d83d0040d3dea7df64d58cdbebe5a9"
+			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "append-db",
+					"database_id": "db763705-f8d3-4d94-bda9-305ac66a7b3a",
+					"migrations_dir": "drizzle"
+				}
+			],
 			"secrets_store_secrets": [
 				{
 					"binding": "OPENAI_API_KEY",
