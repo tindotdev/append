@@ -6,11 +6,13 @@
 - App architecture: SPA (React + TanStack Router) + Hono on Cloudflare Workers (ADR: `docs/adr/0004-spa-hono-workers.md`).
 - Auth/access: Google SSO allowlist (ADR: `docs/adr/0001-google-allowlist-auth.md`).
 - Web auth gating: protected layout route (ADR: `docs/adr/0005-web-auth-gating-protected-layout.md`).
-- Duplicates: `Term` + append-only `TermSense` (“allowed-but-flagged”) (ADR: `docs/adr/0002-term-sense-duplicates.md`).
-- Bucket feed UX: primary sense by default, expandable, “Needs review” view (ADR: `docs/adr/0003-bucket-feed-primary-sense.md`).
-- UX north-star: “fast capture → AI suggests → you accept → it becomes an append-only log entry”.
+- Duplicates: `Term` + append-only `TermSense` ("allowed-but-flagged") (ADR: `docs/adr/0002-term-sense-duplicates.md`).
+- Bucket feed UX: primary sense by default, expandable, "Needs review" view (ADR: `docs/adr/0003-bucket-feed-primary-sense.md`).
+- UX north-star: "fast capture → AI suggests → you accept → it becomes an append-only log entry".
 - LLM provider/model: OpenAI `gpt-5-mini` via Cloudflare AI Gateway (ADR: `docs/adr/0006-openai-gpt-5-mini-via-ai-gateway.md`).
 - Step 3 suggestion storage: latest suggestion fields live on `Candidate` + per-term cache (ADR: `docs/adr/0007-step-3-suggestions-on-candidate-plus-cache.md`).
+- Custom buckets: user-owned dynamic buckets, max 20 per user (ADR: `docs/adr/0012-custom-user-buckets.md`).
+- Type sharing: Hono RPC for end-to-end type safety between API and web (ADR: `docs/adr/0013-hono-rpc-type-sharing.md`).
 
 ## Current stage
 
@@ -25,7 +27,7 @@
 - **Capture batch**: a group of Term (input) captured together.
 - **Candidate**: a Term (input) inside a batch with optional suggestions/edits, not yet accepted.
 - **Suggestion**: AI-proposed one-liner + bucket for a Candidate (stored on `Candidate` for Step 3; see `docs/adr/README.md`).
-- **Bucket**: one of `foundations | backend | frontend | dx-tooling | deep-concepts` (stable slug values used in DB + API + URLs; source of truth: `packages/contracts/src/types/index.ts`).
+- **Bucket**: user-owned category entity (slug, name, description, color, order). New users get 5 default tech-focused buckets on signup (fully editable). Max 20 per user. See ADR 0012.
 - **Term (entity)**: the canonical concept keyed by the normalized term (`canonical`).
 - **Sense**: an append-only meaning/usage note for a Term (entity) (one-liner, analogy, etc).
 - **Export**: rendering Terms/Senses back into ENG-LOG-compatible markdown files (convenience, not source of truth).
@@ -92,11 +94,12 @@
 ### Entities
 
 - `User` (Google subject, email)
+- `Bucket` (id, user_id, slug, name, description, color?, order, created_at, updated_at)
 - `Batch` (id, user_id, status, created_at)
-- `Candidate` (id, batch_id, term, normalized_term, status, chosen_bucket?, chosen_text?, version, suggested_bucket?, suggested_text?, suggestion_status?, suggestion_error?, suggestion_attempts, suggestion_model, suggestion_prompt_version, suggestion_updated_at?, materialized_term_id?, materialized_term_sense_id?, created_at)
-- `SuggestionCache` (user_id, normalized_term, model, prompt_version, suggested_bucket, suggested_text, created_at, updated_at)
+- `Candidate` (id, batch_id, term, normalized_term, status, chosen_bucket_id?, chosen_text?, version, suggested_bucket_id?, suggested_text?, suggestion_status?, suggestion_error?, suggestion_attempts, suggestion_model, suggestion_prompt_version, suggestion_updated_at?, materialized_term_id?, materialized_term_sense_id?, created_at)
+- `SuggestionCache` (user_id, normalized_term, model, prompt_version, suggested_bucket_id, suggested_text, created_at, updated_at)
 - `Term` (id, user_id, canonical, display_term, primary_sense_id?, created_at, archived_at?)
-- `TermSense` (id, term_id, bucket, text, source, sense_label?, flagged_reason?, created_at, archived_at?)
+- `TermSense` (id, term_id, bucket_id, text, source, sense_label?, flagged_reason?, created_at, archived_at?)
 - `IdempotencyKey` (user_id, scope, key, result_ref, created_at, expires_at?)
 - `ImportRun` (id, user_id, status, idempotency_key, stats, created_at)
 
@@ -125,10 +128,10 @@
 - Frontend hosting: static SPA (Cloudflare Pages).
 - DB: Cloudflare D1 (relational).
 - Indexing:
+  - `Bucket(user_id, order)` — ordered bucket list per user
   - `Term(user_id, canonical)`
   - `TermSense(term_id, created_at)`
-  - optional: FTS later for sense text
-  - optional: D1 FTS later for body text.
+  - optional: D1 FTS later for sense text.
 
 ## Phase 6 — Integration
 
@@ -137,16 +140,28 @@
 - SPA UI (capture/edit/accept/search)
 - Worker API (Hono)
 - D1 (canonical store)
-- LLM provider (suggestions + later “feedback” grading): OpenAI `gpt-5-mini` via Cloudflare AI Gateway (see `docs/adr/README.md`)
+- LLM provider (suggestions + later "feedback" grading): OpenAI `gpt-5-mini` via Cloudflare AI Gateway; prompt built dynamically from user's bucket slugs and descriptions (see ADRs 0006, 0012)
 - Google OAuth (SSO)
   - Fail closed if neither `ALLOWED_SUB` nor `ALLOWED_EMAIL` is configured (see `docs/adr/README.md`)
 
 ### Import/export
 
-- Import: accept ENG-LOG markdown (5 files) and turn each bullet into a `Term` + `TermSense` with `source=import` (canonical dedupe applies).
-- Export: render by bucket into 5 markdown files (stable ordering by `created_at`).
+- Import: accept ENG-LOG markdown and turn each bullet into a `Term` + `TermSense` with `source=import` (canonical dedupe applies).
+- Export: render by bucket into markdown files (one per bucket, stable ordering by `created_at`).
 
-## ENG-LOG bucket mapping (writeback)
+## Default buckets (seeded on signup)
+
+New users get 5 tech-focused buckets pre-seeded (fully editable):
+
+| Slug | Name | Description |
+|------|------|-------------|
+| foundations | Foundations | Core CS concepts, algorithms, data structures |
+| backend | Backend | Server-side patterns, APIs, databases, storage |
+| frontend | Frontend | UI patterns, React, state management, conflict UX |
+| dx-tooling | DX Tooling | Build tools, migrations, scripts, CI/CD |
+| deep-concepts | Deep Concepts | System design, CAP theorem, architecture |
+
+Example concepts by bucket:
 
 - Foundations: `Idempotency keys`, `Optimistic locking`
 - Backend: `Append-only senses`, `Import preview + commit pattern`
