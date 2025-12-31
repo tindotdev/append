@@ -1,8 +1,7 @@
-import type { Bucket } from '@append/contracts/types';
 import type { Candidate, CandidateDraft, CandidateRowState } from '../types';
 import { CandidateActions } from './CandidateActions';
 import { CandidateHeader } from './CandidateHeader';
-import { CandidateInputs } from './CandidateInputs';
+import { type BucketOption, CandidateInputs } from './CandidateInputs';
 import { SuggestedValues } from './SuggestedValues';
 import { getSuggestionFlags } from './suggestions';
 
@@ -18,7 +17,7 @@ export function CandidateRow({
 	candidate: Candidate;
 	index: number;
 	rowState: CandidateRowState;
-	buckets: readonly Bucket[];
+	buckets: readonly BucketOption[];
 	onDraftChange: (id: string, updates: Partial<CandidateDraft>) => void;
 	onSave: (candidate: Candidate) => void;
 	onClear: (candidate: Candidate) => void;
