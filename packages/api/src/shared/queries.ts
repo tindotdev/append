@@ -30,8 +30,10 @@ export async function findUserBucketBySlug(
 	userId: string,
 	slug: string
 ): Promise<{ id: string; slug: string; name: string } | null> {
-	return db.query.bucket.findFirst({
+	const bucketRow = await db.query.bucket.findFirst({
 		where: and(eq(bucket.userId, userId), eq(bucket.slug, slug)),
 		columns: { id: true, slug: true, name: true },
 	});
+
+	return bucketRow ?? null;
 }

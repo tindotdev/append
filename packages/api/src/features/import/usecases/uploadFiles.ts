@@ -15,10 +15,10 @@ export interface UploadFilesResult {
 	files: UploadedFile[];
 }
 
-export interface UploadFilesError {
-	type: 'no_files' | 'invalid_file_type' | 'file_too_large';
-	message: string;
-}
+export type UploadFilesError =
+	| { type: 'no_files'; message: string }
+	| { type: 'invalid_file_type'; message: string }
+	| { type: 'file_too_large'; message: string };
 
 export type UploadFilesOutcome = { success: true; result: UploadFilesResult } | { success: false; error: UploadFilesError };
 

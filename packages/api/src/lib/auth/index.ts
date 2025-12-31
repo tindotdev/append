@@ -10,10 +10,10 @@ import { DEFAULT_BUCKETS } from '../../db/default-buckets';
 
 type Env = {
 	DB: D1Database;
-	GOOGLE_CLIENT_ID: string;
-	GOOGLE_CLIENT_SECRET: string;
-	BETTER_AUTH_SECRET: string;
-	BETTER_AUTH_URL: string;
+	GOOGLE_CLIENT_ID?: string;
+	GOOGLE_CLIENT_SECRET?: string;
+	BETTER_AUTH_SECRET?: string;
+	BETTER_AUTH_URL?: string;
 	// Allowlist (ADR 0001)
 	ALLOWED_SUB?: string;
 	ALLOWED_EMAIL?: string;
