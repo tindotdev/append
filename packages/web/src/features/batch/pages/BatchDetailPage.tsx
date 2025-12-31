@@ -1,6 +1,6 @@
-import { BUCKETS } from '@append/contracts/types';
 import { Link, useParams } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useUserBuckets } from '@/features/settings';
 import { ApiRequestError } from '@/lib/api-rpc';
 import { acceptBatch } from '../api/accept-batch';
 import { getBatch } from '../api/get-batch';
@@ -92,6 +92,10 @@ export function BatchDetailPage() {
 	const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
 	const generationInFlightRef = useRef(false);
 	const { rowStates, initialize, updateDraft, markSaving, markError, applyCandidate } = useCandidateRowStates();
+
+	// Fetch user buckets for the dropdown
+	const { data: bucketsData, isLoading: bucketsLoading } = useUserBuckets();
+	const buckets = bucketsData?.buckets ?? [];
 
 	const fetchBatch = useCallback(async () => {
 		try {
@@ -257,7 +261,7 @@ export function BatchDetailPage() {
 		}
 	}, [batchId, fetchBatch]);
 
-	if (isLoading) {
+	if (isLoading || bucketsLoading) {
 		return <LoadingState />;
 	}
 
@@ -297,7 +301,7 @@ export function BatchDetailPage() {
 			<CandidateList
 				candidates={batch.candidates}
 				rowStates={rowStates}
-				buckets={BUCKETS}
+				buckets={buckets}
 				onDraftChange={updateDraft}
 				onSave={handleSave}
 				onClear={handleClearOverrides}

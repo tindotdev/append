@@ -1,20 +1,34 @@
-import { BUCKET_TITLES, BUCKETS, type Bucket, isBucket } from '@append/contracts/types';
 import { useParams } from '@tanstack/react-router';
+import { useUserBuckets } from '@/features/settings';
 import { useBucketFeed } from '../api/get-bucket-feed';
 
 export function BucketFeedPage() {
 	const { slug } = useParams({ from: '/protected/bucket/$slug' });
 
-	// Validate slug and determine bucket
-	const isValidBucket = isBucket(slug);
-	// Use slug as bucket when valid, otherwise use first bucket as placeholder (query disabled)
-	const bucket: Bucket = isValidBucket ? slug : BUCKETS[0];
-	const title = isValidBucket ? BUCKET_TITLES[bucket] : '';
+	// Fetch user buckets to validate the slug
+	const { data: bucketsData, isLoading: bucketsLoading } = useUserBuckets();
+	const userBuckets = bucketsData?.buckets ?? [];
+
+	// Validate slug against user's buckets
+	const matchedBucket = userBuckets.find((b) => b.slug === slug);
+	const isValidBucket = !!matchedBucket;
+	const title = matchedBucket?.name ?? '';
 
 	// Always call hook unconditionally to satisfy React rules
-	const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useBucketFeed(bucket, {
-		enabled: isValidBucket,
+	const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useBucketFeed(slug, {
+		enabled: isValidBucket && !bucketsLoading,
 	});
+
+	// Loading buckets
+	if (bucketsLoading) {
+		return (
+			<div className="max-w-4xl">
+				<div className="flex items-center justify-center py-12">
+					<span className="text-zinc-400">Loading...</span>
+				</div>
+			</div>
+		);
+	}
 
 	// Invalid bucket - show error
 	if (!isValidBucket) {
@@ -22,7 +36,7 @@ export function BucketFeedPage() {
 			<div className="max-w-4xl">
 				<div className="flex flex-col items-center justify-center py-12 text-center">
 					<p className="text-zinc-400">Bucket not found.</p>
-					<p className="text-zinc-500 text-sm mt-2">Valid buckets: {BUCKETS.join(', ')}</p>
+					{userBuckets.length > 0 && <p className="text-zinc-500 text-sm mt-2">Valid buckets: {userBuckets.map((b) => b.name).join(', ')}</p>}
 				</div>
 			</div>
 		);

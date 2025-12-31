@@ -1,5 +1,3 @@
-import type { Bucket } from '@append/contracts/types';
-
 export type SuggestionStatus = 'in_progress' | 'done' | 'error';
 
 export interface Candidate {
@@ -8,9 +6,9 @@ export interface Candidate {
 	term: string;
 	normalizedTerm: string;
 	status: string;
-	chosenBucket: Bucket | null;
+	chosenBucket: string | null;
 	chosenText: string | null;
-	suggestedBucket: Bucket | null;
+	suggestedBucket: string | null;
 	suggestedText: string | null;
 	suggestionStatus: SuggestionStatus | null;
 	suggestionError: string | null;
@@ -61,7 +59,7 @@ export interface CreateBatchResponse {
 
 export interface UpdateCandidateRequest {
 	expectedVersion: number;
-	chosenBucket?: Bucket | null;
+	chosenBucket?: string | null;
 	chosenText?: string | null;
 }
 
@@ -98,7 +96,7 @@ export interface SuggestCandidateEvent {
 	term: string;
 	status: 'running' | 'ok' | 'cached' | 'error' | 'skipped';
 	suggestion?: {
-		bucket: Bucket;
+		bucket: string;
 		text: string;
 	};
 	error?: string;
@@ -116,7 +114,7 @@ export interface SuggestDoneEvent {
 export type BatchError = { status: number; message: string };
 
 export interface CandidateDraft {
-	bucket: Bucket | null;
+	bucket: string | null;
 	text: string;
 }
 

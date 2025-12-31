@@ -2,7 +2,6 @@
  * Valibot schema for PUT /api/candidate/:id request body.
  */
 
-import { BUCKETS } from '@append/contracts/types';
 import * as v from 'valibot';
 
 /**
@@ -11,10 +10,21 @@ import * as v from 'valibot';
 export const MAX_CHOSEN_TEXT_LENGTH = 500;
 
 /**
- * Schema for nullable bucket - accepts a valid bucket string or null.
- * Uses custom message to include field name for clearer error messages.
+ * Maximum length for bucket slug.
  */
-const NullableBucketSchema = v.nullable(v.picklist(BUCKETS, `chosenBucket must be one of: ${BUCKETS.join(', ')}`));
+export const MAX_BUCKET_SLUG_LENGTH = 50;
+
+/**
+ * Schema for nullable bucket - accepts a valid bucket slug (string) or null.
+ * The actual validation against user's buckets is done at the database level.
+ */
+const NullableBucketSchema = v.nullable(
+	v.pipe(
+		v.string('chosenBucket must be a string'),
+		v.maxLength(MAX_BUCKET_SLUG_LENGTH, `chosenBucket must not exceed ${MAX_BUCKET_SLUG_LENGTH} characters`),
+		v.regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'chosenBucket must be a valid slug (lowercase letters, numbers, and hyphens)')
+	)
+);
 
 /**
  * Schema for nullable chosen text with validation rules:

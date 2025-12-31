@@ -2,7 +2,8 @@ import { Link, Outlet, useNavigate } from '@tanstack/react-router';
 import { ChevronDown, Menu } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { signOut, useAuth } from '@/features/auth';
-import { BUCKETS, CAPTURE_NAV, HEADER_NAV, NAV_LINKS } from '@/lib/navigation';
+import { useUserBuckets } from '@/features/settings';
+import { CAPTURE_NAV, HEADER_NAV, NAV_LINKS } from '@/lib/navigation';
 import { NavLink } from '../NavLink';
 import {
 	DropdownMenu,
@@ -20,6 +21,10 @@ export function ProtectedLayout() {
 
 	const isAuthenticated = !!session;
 	const email = session?.user?.email ?? null;
+
+	// Fetch user buckets for dynamic menu (only when authenticated)
+	const { data: bucketsData } = useUserBuckets({ enabled: isAuthenticated });
+	const buckets = bucketsData?.buckets ?? [];
 
 	const shortEmail = useMemo(() => {
 		if (!email) return null;
@@ -78,15 +83,19 @@ export function ProtectedLayout() {
 											<Link to={link.to}>{link.label}</Link>
 										</DropdownMenuItem>
 									))}
-									<DropdownMenuSeparator />
-									<DropdownMenuLabel className="text-xs text-zinc-500">Buckets</DropdownMenuLabel>
-									{BUCKETS.map((b) => (
-										<DropdownMenuItem key={b.slug} asChild>
-											<Link to="/bucket/$slug" params={{ slug: b.slug }}>
-												{b.label}
-											</Link>
-										</DropdownMenuItem>
-									))}
+									{buckets.length > 0 && (
+										<>
+											<DropdownMenuSeparator />
+											<DropdownMenuLabel className="text-xs text-zinc-500">Buckets</DropdownMenuLabel>
+											{buckets.map((b) => (
+												<DropdownMenuItem key={b.id} asChild>
+													<Link to="/bucket/$slug" params={{ slug: b.slug }}>
+														{b.name}
+													</Link>
+												</DropdownMenuItem>
+											))}
+										</>
+									)}
 								</DropdownMenuContent>
 							</DropdownMenu>
 						</div>
@@ -100,13 +109,17 @@ export function ProtectedLayout() {
 									</span>
 								</DropdownMenuTrigger>
 								<DropdownMenuContent align="start" className="w-56">
-									{BUCKETS.map((b) => (
-										<DropdownMenuItem key={b.slug} asChild>
-											<Link to="/bucket/$slug" params={{ slug: b.slug }}>
-												{b.label}
-											</Link>
-										</DropdownMenuItem>
-									))}
+									{buckets.length > 0 ? (
+										buckets.map((b) => (
+											<DropdownMenuItem key={b.id} asChild>
+												<Link to="/bucket/$slug" params={{ slug: b.slug }}>
+													{b.name}
+												</Link>
+											</DropdownMenuItem>
+										))
+									) : (
+										<DropdownMenuItem disabled>No buckets yet</DropdownMenuItem>
+									)}
 								</DropdownMenuContent>
 							</DropdownMenu>
 

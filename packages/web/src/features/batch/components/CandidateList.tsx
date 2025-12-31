@@ -1,5 +1,5 @@
-import type { Bucket } from '@append/contracts/types';
 import type { Candidate, CandidateDraft, RowStateMap } from '../types';
+import type { BucketOption } from './CandidateInputs';
 import { CandidateRow } from './CandidateRow';
 
 export function CandidateList({
@@ -12,7 +12,7 @@ export function CandidateList({
 }: {
 	candidates: Candidate[];
 	rowStates: RowStateMap;
-	buckets: readonly Bucket[];
+	buckets: readonly BucketOption[];
 	onDraftChange: (id: string, updates: Partial<CandidateDraft>) => void;
 	onSave: (candidate: Candidate) => void;
 	onClear: (candidate: Candidate) => void;
