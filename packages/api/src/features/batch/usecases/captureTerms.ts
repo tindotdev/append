@@ -9,6 +9,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type BatchStatus, batch, candidate, idempotencyKey, normalize, type schema } from '../../../db';
 import { generateUUID, sha256Hex } from '../../../shared/crypto';
 import { checkIdempotencyKey } from '../../../shared/idempotency/keys';
+import { formatResultRef, parseResultRef } from '../../../shared/idempotency/result-ref';
 import type { CaptureTermsInput } from '../validation/captureTerms.schema';
 
 /**
@@ -56,13 +57,10 @@ export async function captureTerms(
 	const idempotencyCheck = await checkIdempotencyKey(db, userId, IDEMPOTENCY_SCOPE, clientRequestId, requestHash);
 
 	if (idempotencyCheck.status === 'replay') {
-		// Extract batch ID from result ref
-		const resultRefMatch = idempotencyCheck.resultRef.match(/^batch:(.+)$/);
-		if (!resultRefMatch) {
+		const batchId = parseResultRef(idempotencyCheck.resultRef, 'batch');
+		if (!batchId) {
 			return { success: false, error: { type: 'internal_error', message: 'Invalid idempotency result reference' } };
 		}
-
-		const batchId = resultRefMatch[1];
 
 		// Get candidate count for replay response
 		const [countResult] = await db.select({ count: count() }).from(candidate).where(eq(candidate.batchId, batchId));
@@ -126,7 +124,7 @@ export async function captureTerms(
 				scope: IDEMPOTENCY_SCOPE,
 				key: clientRequestId,
 				requestHash,
-				resultRef: `batch:${batchId}`,
+				resultRef: formatResultRef('batch', batchId),
 				createdAt: now,
 			})
 			.toSQL();
@@ -163,9 +161,8 @@ export async function captureTerms(
 					};
 				}
 
-				const resultRefMatch = racedKey.resultRef.match(/^batch:(.+)$/);
-				if (resultRefMatch) {
-					const existingBatchId = resultRefMatch[1];
+				const existingBatchId = parseResultRef(racedKey.resultRef, 'batch');
+				if (existingBatchId) {
 					const [countResult] = await db.select({ count: count() }).from(candidate).where(eq(candidate.batchId, existingBatchId));
 
 					return {

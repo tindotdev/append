@@ -4,12 +4,12 @@
 
 import { vValidator } from '@hono/valibot-validator';
 import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
-import { batch, bucket, schema } from '../../db';
+import { bucket } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
-import { sseHeaders } from '../../platform/sse';
+import { sseEvent, sseResponse } from '../../platform/sse';
 import { apiError, validationHook } from '../../shared/api-error';
+import { requireBatchOwned } from '../../shared/queries';
 import { createLlmClient } from './adapters';
 import { generateSuggestions } from './usecases/generateSuggestions';
 import { SuggestSchema } from './validation/suggest.schema';
@@ -27,7 +27,7 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 export const suggestionsRoutes = app.post('/batch/:id/suggest', vValidator('query', SuggestSchema, validationHook), async (c) => {
 	const userId = c.get('userId');
 	const batchId = c.req.param('id');
-	const db = drizzle(c.env.DB, { schema });
+	const db = c.get('db');
 	const query = c.req.valid('query');
 
 	const { limit, regenerate } = query;
@@ -40,16 +40,12 @@ export const suggestionsRoutes = app.post('/batch/:id/suggest', vValidator('quer
 	}
 
 	// Verify batch exists and user owns it
-	const batchRow = await db.query.batch.findFirst({
-		where: eq(batch.id, batchId),
-	});
-
-	if (!batchRow) {
-		return apiError(c, 404, 'NOT_FOUND', 'Batch not found');
-	}
-
-	if (batchRow.userId !== userId) {
-		return apiError(c, 403, 'FORBIDDEN', 'Access denied');
+	const batchOwnership = await requireBatchOwned(db, userId, batchId);
+	if (!batchOwnership.ok) {
+		const status = batchOwnership.error === 'not_found' ? 404 : 403;
+		const code = batchOwnership.error === 'not_found' ? 'NOT_FOUND' : 'FORBIDDEN';
+		const message = batchOwnership.error === 'not_found' ? 'Batch not found' : 'Access denied';
+		return apiError(c, status, code, message);
 	}
 
 	// Fetch user's buckets for dynamic prompt (Phase 5C)
@@ -63,26 +59,10 @@ export const suggestionsRoutes = app.post('/batch/:id/suggest', vValidator('quer
 		return apiError(c, 400, 'VALIDATION_ERROR', 'No buckets configured. Please add at least one bucket.');
 	}
 
-	// Create SSE stream
-	const encoder = new TextEncoder();
-	const stream = new ReadableStream<Uint8Array>({
-		async start(controller) {
-			try {
-				const generator = generateSuggestions(db, userId, batchId, llm, mode, limit, userBuckets);
-
-				for await (const chunk of generator) {
-					controller.enqueue(encoder.encode(chunk));
-				}
-			} catch (error) {
-				// Emit error event if something goes wrong
-				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-				const errorEvent = `event: error\ndata: ${JSON.stringify({ error: errorMessage })}\n\n`;
-				controller.enqueue(encoder.encode(errorEvent));
-			} finally {
-				controller.close();
-			}
+	return sseResponse(() => generateSuggestions(db, userId, batchId, llm, mode, limit, userBuckets), {
+		onError: (error) => {
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			return sseEvent('error', { error: errorMessage });
 		},
 	});
-
-	return new Response(stream, { headers: sseHeaders() });
 });

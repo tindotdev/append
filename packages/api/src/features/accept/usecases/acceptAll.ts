@@ -18,8 +18,9 @@ import {
 	termSense,
 } from '../../../db';
 import { sha256Hex } from '../../../shared/crypto';
-import { fromBase64Url, toBase64Url } from '../../../shared/idempotency/encoding';
 import { checkIdempotencyKey } from '../../../shared/idempotency/keys';
+import { decodeJsonResultRef, encodeJsonResultRef } from '../../../shared/idempotency/result-ref';
+import { requireBatchOwned } from '../../../shared/queries';
 import type { AcceptAllInput, AcceptSummary } from '../validation/acceptAll.schema';
 
 /**
@@ -37,6 +38,25 @@ export type AcceptAllError =
 	| { type: 'missing_effective_fields'; candidateIds: string[] }
 	| { type: 'idempotency_conflict'; originalBatchId: string }
 	| { type: 'internal_error'; message: string };
+
+type CandidateRow = {
+	id: string;
+	position: number;
+	term: string;
+	normalizedTerm: string;
+	chosenBucket: string | null;
+	chosenText: string | null;
+	suggestedBucket: string | null;
+	suggestedText: string | null;
+	suggestionStatus: string | null;
+	materializedTermId: string | null;
+	materializedTermSenseId: string | null;
+};
+
+type CandidateWithEffective = CandidateRow & {
+	effectiveBucket: string | null;
+	effectiveText: string | null;
+};
 
 /**
  * Accept all candidates in a batch.
@@ -59,16 +79,9 @@ export async function acceptAll(
 	const { clientRequestId } = input;
 
 	// Verify batch exists and user owns it
-	const batchRow = await db.query.batch.findFirst({
-		where: eq(batch.id, batchId),
-	});
-
-	if (!batchRow) {
-		return { success: false, error: { type: 'not_found' } };
-	}
-
-	if (batchRow.userId !== userId) {
-		return { success: false, error: { type: 'forbidden' } };
+	const batchOwnership = await requireBatchOwned(db, userId, batchId);
+	if (!batchOwnership.ok) {
+		return { success: false, error: { type: batchOwnership.error } };
 	}
 
 	// Check idempotency key
@@ -76,19 +89,12 @@ export async function acceptAll(
 	const idempotencyCheck = await checkIdempotencyKey(db, userId, ACCEPT_ALL_SCOPE, clientRequestId, requestHash);
 
 	if (idempotencyCheck.status === 'replay') {
-		// Extract and decode cached summary
-		const resultRefMatch = idempotencyCheck.resultRef.match(/^accept_summary:(.+)$/);
-		if (!resultRefMatch) {
+		const cachedSummary = decodeJsonResultRef<AcceptSummary>('accept_summary', idempotencyCheck.resultRef);
+		if (!cachedSummary) {
 			return { success: false, error: { type: 'internal_error', message: 'Invalid idempotency result reference' } };
 		}
 
-		try {
-			const summaryJson = fromBase64Url(resultRefMatch[1]);
-			const cachedSummary = JSON.parse(summaryJson) as AcceptSummary;
-			return { success: true, result: cachedSummary, isReplay: true };
-		} catch {
-			return { success: false, error: { type: 'internal_error', message: 'Invalid idempotency result reference' } };
-		}
+		return { success: true, result: cachedSummary, isReplay: true };
 	}
 
 	if (idempotencyCheck.status === 'conflict') {
@@ -99,15 +105,9 @@ export async function acceptAll(
 
 		let originalBatchId = 'unknown';
 		if (existingKey) {
-			const resultRefMatch = existingKey.resultRef.match(/^accept_summary:(.+)$/);
-			if (resultRefMatch) {
-				try {
-					const summaryJson = fromBase64Url(resultRefMatch[1]);
-					const storedSummary = JSON.parse(summaryJson) as AcceptSummary;
-					originalBatchId = storedSummary.batchId;
-				} catch {
-					// Keep 'unknown'
-				}
+			const storedSummary = decodeJsonResultRef<AcceptSummary>('accept_summary', existingKey.resultRef);
+			if (storedSummary) {
+				originalBatchId = storedSummary.batchId;
 			}
 		}
 
@@ -115,7 +115,7 @@ export async function acceptAll(
 	}
 
 	// Load all candidates
-	const allCandidates = await db
+	const allCandidates: CandidateRow[] = await db
 		.select({
 			id: candidate.id,
 			position: candidate.position,
@@ -133,40 +133,17 @@ export async function acceptAll(
 		.where(eq(candidate.batchId, batchId))
 		.orderBy(asc(candidate.position));
 
-	const candidateCount = allCandidates.length;
-
-	// Precondition: check for in-progress suggestions
-	const inProgressIds = allCandidates.filter((c) => c.suggestionStatus === 'in_progress').map((c) => c.id);
-
-	if (inProgressIds.length > 0) {
-		return { success: false, error: { type: 'suggestions_in_progress', candidateIds: inProgressIds } };
-	}
-
-	// Compute effective fields and check for missing
-	type CandidateWithEffective = (typeof allCandidates)[number] & {
-		effectiveBucket: string | null;
-		effectiveText: string | null;
-	};
-
-	const candidatesWithEffective: CandidateWithEffective[] = allCandidates.map((cand) => ({
-		...cand,
-		effectiveBucket: cand.chosenBucket ?? cand.suggestedBucket,
-		effectiveText: cand.chosenText ?? cand.suggestedText,
-	}));
-
-	const missingIds = candidatesWithEffective.filter((c) => c.effectiveBucket === null || c.effectiveText === null).map((c) => c.id);
-
-	if (missingIds.length > 0) {
-		return { success: false, error: { type: 'missing_effective_fields', candidateIds: missingIds } };
+	const preparedCandidates = prepareCandidatesForAccept(allCandidates);
+	if (!preparedCandidates.ok) {
+		return { success: false, error: preparedCandidates.error };
 	}
 
 	// Phase 1: Build canonical → termId mapping
 
 	// Filter unmaterialized candidates
-	const unmaterializedCandidates = candidatesWithEffective.filter((c) => c.materializedTermSenseId === null);
+	const { unmaterializedCandidates, candidateCount, skippedAlreadyAcceptedCount } = preparedCandidates;
 
 	// Count already materialized
-	const skippedAlreadyAcceptedCount = candidateCount - unmaterializedCandidates.length;
 
 	// Get unique canonicals from unmaterialized candidates
 	const uniqueCanonicals = [...new Set(unmaterializedCandidates.map((c) => normalize(c.term)))];
@@ -365,7 +342,7 @@ export async function acceptAll(
 	};
 
 	// Insert idempotency key
-	const resultRef = `accept_summary:${toBase64Url(JSON.stringify(summary))}`;
+	const resultRef = encodeJsonResultRef('accept_summary', summary);
 	const idempStmt = db
 		.insert(idempotencyKey)
 		.values({
@@ -394,28 +371,16 @@ export async function acceptAll(
 			if (racedKey) {
 				if (racedKey.requestHash === requestHash) {
 					// Replay
-					const resultRefMatch = racedKey.resultRef.match(/^accept_summary:(.+)$/);
-					if (resultRefMatch) {
-						try {
-							const summaryJson = fromBase64Url(resultRefMatch[1]);
-							const cachedSummary = JSON.parse(summaryJson) as AcceptSummary;
-							return { success: true, result: cachedSummary, isReplay: true };
-						} catch {
-							// Fall through to error
-						}
+					const cachedSummary = decodeJsonResultRef<AcceptSummary>('accept_summary', racedKey.resultRef);
+					if (cachedSummary) {
+						return { success: true, result: cachedSummary, isReplay: true };
 					}
 				} else {
 					// Conflict
-					const resultRefMatch = racedKey.resultRef.match(/^accept_summary:(.+)$/);
 					let originalBatchId = 'unknown';
-					if (resultRefMatch) {
-						try {
-							const summaryJson = fromBase64Url(resultRefMatch[1]);
-							const storedSummary = JSON.parse(summaryJson) as AcceptSummary;
-							originalBatchId = storedSummary.batchId;
-						} catch {
-							// Fall through
-						}
+					const storedSummary = decodeJsonResultRef<AcceptSummary>('accept_summary', racedKey.resultRef);
+					if (storedSummary) {
+						originalBatchId = storedSummary.batchId;
 					}
 					return { success: false, error: { type: 'idempotency_conflict', originalBatchId } };
 				}
@@ -427,4 +392,39 @@ export async function acceptAll(
 	}
 
 	return { success: true, result: summary, isReplay: false };
+}
+
+function prepareCandidatesForAccept(candidates: CandidateRow[]):
+	| {
+			ok: true;
+			unmaterializedCandidates: CandidateWithEffective[];
+			candidateCount: number;
+			skippedAlreadyAcceptedCount: number;
+	  }
+	| { ok: false; error: AcceptAllError } {
+	const candidateCount = candidates.length;
+
+	// Precondition: check for in-progress suggestions
+	const inProgressIds = candidates.filter((c) => c.suggestionStatus === 'in_progress').map((c) => c.id);
+	if (inProgressIds.length > 0) {
+		return { ok: false, error: { type: 'suggestions_in_progress', candidateIds: inProgressIds } };
+	}
+
+	// Compute effective fields and check for missing
+	const candidatesWithEffective: CandidateWithEffective[] = candidates.map((cand) => ({
+		...cand,
+		effectiveBucket: cand.chosenBucket ?? cand.suggestedBucket,
+		effectiveText: cand.chosenText ?? cand.suggestedText,
+	}));
+
+	const missingIds = candidatesWithEffective.filter((c) => c.effectiveBucket === null || c.effectiveText === null).map((c) => c.id);
+	if (missingIds.length > 0) {
+		return { ok: false, error: { type: 'missing_effective_fields', candidateIds: missingIds } };
+	}
+
+	// Filter unmaterialized candidates
+	const unmaterializedCandidates = candidatesWithEffective.filter((c) => c.materializedTermSenseId === null);
+	const skippedAlreadyAcceptedCount = candidateCount - unmaterializedCandidates.length;
+
+	return { ok: true, unmaterializedCandidates, candidateCount, skippedAlreadyAcceptedCount };
 }

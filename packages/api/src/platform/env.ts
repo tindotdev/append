@@ -2,13 +2,13 @@
  * Environment bindings for Cloudflare Workers.
  */
 
+import type { SecretsStoreSecret } from './bindings';
+
 /**
  * Cloudflare Secrets Store binding interface.
  * @see https://developers.cloudflare.com/secrets-store/integrations/workers/
  */
-export interface SecretsStoreSecret {
-	get(): Promise<string>;
-}
+export type { Bindings, SecretsStoreSecret, Variables } from './bindings';
 
 /**
  * Check if a value is a Secrets Store binding (has .get() method).
@@ -30,35 +30,3 @@ export async function getSecretValue(secret: string | SecretsStoreSecret | undef
 	if (isSecretsStoreBinding(secret)) return secret.get();
 	return undefined;
 }
-
-export type Bindings = {
-	// Database
-	DB: D1Database;
-
-	// R2 Object Storage
-	IMPORT_FILES: R2Bucket;
-
-	// AI Gateway
-	CF_ACCOUNT_ID: string;
-	AI_GATEWAY_ID: string;
-	CF_AIG_TOKEN?: string;
-
-	// OpenAI API key - either:
-	// - Plain string from .dev.vars (local development)
-	// - SecretsStoreSecret from Secrets Store (production)
-	OPENAI_API_KEY?: string | SecretsStoreSecret;
-
-	// Suggestion provider: 'openai' | 'stub' | 'disabled'
-	SUGGESTIONS_PROVIDER?: string;
-
-	// Auth
-	ALLOWED_EMAIL?: string;
-	ALLOWED_SUB?: string;
-	BETTER_AUTH_SECRET?: string;
-	GOOGLE_CLIENT_ID?: string;
-	GOOGLE_CLIENT_SECRET?: string;
-};
-
-export type Variables = {
-	userId: string;
-};

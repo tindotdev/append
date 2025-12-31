@@ -30,14 +30,24 @@ export function sseEvent(event: string, data: unknown): string {
  * @param generator - Async generator that yields SSE event strings
  * @returns Response object with SSE stream
  */
-export function sseResponse(generator: () => AsyncGenerator<string, void, unknown>): Response {
+export type SseResponseOptions = {
+	onError?: (error: unknown) => string | null;
+};
+
+export function sseResponse(generator: () => AsyncGenerator<string, void, unknown>, options: SseResponseOptions = {}): Response {
 	const encoder = new TextEncoder();
+	const { onError } = options;
 
 	const stream = new ReadableStream<Uint8Array>({
 		async start(controller) {
 			try {
 				for await (const chunk of generator()) {
 					controller.enqueue(encoder.encode(chunk));
+				}
+			} catch (error) {
+				const errorChunk = onError?.(error);
+				if (errorChunk) {
+					controller.enqueue(encoder.encode(errorChunk));
 				}
 			} finally {
 				controller.close();

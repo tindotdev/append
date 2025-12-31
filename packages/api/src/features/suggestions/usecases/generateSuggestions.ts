@@ -93,37 +93,7 @@ export async function* generateSuggestions(
 		.where(eq(candidate.batchId, batchId))
 		.orderBy(asc(candidate.position));
 
-	// Count already suggested for fill-missing mode
-	let skippedAlreadySuggested = 0;
-
-	// Determine eligible candidates based on mode
-	const eligibleCandidates = allCandidates.filter((cand) => {
-		// Never process candidates at max attempts
-		if (cand.suggestionAttempts >= MAX_SUGGESTION_ATTEMPTS) {
-			return false;
-		}
-
-		if (isRegenerate) {
-			// Regenerate mode: all candidates with attempts < 3
-			return true;
-		}
-
-		// Fill-missing mode:
-		// - Skip already suggested (has both bucket and text)
-		// - Skip in_progress
-		// - Include null/error status for retry
-		if (cand.suggestedBucket !== null && cand.suggestedText !== null) {
-			skippedAlreadySuggested++;
-			return false;
-		}
-		if (cand.suggestionStatus === 'in_progress') {
-			return false;
-		}
-		return true;
-	});
-
-	// Apply limit
-	const candidatesToProcess = eligibleCandidates.slice(0, limit);
+	const { candidatesToProcess, skippedAlreadySuggested } = selectCandidatesForSuggestion(allCandidates, isRegenerate, limit);
 
 	// Emit start event with all the stats
 	yield sseEvent('start', {
@@ -172,6 +142,44 @@ export async function* generateSuggestions(
 
 	// Emit done event
 	yield sseEvent('done', results satisfies SuggestDoneEvent);
+}
+
+function selectCandidatesForSuggestion(
+	allCandidates: CandidateRecord[],
+	isRegenerate: boolean,
+	limit: number
+): { candidatesToProcess: CandidateRecord[]; skippedAlreadySuggested: number } {
+	let skippedAlreadySuggested = 0;
+
+	const eligibleCandidates = allCandidates.filter((cand) => {
+		// Never process candidates at max attempts
+		if (cand.suggestionAttempts >= MAX_SUGGESTION_ATTEMPTS) {
+			return false;
+		}
+
+		if (isRegenerate) {
+			// Regenerate mode: all candidates with attempts < 3
+			return true;
+		}
+
+		// Fill-missing mode:
+		// - Skip already suggested (has both bucket and text)
+		// - Skip in_progress
+		// - Include null/error status for retry
+		if (cand.suggestedBucket !== null && cand.suggestedText !== null) {
+			skippedAlreadySuggested++;
+			return false;
+		}
+		if (cand.suggestionStatus === 'in_progress') {
+			return false;
+		}
+		return true;
+	});
+
+	return {
+		candidatesToProcess: eligibleCandidates.slice(0, limit),
+		skippedAlreadySuggested,
+	};
 }
 
 /**

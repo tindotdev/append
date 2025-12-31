@@ -69,3 +69,27 @@ export function validationHook<E extends Env>(
 		return apiError(c, 400, 'VALIDATION_ERROR', message);
 	}
 }
+
+type ErrorMapping<E extends { type: string }> = {
+	[K in E['type']]: {
+		status: ContentfulStatusCode;
+		code: ApiErrorCode;
+		message: string | ((error: Extract<E, { type: K }>) => string);
+		details?: Record<string, unknown> | ((error: Extract<E, { type: K }>) => Record<string, unknown> | undefined);
+	};
+};
+
+/**
+ * Map a typed error object to the standard API error response.
+ */
+export function apiErrorFrom<E extends { type: string }>(c: Context, error: E, mapping: ErrorMapping<E>) {
+	const entry = mapping[error.type as E['type']];
+	if (!entry) {
+		return apiError(c, 500, 'INTERNAL_ERROR', 'Unhandled error');
+	}
+
+	const message = typeof entry.message === 'function' ? entry.message(error as Extract<E, { type: E['type'] }>) : entry.message;
+	const details = typeof entry.details === 'function' ? entry.details(error as Extract<E, { type: E['type'] }>) : entry.details;
+
+	return apiError(c, entry.status, entry.code, message, details);
+}

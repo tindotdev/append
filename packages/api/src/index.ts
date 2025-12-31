@@ -10,24 +10,12 @@ import { importRoutes } from './features/import/routes';
 import { suggestionsRoutes } from './features/suggestions/routes';
 import { userBucketRoutes } from './features/user-bucket/routes';
 import { createAuth } from './lib/auth';
+import type { Variables as BaseVariables, Bindings } from './platform/bindings';
+import { attachDb } from './platform/context';
 import { apiError } from './shared/api-error';
 
-type Bindings = {
-	DB: D1Database;
-	GOOGLE_CLIENT_ID: string;
-	GOOGLE_CLIENT_SECRET: string;
-	BETTER_AUTH_SECRET: string;
-	BETTER_AUTH_URL: string;
-	// Allowlist (ADR 0001)
-	ALLOWED_SUB?: string;
-	ALLOWED_EMAIL?: string;
-	// Test-only: enable email/password auth (§5.2)
-	ENABLE_TEST_EMAIL_PASSWORD_AUTH?: string;
-};
-
-type Variables = {
+type Variables = BaseVariables & {
 	auth: ReturnType<typeof createAuth>;
-	userId: string;
 };
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -132,6 +120,12 @@ app.use('/api/*', async (c, next) => {
 	c.set('userId', session.user.id);
 	await next();
 });
+
+// =============================================================================
+// DB context for /api/* routes
+// =============================================================================
+
+app.use('/api/*', attachDb);
 
 // =============================================================================
 // Handle all auth routes (Better Auth)
