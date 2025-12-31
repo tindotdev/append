@@ -39,7 +39,7 @@ export async function listBuckets(db: DrizzleD1Database<typeof schema>, userId: 
 				SELECT COUNT(*)
 				FROM term_sense ts
 				JOIN term t ON t.id = ts.term_id
-				WHERE ts.bucket_id = ${bucket.id}
+				WHERE ts.bucket_id = bucket.id
 				AND t.user_id = ${userId}
 				AND ts.archived_at IS NULL
 				AND t.archived_at IS NULL

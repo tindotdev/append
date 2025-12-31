@@ -43,6 +43,8 @@ export const candidateRoutes = app.put('/:id', vValidator('json', UpdateCandidat
 				return apiError(c, 404, 'NOT_FOUND', 'Candidate not found');
 			case 'forbidden':
 				return apiError(c, 403, 'FORBIDDEN', 'Access denied');
+			case 'invalid_bucket':
+				return apiError(c, 400, 'VALIDATION_ERROR', `Invalid chosenBucket: '${result.error.slug}' does not exist`);
 			case 'version_conflict':
 				return apiError(c, 409, 'VERSION_CONFLICT', 'Candidate was modified by another request', {
 					currentVersion: result.error.currentVersion,
