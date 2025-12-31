@@ -28,6 +28,96 @@ export interface ParseResult {
 	warnings: ParseWarning[];
 }
 
+interface LineParseResult {
+	entry?: ParsedEntry;
+	warning?: ParseWarning;
+}
+
+/**
+ * Parse a single line of markdown.
+ *
+ * @param line - The line to parse
+ * @param lineNumber - Line number (1-based)
+ * @returns Parsed entry and/or warning
+ */
+function parseLine(line: string, lineNumber: number): LineParseResult {
+	const trimmed = line.trim();
+
+	// Skip empty lines
+	if (trimmed === '') {
+		return {};
+	}
+
+	// Skip markdown headers
+	if (trimmed.startsWith('#')) {
+		return {
+			warning: {
+				lineNumber,
+				message: 'Skipped header line',
+			},
+		};
+	}
+
+	// Must be a bullet point
+	if (!trimmed.startsWith('- ')) {
+		return {
+			warning: {
+				lineNumber,
+				message: 'Skipped non-bullet line',
+			},
+		};
+	}
+
+	// Remove bullet prefix
+	const content = trimmed.slice(2);
+
+	// Find first `: ` separator (colon followed by space)
+	const colonIndex = content.indexOf(': ');
+
+	if (colonIndex === -1) {
+		// No colon - inbox format (term only, no definition)
+		const term = content.trim();
+		if (term === '') {
+			return {
+				warning: {
+					lineNumber,
+					message: 'Skipped empty bullet',
+				},
+			};
+		}
+		return {
+			entry: {
+				lineNumber,
+				term,
+				definition: '',
+				isInbox: true,
+			},
+		};
+	}
+
+	// Standard format: term: definition
+	const term = content.slice(0, colonIndex).trim();
+	const definition = content.slice(colonIndex + 2).trim();
+
+	if (term === '') {
+		return {
+			warning: {
+				lineNumber,
+				message: 'Skipped bullet with empty term',
+			},
+		};
+	}
+
+	return {
+		entry: {
+			lineNumber,
+			term,
+			definition,
+			isInbox: false,
+		},
+	};
+}
+
 /**
  * Parse markdown content into entries.
  *
@@ -42,72 +132,15 @@ export function parseMarkdown(content: string): ParseResult {
 	for (let i = 0; i < lines.length; i++) {
 		const lineNumber = i + 1;
 		const line = lines[i];
-		const trimmed = line.trim();
 
-		// Skip empty lines
-		if (trimmed === '') {
-			continue;
+		const result = parseLine(line, lineNumber);
+
+		if (result.warning) {
+			warnings.push(result.warning);
 		}
 
-		// Skip markdown headers
-		if (trimmed.startsWith('#')) {
-			warnings.push({
-				lineNumber,
-				message: 'Skipped header line',
-			});
-			continue;
-		}
-
-		// Must be a bullet point
-		if (!trimmed.startsWith('- ')) {
-			warnings.push({
-				lineNumber,
-				message: 'Skipped non-bullet line',
-			});
-			continue;
-		}
-
-		// Remove bullet prefix
-		const content = trimmed.slice(2);
-
-		// Find first `: ` separator (colon followed by space)
-		const colonIndex = content.indexOf(': ');
-
-		if (colonIndex === -1) {
-			// No colon - inbox format (term only, no definition)
-			const term = content.trim();
-			if (term === '') {
-				warnings.push({
-					lineNumber,
-					message: 'Skipped empty bullet',
-				});
-				continue;
-			}
-			entries.push({
-				lineNumber,
-				term,
-				definition: '',
-				isInbox: true,
-			});
-		} else {
-			// Standard format: term: definition
-			const term = content.slice(0, colonIndex).trim();
-			const definition = content.slice(colonIndex + 2).trim();
-
-			if (term === '') {
-				warnings.push({
-					lineNumber,
-					message: 'Skipped bullet with empty term',
-				});
-				continue;
-			}
-
-			entries.push({
-				lineNumber,
-				term,
-				definition,
-				isInbox: false,
-			});
+		if (result.entry) {
+			entries.push(result.entry);
 		}
 	}
 
