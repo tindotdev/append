@@ -1,5 +1,5 @@
 import { useParams } from '@tanstack/react-router';
-import { useUserBuckets } from '@/features/settings';
+import { useUserBuckets } from '@/lib/user-buckets';
 import { useBucketFeed } from '../api/get-bucket-feed';
 
 function BucketLoadingState() {

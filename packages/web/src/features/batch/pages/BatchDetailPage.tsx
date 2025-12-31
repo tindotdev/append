@@ -1,6 +1,6 @@
 import { Link, useParams } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useUserBuckets } from '@/features/settings';
+import { useUserBuckets } from '@/lib/user-buckets';
 import { ApiRequestError } from '@/lib/api-rpc';
 import { acceptBatch } from '../api/accept-batch';
 import { getBatch } from '../api/get-batch';
