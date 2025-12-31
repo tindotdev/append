@@ -1,7 +1,7 @@
 import { BUCKETS } from '@append/contracts/types';
 import { Link, useParams } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiRequestError } from '@/lib/api-client';
+import { ApiRequestError } from '@/lib/api-rpc';
 import { acceptBatch } from '../api/accept-batch';
 import { getBatch } from '../api/get-batch';
 import { generateSuggestions } from '../api/retry-suggestions';

@@ -151,11 +151,16 @@ app.get('/', (c) => c.json({ status: 'ok' }));
 // =============================================================================
 
 // Feature routes (vertical slice architecture)
-app.route('/api', acceptRoutes);
-app.route('/api/batch', batchRoutes);
-app.route('/api/bucket', bucketRoutes);
-app.route('/api/candidate', candidateRoutes);
-app.route('/api/export', exportRoutes);
-app.route('/api', suggestionsRoutes);
+// Chain routes for Hono RPC type inference
+const apiRoutes = app
+	.route('/api', acceptRoutes)
+	.route('/api/batch', batchRoutes)
+	.route('/api/bucket', bucketRoutes)
+	.route('/api/candidate', candidateRoutes)
+	.route('/api/export', exportRoutes)
+	.route('/api', suggestionsRoutes);
+
+// Export type for Hono RPC client
+export type AppType = typeof apiRoutes;
 
 export default app;

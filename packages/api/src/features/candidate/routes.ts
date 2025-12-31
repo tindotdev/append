@@ -4,18 +4,20 @@
  * PUT /api/candidate/:id - Update a candidate's chosen bucket/text
  */
 
+import { vValidator } from '@hono/valibot-validator';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
-import * as v from 'valibot';
 import { schema } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
-import { apiError } from '../../shared/api-error';
+import { apiError, validationHook } from '../../shared/api-error';
 import { updateCandidate } from './usecases/updateCandidate';
 import { UpdateCandidateSchema } from './validation/updateCandidate.schema';
 
-export const candidateRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 /**
+ * Candidate routes - exported as the result of route chain for Hono RPC type inference.
+ *
  * PUT /api/candidate/:id - Update a candidate's chosen bucket/text (owner-only)
  *
  * Request: {
@@ -27,28 +29,14 @@ export const candidateRoutes = new Hono<{ Bindings: Bindings; Variables: Variabl
  * Response 200: { candidate: <Candidate> }
  * Errors: 400, 401, 403, 404, 409
  */
-candidateRoutes.put('/:id', async (c) => {
+export const candidateRoutes = app.put('/:id', vValidator('json', UpdateCandidateSchema, validationHook), async (c) => {
 	const userId = c.get('userId');
 	const candidateId = c.req.param('id');
 	const db = drizzle(c.env.DB, { schema });
-
-	// Parse JSON body
-	let body: unknown;
-	try {
-		body = await c.req.json();
-	} catch {
-		return apiError(c, 400, 'INVALID_JSON', 'Invalid JSON in request body');
-	}
-
-	// Validate with Valibot
-	const parseResult = v.safeParse(UpdateCandidateSchema, body);
-	if (!parseResult.success) {
-		const issue = parseResult.issues[0];
-		return apiError(c, 400, 'VALIDATION_ERROR', issue.message);
-	}
+	const body = c.req.valid('json');
 
 	// Call usecase
-	const result = await updateCandidate(db, userId, candidateId, parseResult.output);
+	const result = await updateCandidate(db, userId, candidateId, body);
 	if (!result.success) {
 		switch (result.error.type) {
 			case 'not_found':

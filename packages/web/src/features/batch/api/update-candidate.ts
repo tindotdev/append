@@ -1,14 +1,22 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/api-client';
+import { api, ApiRequestError } from '@/lib/api-rpc';
 import type { UpdateCandidateRequest, UpdateCandidateResponse } from '../types';
 import { batchKeys } from './get-batch';
 
-// Fetcher function
+// Fetcher function using Hono RPC
 export async function updateCandidate(id: string, request: UpdateCandidateRequest): Promise<UpdateCandidateResponse> {
-	return apiRequest<UpdateCandidateResponse>(`/api/candidate/${id}`, {
-		method: 'PUT',
-		body: request,
+	const res = await api.api.candidate[':id'].$put({
+		param: { id },
+		json: request,
 	});
+
+	if (!res.ok) {
+		const errorBody = (await res.json()) as { error?: { code?: string; message?: string } };
+		throw new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
+	}
+
+	// Cast to expected type - API returns compatible structure
+	return res.json() as Promise<UpdateCandidateResponse>;
 }
 
 // React Query mutation hook
