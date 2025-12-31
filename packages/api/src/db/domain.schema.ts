@@ -1,4 +1,4 @@
-import { BUCKETS, type Bucket } from '@append/contracts/types';
+import { type Bucket } from '@append/contracts/types';
 import { sql } from 'drizzle-orm';
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { user } from './auth.schema';
@@ -10,8 +10,6 @@ import { user } from './auth.schema';
 /** Batch/candidate lifecycle status */
 export const BATCH_STATUS = ['captured', 'suggested', 'accepted'] as const;
 export type BatchStatus = (typeof BATCH_STATUS)[number];
-
-const BUCKETS_SQL = sql.raw(BUCKETS.map((bucket) => `'${bucket}'`).join(', '));
 
 /** Suggestion generation status */
 export const SUGGESTION_STATUS = ['in_progress', 'done', 'error'] as const;
@@ -38,6 +36,34 @@ export function normalize(term: string): string {
 // =============================================================================
 // Tables
 // =============================================================================
+
+/**
+ * Bucket: user-owned vocabulary categories.
+ * Users can create, edit, delete, and reorder buckets.
+ */
+export const bucket = sqliteTable(
+	'bucket',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		slug: text('slug').notNull(),
+		name: text('name').notNull(),
+		description: text('description').notNull(),
+		color: text('color'),
+		order: integer('order').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsec') * 1000 as integer))`).notNull(),
+		updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsec') * 1000 as integer))`)
+			.$onUpdate(() => new Date())
+			.notNull(),
+	},
+	(table) => [
+		uniqueIndex('bucket_user_slug_unique').on(table.userId, table.slug),
+		index('bucket_user_order_idx').on(table.userId, table.order),
+	]
+);
 
 /**
  * Batch: a collection of candidate terms from a single capture session.
@@ -76,12 +102,18 @@ export const candidate = sqliteTable(
 		term: text('term').notNull(),
 		normalizedTerm: text('normalized_term').notNull(),
 		status: text('status').notNull().$type<BatchStatus>(),
-		// Step 4+ fields (nullable for now)
+		// Step 4+ fields
+		// Legacy: chosenBucket (slug string) - to be removed after migration
 		chosenBucket: text('chosen_bucket').$type<Bucket>(),
+		// New: chosenBucketId (FK to bucket table)
+		chosenBucketId: text('chosen_bucket_id').references(() => bucket.id, { onDelete: 'set null' }),
 		chosenText: text('chosen_text'),
 		version: integer('version').default(1).notNull(),
 		// Step 3: Suggestion fields
+		// Legacy: suggestedBucket (slug string) - to be removed after migration
 		suggestedBucket: text('suggested_bucket').$type<Bucket>(),
+		// New: suggestedBucketId (FK to bucket table)
+		suggestedBucketId: text('suggested_bucket_id').references(() => bucket.id, { onDelete: 'set null' }),
 		suggestedText: text('suggested_text'),
 		suggestionStatus: text('suggestion_status').$type<SuggestionStatus>(),
 		suggestionError: text('suggestion_error'),
@@ -105,8 +137,6 @@ export const candidate = sqliteTable(
 		uniqueIndex('candidate_batch_position_unique').on(table.batchId, table.position),
 		index('candidate_suggestion_lookup_idx').on(table.batchId, table.suggestionStatus, table.suggestionAttempts),
 		check('candidate_status_check', sql`${table.status} IN ('captured', 'suggested', 'accepted')`),
-		check('candidate_chosen_bucket_check', sql`${table.chosenBucket} IS NULL OR ${table.chosenBucket} IN (${BUCKETS_SQL})`),
-		check('candidate_suggested_bucket_check', sql`${table.suggestedBucket} IS NULL OR ${table.suggestedBucket} IN (${BUCKETS_SQL})`),
 		check(
 			'candidate_suggestion_status_check',
 			sql`${table.suggestionStatus} IS NULL OR ${table.suggestionStatus} IN ('in_progress', 'done', 'error')`
@@ -145,7 +175,10 @@ export const termSense = sqliteTable(
 		termId: text('term_id')
 			.notNull()
 			.references(() => term.id, { onDelete: 'cascade' }),
+		// Legacy: bucket (slug string) - to be removed after migration
 		bucket: text('bucket').notNull().$type<Bucket>(),
+		// New: bucketId (FK to bucket table) - will become NOT NULL after migration
+		bucketId: text('bucket_id').references(() => bucket.id, { onDelete: 'restrict' }),
 		text: text('text').notNull(),
 		source: text('source').notNull().$type<TermSenseSource>(),
 		senseLabel: text('sense_label'),
@@ -155,7 +188,6 @@ export const termSense = sqliteTable(
 	},
 	(table) => [
 		index('term_sense_term_created_idx').on(table.termId, table.createdAt),
-		check('term_sense_bucket_check', sql`${table.bucket} IN (${BUCKETS_SQL})`),
 		check('term_sense_source_check', sql`${table.source} IN ('manual', 'batch', 'import')`),
 	]
 );
@@ -194,7 +226,10 @@ export const suggestionCache = sqliteTable(
 		normalizedTerm: text('normalized_term').notNull(),
 		model: text('model').notNull(),
 		promptVersion: integer('prompt_version').notNull(),
+		// Legacy: suggestedBucket (slug string) - to be removed after migration
 		suggestedBucket: text('suggested_bucket').notNull().$type<Bucket>(),
+		// New: suggestedBucketId (FK to bucket table) - will become NOT NULL after migration
+		suggestedBucketId: text('suggested_bucket_id').references(() => bucket.id, { onDelete: 'cascade' }),
 		suggestedText: text('suggested_text').notNull(),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsec') * 1000 as integer))`).notNull(),
 		updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
@@ -204,6 +239,5 @@ export const suggestionCache = sqliteTable(
 	},
 	(table) => [
 		uniqueIndex('suggestion_cache_user_term_model_version_unique').on(table.userId, table.normalizedTerm, table.model, table.promptVersion),
-		check('suggestion_cache_bucket_check', sql`${table.suggestedBucket} IN (${BUCKETS_SQL})`),
 	]
 );

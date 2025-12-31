@@ -21,3 +21,4 @@ Rules:
 - `0009-vercel-ai-sdk-with-streaming.md` — Vercel AI SDK with SSE streaming for suggestions
 - `0010-openai-api-key-secrets-store.md` — OpenAI API key stored in Cloudflare Secrets Store
 - `0011-parallel-suggestion-generation.md` — Parallel suggestion generation with concurrency=10
+- `0012-custom-user-buckets.md` — User-owned dynamic buckets (replacing static hardcoded buckets)
