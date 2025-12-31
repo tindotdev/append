@@ -1,44 +1,19 @@
 /**
  * API client for user bucket CRUD operations using Hono RPC.
+ * Read-only queries (useUserBuckets) are in @/lib/user-buckets for cross-feature access.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiRequestError, api, type InferResponseType } from '@/lib/api-rpc';
 
-// Query key factory
-export const userBucketKeys = {
-	all: ['user-bucket'] as const,
-	list: () => [...userBucketKeys.all, 'list'] as const,
-};
-
-// Infer response types from API
-type ListBucketsFullResponse = InferResponseType<(typeof api.api)['user-bucket']['$get']>;
-export type ListBucketsResponse = Extract<ListBucketsFullResponse, { buckets: unknown }>;
-export type UserBucket = ListBucketsResponse['buckets'][number];
+// Re-export shared types and hooks from lib
+export { userBucketKeys, useUserBuckets, type ListBucketsResponse, type UserBucket } from '@/lib/user-buckets';
 
 type CreateBucketFullResponse = InferResponseType<(typeof api.api)['user-bucket']['$post']>;
 export type CreateBucketResponse = Extract<CreateBucketFullResponse, { id: string }>;
 
-// Fetcher: List all buckets
-export async function listUserBuckets(): Promise<ListBucketsResponse> {
-	const res = await api.api['user-bucket'].$get();
-
-	if (!res.ok) {
-		const errorBody = (await res.json()) as { error?: { code?: string; message?: string } };
-		throw new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
-	}
-
-	return res.json() as Promise<ListBucketsResponse>;
-}
-
-// Hook: List buckets
-export function useUserBuckets(options?: { enabled?: boolean }) {
-	return useQuery({
-		queryKey: userBucketKeys.list(),
-		queryFn: listUserBuckets,
-		enabled: options?.enabled ?? true,
-	});
-}
+// Import for internal use
+import { userBucketKeys } from '@/lib/user-buckets';
 
 // Mutation: Create bucket
 export interface CreateBucketInput {

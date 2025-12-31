@@ -86,7 +86,7 @@ function BucketFormView({
 	bucket?: UserBucket;
 	error: string | null;
 	isPending: boolean;
-	onSubmit: (data: BucketFormData) => void;
+	onSubmit: (data: BucketFormData) => Promise<void>;
 	onCancel: () => void;
 }) {
 	return (
