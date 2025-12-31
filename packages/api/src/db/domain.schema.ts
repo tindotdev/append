@@ -1,4 +1,3 @@
-import { type Bucket } from '@append/contracts/types';
 import { sql } from 'drizzle-orm';
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { user } from './auth.schema';
@@ -103,15 +102,15 @@ export const candidate = sqliteTable(
 		normalizedTerm: text('normalized_term').notNull(),
 		status: text('status').notNull().$type<BatchStatus>(),
 		// Step 4+ fields
-		// Legacy: chosenBucket (slug string) - to be removed after migration
-		chosenBucket: text('chosen_bucket').$type<Bucket>(),
+		// Legacy: chosenBucket (slug string) - coexists with chosenBucketId during migration
+		chosenBucket: text('chosen_bucket'),
 		// New: chosenBucketId (FK to bucket table)
 		chosenBucketId: text('chosen_bucket_id').references(() => bucket.id, { onDelete: 'set null' }),
 		chosenText: text('chosen_text'),
 		version: integer('version').default(1).notNull(),
 		// Step 3: Suggestion fields
-		// Legacy: suggestedBucket (slug string) - to be removed after migration
-		suggestedBucket: text('suggested_bucket').$type<Bucket>(),
+		// Legacy: suggestedBucket (slug string) - coexists with suggestedBucketId during migration
+		suggestedBucket: text('suggested_bucket'),
 		// New: suggestedBucketId (FK to bucket table)
 		suggestedBucketId: text('suggested_bucket_id').references(() => bucket.id, { onDelete: 'set null' }),
 		suggestedText: text('suggested_text'),
@@ -175,8 +174,8 @@ export const termSense = sqliteTable(
 		termId: text('term_id')
 			.notNull()
 			.references(() => term.id, { onDelete: 'cascade' }),
-		// Legacy: bucket (slug string) - to be removed after migration
-		bucket: text('bucket').notNull().$type<Bucket>(),
+		// Legacy: bucket (slug string) - coexists with bucketId during migration
+		bucket: text('bucket').notNull(),
 		// New: bucketId (FK to bucket table) - will become NOT NULL after migration
 		bucketId: text('bucket_id').references(() => bucket.id, { onDelete: 'restrict' }),
 		text: text('text').notNull(),
@@ -226,8 +225,8 @@ export const suggestionCache = sqliteTable(
 		normalizedTerm: text('normalized_term').notNull(),
 		model: text('model').notNull(),
 		promptVersion: integer('prompt_version').notNull(),
-		// Legacy: suggestedBucket (slug string) - to be removed after migration
-		suggestedBucket: text('suggested_bucket').notNull().$type<Bucket>(),
+		// Legacy: suggestedBucket (slug string) - coexists with suggestedBucketId during migration
+		suggestedBucket: text('suggested_bucket').notNull(),
 		// New: suggestedBucketId (FK to bucket table) - will become NOT NULL after migration
 		suggestedBucketId: text('suggested_bucket_id').references(() => bucket.id, { onDelete: 'cascade' }),
 		suggestedText: text('suggested_text').notNull(),

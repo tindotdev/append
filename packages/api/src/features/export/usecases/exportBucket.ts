@@ -5,7 +5,6 @@
  * formatted as a markdown document.
  */
 
-import { BUCKET_TITLES, type Bucket } from '@append/contracts/types';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type schema, term, termSense } from '../../../db';
@@ -14,7 +13,7 @@ import { type schema, term, termSense } from '../../../db';
  * Export all terms in a bucket as markdown.
  *
  * Format:
- * # {Bucket Title}
+ * # {Bucket Name}
  *
  * - {displayTerm}: {primarySenseText}
  * - {displayTerm}: {primarySenseText}
@@ -27,9 +26,14 @@ import { type schema, term, termSense } from '../../../db';
  * - term.archived_at IS NULL
  * - term.primary_sense_id IS NOT NULL (enforced by join)
  * - term_sense.archived_at IS NULL
- * - term_sense.bucket = bucket
+ * - term_sense.bucket = bucketSlug
  */
-export async function exportBucket(db: DrizzleD1Database<typeof schema>, userId: string, bucket: Bucket): Promise<string> {
+export async function exportBucket(
+	db: DrizzleD1Database<typeof schema>,
+	userId: string,
+	bucketSlug: string,
+	bucketName: string
+): Promise<string> {
 	const rows = await db
 		.select({
 			termId: term.id,
@@ -39,11 +43,10 @@ export async function exportBucket(db: DrizzleD1Database<typeof schema>, userId:
 		})
 		.from(term)
 		.innerJoin(termSense, eq(term.primarySenseId, termSense.id))
-		.where(and(eq(term.userId, userId), isNull(term.archivedAt), eq(termSense.bucket, bucket), isNull(termSense.archivedAt)))
+		.where(and(eq(term.userId, userId), isNull(term.archivedAt), eq(termSense.bucket, bucketSlug), isNull(termSense.archivedAt)))
 		.orderBy(asc(termSense.createdAt), asc(term.id));
 
-	const title = BUCKET_TITLES[bucket];
-	const lines: string[] = [`# ${title}`, ''];
+	const lines: string[] = [`# ${bucketName}`, ''];
 
 	for (const row of rows) {
 		lines.push(`- ${row.displayTerm}: ${row.senseText}`);

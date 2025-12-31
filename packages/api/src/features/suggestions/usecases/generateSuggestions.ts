@@ -4,7 +4,6 @@
  * Streams progress events to the client as candidates are processed.
  */
 
-import type { Bucket } from '@append/contracts/types';
 import { and, asc, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type BatchStatus, batch, candidate, type SuggestionStatus, type schema } from '../../../db';
@@ -12,7 +11,7 @@ import { DEFAULT_CONCURRENCY, parallelStream } from '../../../platform/parallel'
 import { sseEvent } from '../../../platform/sse';
 import { PROMPT_VERSION, SUGGESTION_MODEL } from '../adapters/llm.aigateway';
 import { cacheSuggestion, findCachedSuggestion } from '../data/suggestion-cache';
-import type { LlmClient, Suggestion } from '../ports/llm';
+import type { BucketInfo, LlmClient, Suggestion } from '../ports/llm';
 import { MAX_SUGGESTION_ATTEMPTS, type SuggestionMode } from '../validation/suggest.schema';
 
 /**
@@ -50,7 +49,7 @@ interface CandidateRecord {
 	normalizedTerm: string;
 	term: string;
 	position: number;
-	suggestedBucket: Bucket | null;
+	suggestedBucket: string | null;
 	suggestedText: string | null;
 	suggestionStatus: SuggestionStatus | null;
 	suggestionAttempts: number;
@@ -65,7 +64,7 @@ interface CandidateRecord {
  * @param llm - LLM client for generating suggestions
  * @param mode - 'fill-missing' or 'regenerate'
  * @param limit - Maximum candidates to process
- * @param emit - Function to emit SSE events
+ * @param buckets - User's buckets for dynamic prompt
  */
 export async function* generateSuggestions(
 	db: DrizzleD1Database<typeof schema>,
@@ -73,7 +72,8 @@ export async function* generateSuggestions(
 	batchId: string,
 	llm: LlmClient,
 	mode: SuggestionMode,
-	limit: number
+	limit: number,
+	buckets: BucketInfo[]
 ): AsyncGenerator<string, void, unknown> {
 	const isRegenerate = mode === 'regenerate';
 
@@ -151,7 +151,7 @@ export async function* generateSuggestions(
 	// Process candidates in parallel with concurrency limit (ADR 0011)
 	for await (const result of parallelStream(
 		candidatesToProcess,
-		(cand) => processCandidate(db, userId, batchId, cand, llm, isRegenerate, inFlightTerms, results),
+		(cand) => processCandidate(db, userId, batchId, cand, llm, buckets, isRegenerate, inFlightTerms, results),
 		DEFAULT_CONCURRENCY
 	)) {
 		// parallelStream yields PromiseSettledResult, but processCandidate handles its own errors
@@ -183,6 +183,7 @@ async function processCandidate(
 	_batchId: string,
 	cand: CandidateRecord,
 	llm: LlmClient,
+	buckets: BucketInfo[],
 	isRegenerate: boolean,
 	inFlightTerms: Map<string, Promise<Suggestion>>,
 	results: { ok: number; failed: number; cached: number; skippedAlreadySuggested: number; errors: number }
@@ -251,7 +252,7 @@ async function processCandidate(
 				}
 
 				// Generate suggestion
-				const suggestion = await llm.suggestOne(cand.term);
+				const suggestion = await llm.suggestOne(cand.term, buckets);
 
 				// Update candidate with result
 				await db
@@ -302,7 +303,7 @@ async function processCandidate(
 			}
 
 			// Generate suggestion
-			const suggestion = await llm.suggestOne(cand.term);
+			const suggestion = await llm.suggestOne(cand.term, buckets);
 
 			// Update candidate with result
 			await db

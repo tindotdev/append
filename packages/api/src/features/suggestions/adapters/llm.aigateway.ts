@@ -6,12 +6,11 @@
  */
 
 import { valibotSchema } from '@ai-sdk/valibot';
-import { BUCKET_LIST, BucketSchema } from '@append/contracts';
 import { generateText, Output } from 'ai';
 import { createAiGateway } from 'ai-gateway-provider';
 import { createOpenAI } from 'ai-gateway-provider/providers/openai';
-import { maxLength, pipe, strictObject, string } from 'valibot';
-import type { LlmClient, Suggestion } from '../ports/llm';
+import { maxLength, picklist, pipe, strictObject, string } from 'valibot';
+import type { BucketInfo, LlmClient, Suggestion } from '../ports/llm';
 
 /**
  * Configuration for AI Gateway LLM client.
@@ -24,20 +23,20 @@ export interface AIGatewayConfig {
 }
 
 /**
- * System prompt for suggestion generation (v1).
+ * Build a dynamic system prompt based on user's buckets.
  */
-const SYSTEM_PROMPT = `You are a concise technical glossary assistant for a software engineer's personal learning log.
+function buildSystemPrompt(buckets: BucketInfo[]): string {
+	const bucketList = buckets.map((b) => b.slug).join(', ');
+	const bucketDefs = buckets.map((b) => `- ${b.slug}: ${b.description}`).join('\n');
+
+	return `You are a concise technical glossary assistant for a software engineer's personal learning log.
 
 Given a technical term or concept, respond with:
 1. A one-liner explanation (1-2 sentences max, practical and memorable)
-2. A bucket classification from exactly one of: ${BUCKET_LIST}
+2. A bucket classification from exactly one of: ${bucketList}
 
 Bucket definitions:
-- foundations: Core CS concepts, algorithms, data structures
-- backend: Server-side patterns, APIs, databases, storage
-- frontend: UI patterns, React, state management, conflict UX, accept workflows
-- dx-tooling: Build tools, migrations, scripts, CI/CD, developer experience
-- deep-concepts: Model Context Protocol, CAP theorem, system design philosophy
+${bucketDefs}
 
 Response format (JSON):
 {"bucket": "<bucket-slug>", "text": "<one-liner explanation>"}
@@ -47,14 +46,18 @@ Guidelines:
 - Prefer concrete examples over abstract definitions when helpful
 - Keep it under 200 characters for the one-liner
 - Only output valid JSON, nothing else`;
+}
 
 /**
- * Valibot schema for LLM output validation.
+ * Build a valibot schema for LLM output validation with dynamic bucket list.
  */
-const SuggestionSchema = strictObject({
-	bucket: BucketSchema,
-	text: pipe(string(), maxLength(500)),
-});
+function buildSuggestionSchema(buckets: BucketInfo[]) {
+	const slugs = buckets.map((b) => b.slug);
+	return strictObject({
+		bucket: picklist(slugs as [string, ...string[]], 'Invalid bucket'),
+		text: pipe(string(), maxLength(500)),
+	});
+}
 
 /**
  * Default model for suggestions.
@@ -63,8 +66,9 @@ export const SUGGESTION_MODEL = 'gpt-5-mini' as const;
 
 /**
  * Prompt version for cache invalidation.
+ * Increment when prompt logic changes significantly.
  */
-export const PROMPT_VERSION = 1;
+export const PROMPT_VERSION = 2;
 
 /**
  * Create an LLM client using Cloudflare AI Gateway.
@@ -81,13 +85,16 @@ export function makeLlmClient(config: AIGatewayConfig): LlmClient {
 	});
 
 	return {
-		async suggestOne(term: string): Promise<Suggestion> {
+		async suggestOne(term: string, buckets: BucketInfo[]): Promise<Suggestion> {
+			const systemPrompt = buildSystemPrompt(buckets);
+			const suggestionSchema = buildSuggestionSchema(buckets);
+
 			const response = await generateText({
-				system: SYSTEM_PROMPT,
+				system: systemPrompt,
 				model: aigateway(openai.chat(SUGGESTION_MODEL)),
 				prompt: term,
 				output: Output.object({
-					schema: valibotSchema(SuggestionSchema),
+					schema: valibotSchema(suggestionSchema),
 				}),
 			});
 

@@ -7,6 +7,7 @@ import { bucketRoutes } from './features/bucket/routes';
 import { candidateRoutes } from './features/candidate/routes';
 import { exportRoutes } from './features/export/routes';
 import { suggestionsRoutes } from './features/suggestions/routes';
+import { userBucketRoutes } from './features/user-bucket/routes';
 import { createAuth } from './lib/auth';
 import { apiError } from './shared/api-error';
 
@@ -158,7 +159,8 @@ const apiRoutes = app
 	.route('/api/bucket', bucketRoutes)
 	.route('/api/candidate', candidateRoutes)
 	.route('/api/export', exportRoutes)
-	.route('/api', suggestionsRoutes);
+	.route('/api', suggestionsRoutes)
+	.route('/api/user-bucket', userBucketRoutes);
 
 // Export type for Hono RPC client
 export type AppType = typeof apiRoutes;

@@ -4,7 +4,6 @@
  * Returns the batch with all its candidates.
  */
 
-import type { Bucket } from '@append/contracts/types';
 import { asc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type BatchStatus, batch, candidate, type SuggestionStatus, type schema } from '../../../db';
@@ -18,9 +17,9 @@ export interface CandidateDetail {
 	term: string;
 	normalizedTerm: string;
 	status: BatchStatus;
-	chosenBucket: Bucket | null;
+	chosenBucket: string | null;
 	chosenText: string | null;
-	suggestedBucket: Bucket | null;
+	suggestedBucket: string | null;
 	suggestedText: string | null;
 	suggestionStatus: SuggestionStatus | null;
 	suggestionError: string | null;
