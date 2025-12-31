@@ -23,3 +23,4 @@ Rules:
 - `0011-parallel-suggestion-generation.md` — Parallel suggestion generation with concurrency=10
 - `0012-custom-user-buckets.md` — User-owned dynamic buckets (replacing static hardcoded buckets)
 - `0013-hono-rpc-type-sharing.md` — Hono RPC replaces contracts package for API type sharing
+- `0014-module-boundaries-platform-types.md` — Module boundary: `lib` must not depend on `platform`

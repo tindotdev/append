@@ -49,9 +49,10 @@
 - **5D**: Bucket Manager UI (settings page, drag-drop reorder). ✅
 - **5E**: Testing + docs (user-bucket tests, documentation refresh). In progress.
 
-See ADRs: `0012-custom-user-buckets.md`, `0013-hono-rpc-type-sharing.md`.
+See ADRs: `0012-custom-user-buckets.md`, `0013-hono-rpc-type-sharing.md`, `0014-module-boundaries-platform-types.md`.
 
 ## Implementation note
 
 - Stack: SPA (React + TanStack Router) hosted on Cloudflare Pages + Hono API on Cloudflare Workers (ADR: `docs/adr/0004-spa-hono-workers.md`).
 - Type sharing: Hono RPC for end-to-end type safety (ADR: `docs/adr/0013-hono-rpc-type-sharing.md`).
+- Module boundaries: `lib` cannot depend on `platform`; shared types live in `shared` (ADR: `docs/adr/0014-module-boundaries-platform-types.md`).

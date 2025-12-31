@@ -9,11 +9,9 @@
  */
 
 import { vValidator } from '@hono/valibot-validator';
-import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
-import { schema } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
-import { apiError, validationHook } from '../../shared/api-error';
+import { apiErrorFrom, validationHook } from '../../shared/api-error';
 import { createBucket } from './usecases/createBucket';
 import { deleteBucket } from './usecases/deleteBucket';
 import { listBuckets } from './usecases/listBuckets';
@@ -30,7 +28,7 @@ export const userBucketRoutes = app
 	// GET /api/user-bucket - List all buckets for the authenticated user
 	.get('/', async (c) => {
 		const userId = c.get('userId');
-		const db = drizzle(c.env.DB, { schema });
+		const db = c.get('db');
 
 		const result = await listBuckets(db, userId);
 		return c.json(result);
@@ -39,18 +37,16 @@ export const userBucketRoutes = app
 	// POST /api/user-bucket - Create a new bucket
 	.post('/', vValidator('json', CreateBucketSchema, validationHook), async (c) => {
 		const userId = c.get('userId');
-		const db = drizzle(c.env.DB, { schema });
+		const db = c.get('db');
 		const body = c.req.valid('json');
 
 		const result = await createBucket(db, userId, body);
 
 		if (!result.success) {
-			switch (result.error.type) {
-				case 'limit_exceeded':
-					return apiError(c, 400, 'VALIDATION_ERROR', result.error.message);
-				case 'slug_exists':
-					return apiError(c, 409, 'VERSION_CONFLICT', result.error.message);
-			}
+			return apiErrorFrom(c, result.error, {
+				limit_exceeded: { status: 400, code: 'VALIDATION_ERROR', message: (error) => error.message },
+				slug_exists: { status: 409, code: 'VERSION_CONFLICT', message: (error) => error.message },
+			});
 		}
 
 		return c.json(result.result, 201);
@@ -60,18 +56,16 @@ export const userBucketRoutes = app
 	// NOTE: This route MUST come before /:id to avoid matching "reorder" as an ID
 	.put('/reorder', vValidator('json', ReorderBucketsSchema, validationHook), async (c) => {
 		const userId = c.get('userId');
-		const db = drizzle(c.env.DB, { schema });
+		const db = c.get('db');
 		const body = c.req.valid('json');
 
 		const result = await reorderBuckets(db, userId, body);
 
 		if (!result.success) {
-			switch (result.error.type) {
-				case 'invalid_ids':
-					return apiError(c, 400, 'VALIDATION_ERROR', result.error.message);
-				case 'incomplete':
-					return apiError(c, 400, 'VALIDATION_ERROR', result.error.message);
-			}
+			return apiErrorFrom(c, result.error, {
+				invalid_ids: { status: 400, code: 'VALIDATION_ERROR', message: (error) => error.message },
+				incomplete: { status: 400, code: 'VALIDATION_ERROR', message: (error) => error.message },
+			});
 		}
 
 		return c.json({ success: true });
@@ -81,18 +75,16 @@ export const userBucketRoutes = app
 	.put('/:id', vValidator('json', UpdateBucketSchema, validationHook), async (c) => {
 		const userId = c.get('userId');
 		const bucketId = c.req.param('id');
-		const db = drizzle(c.env.DB, { schema });
+		const db = c.get('db');
 		const body = c.req.valid('json');
 
 		const result = await updateBucket(db, userId, bucketId, body);
 
 		if (!result.success) {
-			switch (result.error.type) {
-				case 'not_found':
-					return apiError(c, 404, 'NOT_FOUND', result.error.message);
-				case 'forbidden':
-					return apiError(c, 403, 'FORBIDDEN', result.error.message);
-			}
+			return apiErrorFrom(c, result.error, {
+				not_found: { status: 404, code: 'NOT_FOUND', message: (error) => error.message },
+				forbidden: { status: 403, code: 'FORBIDDEN', message: (error) => error.message },
+			});
 		}
 
 		return c.json(result.result);
@@ -102,21 +94,21 @@ export const userBucketRoutes = app
 	.delete('/:id', async (c) => {
 		const userId = c.get('userId');
 		const bucketId = c.req.param('id');
-		const db = drizzle(c.env.DB, { schema });
+		const db = c.get('db');
 
 		const result = await deleteBucket(db, userId, bucketId);
 
 		if (!result.success) {
-			switch (result.error.type) {
-				case 'not_found':
-					return apiError(c, 404, 'NOT_FOUND', result.error.message);
-				case 'forbidden':
-					return apiError(c, 403, 'FORBIDDEN', result.error.message);
-				case 'has_senses':
-					return apiError(c, 409, 'VERSION_CONFLICT', result.error.message, {
-						senseCount: result.error.senseCount,
-					});
-			}
+			return apiErrorFrom(c, result.error, {
+				not_found: { status: 404, code: 'NOT_FOUND', message: (error) => error.message },
+				forbidden: { status: 403, code: 'FORBIDDEN', message: (error) => error.message },
+				has_senses: {
+					status: 409,
+					code: 'VERSION_CONFLICT',
+					message: (error) => error.message,
+					details: (error) => ({ senseCount: error.senseCount }),
+				},
+			});
 		}
 
 		return c.json({ success: true });

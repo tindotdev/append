@@ -13,6 +13,7 @@
 - Step 3 suggestion storage: latest suggestion fields live on `Candidate` + per-term cache (ADR: `docs/adr/0007-step-3-suggestions-on-candidate-plus-cache.md`).
 - Custom buckets: user-owned dynamic buckets, max 20 per user (ADR: `docs/adr/0012-custom-user-buckets.md`).
 - Type sharing: Hono RPC for end-to-end type safety between API and web (ADR: `docs/adr/0013-hono-rpc-type-sharing.md`).
+- Module boundaries: `lib` cannot depend on `platform`; shared types live in `shared` (ADR: `docs/adr/0014-module-boundaries-platform-types.md`).
 
 ## Current stage
 

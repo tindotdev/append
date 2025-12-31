@@ -8,8 +8,8 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { bucket as bucketTable, idempotencyKey, normalize, type schema, type TermSenseSource, term, termSense } from '../../../db';
 import { sha256Hex } from '../../../shared/crypto';
-import { fromBase64Url, toBase64Url } from '../../../shared/idempotency/encoding';
 import { checkIdempotencyKey } from '../../../shared/idempotency/keys';
+import { decodeJsonResultRef, encodeJsonResultRef } from '../../../shared/idempotency/result-ref';
 import { parseMarkdown } from '../parser/parseMarkdown';
 import type { CommitImportInput, CommitImportResponse } from '../validation/import.schema';
 import { getFileContent, listImportFiles } from './uploadFiles';
@@ -48,6 +48,13 @@ export type CommitImportError =
 export type CommitImportOutcome =
 	| { success: true; result: CommitImportResponse; isReplay: boolean }
 	| { success: false; error: CommitImportError };
+
+interface EntryWithBucket {
+	term: string;
+	definition: string;
+	bucketId: string;
+	r2Key: string;
+}
 
 /**
  * Commit an import by creating terms and senses.
@@ -89,18 +96,12 @@ export async function commitImport(
 	const idempotencyCheck = await checkIdempotencyKey(db, userId, IMPORT_COMMIT_SCOPE, clientRequestId, requestHash);
 
 	if (idempotencyCheck.status === 'replay') {
-		const resultRefMatch = idempotencyCheck.resultRef.match(/^import_summary:(.+)$/);
-		if (!resultRefMatch) {
+		const cachedResult = decodeJsonResultRef<CommitImportResponse>('import_summary', idempotencyCheck.resultRef);
+		if (!cachedResult) {
 			return { success: false, error: { type: 'internal_error', message: 'Invalid idempotency result reference' } };
 		}
 
-		try {
-			const summaryJson = fromBase64Url(resultRefMatch[1]);
-			const cachedResult = JSON.parse(summaryJson) as CommitImportResponse;
-			return { success: true, result: cachedResult, isReplay: true };
-		} catch {
-			return { success: false, error: { type: 'internal_error', message: 'Invalid idempotency result reference' } };
-		}
+		return { success: true, result: cachedResult, isReplay: true };
 	}
 
 	if (idempotencyCheck.status === 'conflict') {
@@ -108,37 +109,7 @@ export async function commitImport(
 	}
 
 	// Parse all files and collect entries
-	interface EntryWithBucket {
-		term: string;
-		definition: string;
-		bucketId: string;
-		r2Key: string;
-	}
-
-	const allEntries: EntryWithBucket[] = [];
-
-	for (const obj of r2Objects) {
-		const content = await getFileContent(r2, obj.key);
-		if (!content) continue;
-
-		const { entries } = parseMarkdown(content);
-		const bucketId = bucketMappingMap.get(obj.key);
-
-		// Skip files without bucket mapping
-		if (!bucketId) continue;
-
-		for (const entry of entries) {
-			// Skip inbox items (no definition)
-			if (entry.isInbox || !entry.definition) continue;
-
-			allEntries.push({
-				term: entry.term,
-				definition: entry.definition,
-				bucketId,
-				r2Key: obj.key,
-			});
-		}
-	}
+	const allEntries = await collectImportEntries(r2, r2Objects, bucketMappingMap);
 
 	// Verify all bucket IDs exist
 	const uniqueBucketIds = [...new Set(allEntries.map((e) => e.bucketId))];
@@ -331,7 +302,7 @@ export async function commitImport(
 	};
 
 	// Insert idempotency key
-	const resultRef = `import_summary:${toBase64Url(JSON.stringify(result))}`;
+	const resultRef = encodeJsonResultRef('import_summary', result);
 	const idempStmt = db
 		.insert(idempotencyKey)
 		.values({
@@ -358,15 +329,9 @@ export async function commitImport(
 
 			if (racedKey) {
 				if (racedKey.requestHash === requestHash) {
-					const resultRefMatch = racedKey.resultRef.match(/^import_summary:(.+)$/);
-					if (resultRefMatch) {
-						try {
-							const summaryJson = fromBase64Url(resultRefMatch[1]);
-							const cachedResult = JSON.parse(summaryJson) as CommitImportResponse;
-							return { success: true, result: cachedResult, isReplay: true };
-						} catch {
-							// Fall through to error
-						}
+					const cachedResult = decodeJsonResultRef<CommitImportResponse>('import_summary', racedKey.resultRef);
+					if (cachedResult) {
+						return { success: true, result: cachedResult, isReplay: true };
 					}
 				} else {
 					return { success: false, error: { type: 'idempotency_conflict', originalImportId: importId } };
@@ -379,4 +344,37 @@ export async function commitImport(
 	}
 
 	return { success: true, result, isReplay: false };
+}
+
+async function collectImportEntries(
+	r2: R2Bucket,
+	objects: { key: string }[],
+	bucketMappingMap: Map<string, string>
+): Promise<EntryWithBucket[]> {
+	const entries: EntryWithBucket[] = [];
+
+	for (const obj of objects) {
+		const content = await getFileContent(r2, obj.key);
+		if (!content) continue;
+
+		const { entries: parsedEntries } = parseMarkdown(content);
+		const bucketId = bucketMappingMap.get(obj.key);
+
+		// Skip files without bucket mapping
+		if (!bucketId) continue;
+
+		for (const entry of parsedEntries) {
+			// Skip inbox items (no definition)
+			if (entry.isInbox || !entry.definition) continue;
+
+			entries.push({
+				term: entry.term,
+				definition: entry.definition,
+				bucketId,
+				r2Key: obj.key,
+			});
+		}
+	}
+
+	return entries;
 }

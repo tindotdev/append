@@ -5,12 +5,10 @@
  */
 
 import { vValidator } from '@hono/valibot-validator';
-import { and, eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
-import { bucket, schema } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
-import { apiError, validationHook } from '../../shared/api-error';
+import { apiError, apiErrorFrom, validationHook } from '../../shared/api-error';
+import { findUserBucketBySlug } from '../../shared/queries';
 import { getBucketFeed } from './usecases/getBucketFeed';
 import { GetBucketFeedParamsSchema } from './validation/getBucketFeed.schema';
 
@@ -32,15 +30,11 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 export const bucketRoutes = app.get('/:slug', vValidator('query', GetBucketFeedParamsSchema, validationHook), async (c) => {
 	const userId = c.get('userId');
 	const slugParam = c.req.param('slug');
-	const db = drizzle(c.env.DB, { schema });
+	const db = c.get('db');
 	const query = c.req.valid('query');
 
 	// Look up bucket by slug for this user
-	const [userBucket] = await db
-		.select({ slug: bucket.slug })
-		.from(bucket)
-		.where(and(eq(bucket.userId, userId), eq(bucket.slug, slugParam)))
-		.limit(1);
+	const userBucket = await findUserBucketBySlug(db, userId, slugParam);
 
 	if (!userBucket) {
 		return apiError(c, 404, 'NOT_FOUND', `Bucket not found: ${slugParam}`);
@@ -49,8 +43,9 @@ export const bucketRoutes = app.get('/:slug', vValidator('query', GetBucketFeedP
 	// Call usecase
 	const result = await getBucketFeed(db, userId, userBucket.slug, query);
 	if (!result.success) {
-		// Only error type is 'invalid_cursor'
-		return apiError(c, 400, 'VALIDATION_ERROR', 'Invalid cursor');
+		return apiErrorFrom(c, result.error, {
+			invalid_cursor: { status: 400, code: 'VALIDATION_ERROR', message: 'Invalid cursor' },
+		});
 	}
 
 	return c.json(result.result);

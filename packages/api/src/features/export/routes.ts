@@ -4,12 +4,10 @@
  * GET /api/export/:slug - Export all terms in a bucket as markdown
  */
 
-import { and, eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
-import { bucket, schema } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
 import { apiError } from '../../shared/api-error';
+import { findUserBucketBySlug } from '../../shared/queries';
 import { exportBucket } from './usecases/exportBucket';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -24,14 +22,10 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 export const exportRoutes = app.get('/:slug', async (c) => {
 	const userId = c.get('userId');
 	const slugParam = c.req.param('slug');
-	const db = drizzle(c.env.DB, { schema });
+	const db = c.get('db');
 
 	// Look up bucket by slug for this user
-	const [userBucket] = await db
-		.select({ slug: bucket.slug, name: bucket.name })
-		.from(bucket)
-		.where(and(eq(bucket.userId, userId), eq(bucket.slug, slugParam)))
-		.limit(1);
+	const userBucket = await findUserBucketBySlug(db, userId, slugParam);
 
 	if (!userBucket) {
 		return apiError(c, 404, 'NOT_FOUND', `Bucket not found: ${slugParam}`);

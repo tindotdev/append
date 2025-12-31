@@ -5,11 +5,9 @@
  */
 
 import { vValidator } from '@hono/valibot-validator';
-import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
-import { schema } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
-import { apiError, validationHook } from '../../shared/api-error';
+import { apiErrorFrom, validationHook } from '../../shared/api-error';
 import { updateCandidate } from './usecases/updateCandidate';
 import { UpdateCandidateSchema } from './validation/updateCandidate.schema';
 
@@ -32,24 +30,27 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 export const candidateRoutes = app.put('/:id', vValidator('json', UpdateCandidateSchema, validationHook), async (c) => {
 	const userId = c.get('userId');
 	const candidateId = c.req.param('id');
-	const db = drizzle(c.env.DB, { schema });
+	const db = c.get('db');
 	const body = c.req.valid('json');
 
 	// Call usecase
 	const result = await updateCandidate(db, userId, candidateId, body);
 	if (!result.success) {
-		switch (result.error.type) {
-			case 'not_found':
-				return apiError(c, 404, 'NOT_FOUND', 'Candidate not found');
-			case 'forbidden':
-				return apiError(c, 403, 'FORBIDDEN', 'Access denied');
-			case 'invalid_bucket':
-				return apiError(c, 400, 'VALIDATION_ERROR', `Invalid chosenBucket: '${result.error.slug}' does not exist`);
-			case 'version_conflict':
-				return apiError(c, 409, 'VERSION_CONFLICT', 'Candidate was modified by another request', {
-					currentVersion: result.error.currentVersion,
-				});
-		}
+		return apiErrorFrom(c, result.error, {
+			not_found: { status: 404, code: 'NOT_FOUND', message: 'Candidate not found' },
+			forbidden: { status: 403, code: 'FORBIDDEN', message: 'Access denied' },
+			invalid_bucket: {
+				status: 400,
+				code: 'VALIDATION_ERROR',
+				message: (error) => `Invalid chosenBucket: '${error.slug}' does not exist`,
+			},
+			version_conflict: {
+				status: 409,
+				code: 'VERSION_CONFLICT',
+				message: 'Candidate was modified by another request',
+				details: (error) => ({ currentVersion: error.currentVersion }),
+			},
+		});
 	}
 
 	return c.json({ candidate: result.result });

@@ -3,11 +3,9 @@
  */
 
 import { vValidator } from '@hono/valibot-validator';
-import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
-import { schema } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
-import { apiError, validationHook } from '../../shared/api-error';
+import { apiErrorFrom, validationHook } from '../../shared/api-error';
 import { commitImport } from './usecases/commitImport';
 import { previewImport } from './usecases/previewImport';
 import { uploadFiles } from './usecases/uploadFiles';
@@ -50,21 +48,18 @@ export const importRoutes = app
 		const result = await uploadFiles(r2, userId, files, clientImportId);
 
 		if (!result.success) {
-			switch (result.error.type) {
-				case 'no_files':
-					return apiError(c, 400, 'VALIDATION_ERROR', result.error.message);
-				case 'invalid_file_type':
-					return apiError(c, 400, 'VALIDATION_ERROR', result.error.message);
-				case 'file_too_large':
-					return apiError(c, 413, 'PAYLOAD_TOO_LARGE', result.error.message);
-			}
+			return apiErrorFrom(c, result.error, {
+				no_files: { status: 400, code: 'VALIDATION_ERROR', message: (error) => error.message },
+				invalid_file_type: { status: 400, code: 'VALIDATION_ERROR', message: (error) => error.message },
+				file_too_large: { status: 413, code: 'PAYLOAD_TOO_LARGE', message: (error) => error.message },
+			});
 		}
 
 		return c.json(result.result, 201);
 	})
 	.post('/preview', vValidator('json', PreviewImportSchema, validationHook), async (c) => {
 		const userId = c.get('userId');
-		const db = drizzle(c.env.DB, { schema });
+		const db = c.get('db');
 		const r2 = c.env.IMPORT_FILES;
 		const body = c.req.valid('json');
 
@@ -72,17 +67,16 @@ export const importRoutes = app
 		const result = await previewImport(db, r2, userId, body.importId);
 
 		if (!result.success) {
-			switch (result.error.type) {
-				case 'not_found':
-					return apiError(c, 404, 'NOT_FOUND', result.error.message);
-			}
+			return apiErrorFrom(c, result.error, {
+				not_found: { status: 404, code: 'NOT_FOUND', message: (error) => error.message },
+			});
 		}
 
 		return c.json(result.result);
 	})
 	.post('/commit', vValidator('json', CommitImportSchema, validationHook), async (c) => {
 		const userId = c.get('userId');
-		const db = drizzle(c.env.DB, { schema });
+		const db = c.get('db');
 		const r2 = c.env.IMPORT_FILES;
 		const body = c.req.valid('json');
 
@@ -90,16 +84,16 @@ export const importRoutes = app
 		const result = await commitImport(db, c.env.DB, r2, userId, body);
 
 		if (!result.success) {
-			switch (result.error.type) {
-				case 'not_found':
-					return apiError(c, 404, 'NOT_FOUND', result.error.message);
-				case 'bucket_limit_exceeded':
-					return apiError(c, 400, 'VALIDATION_ERROR', result.error.message);
-				case 'idempotency_conflict':
-					return apiError(c, 409, 'IDEMPOTENCY_CONFLICT', `Import already committed with different payload`);
-				case 'internal_error':
-					return apiError(c, 500, 'INTERNAL_ERROR', result.error.message);
-			}
+			return apiErrorFrom(c, result.error, {
+				not_found: { status: 404, code: 'NOT_FOUND', message: (error) => error.message },
+				bucket_limit_exceeded: { status: 400, code: 'VALIDATION_ERROR', message: (error) => error.message },
+				idempotency_conflict: {
+					status: 409,
+					code: 'IDEMPOTENCY_CONFLICT',
+					message: 'Import already committed with different payload',
+				},
+				internal_error: { status: 500, code: 'INTERNAL_ERROR', message: (error) => error.message },
+			});
 		}
 
 		// Return 200 for replay, 201 for new commit

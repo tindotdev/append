@@ -4,7 +4,8 @@
 
 import { and, eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { batch, bucket, candidate, type schema } from '../../../db';
+import { bucket, candidate, type schema } from '../../../db';
+import { requireBatchOwned } from '../../../shared/queries';
 import type { UpdateCandidateInput } from '../validation/updateCandidate.schema';
 
 /**
@@ -60,16 +61,9 @@ export async function updateCandidate(
 	}
 
 	// Lookup batch to verify ownership
-	const batchRow = await db.query.batch.findFirst({
-		where: eq(batch.id, candidateRow.batchId),
-	});
-
-	if (!batchRow) {
-		return { success: false, error: { type: 'not_found' } };
-	}
-
-	if (batchRow.userId !== userId) {
-		return { success: false, error: { type: 'forbidden' } };
+	const batchOwnership = await requireBatchOwned(db, userId, candidateRow.batchId);
+	if (!batchOwnership.ok) {
+		return { success: false, error: { type: batchOwnership.error } };
 	}
 
 	// 2. Validate bucket exists for user (if provided)
