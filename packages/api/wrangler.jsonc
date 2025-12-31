@@ -60,6 +60,16 @@
 			"migrations_dir": "drizzle"
 		}
 	],
+	/**
+	 * R2 Object Storage
+	 * https://developers.cloudflare.com/r2/
+	 */
+	"r2_buckets": [
+		{
+			"binding": "IMPORT_FILES",
+			"bucket_name": "append-imports"
+		}
+	],
 	// Note: Secrets Store binding is in "production" env only.
 	// Local dev uses OPENAI_API_KEY from .dev.vars (plain string).
 	/**
@@ -87,6 +97,12 @@
 					"migrations_dir": "drizzle"
 				}
 			],
+			"r2_buckets": [
+				{
+					"binding": "IMPORT_FILES",
+					"bucket_name": "append-imports"
+				}
+			],
 			"secrets_store_secrets": [
 				{
 					"binding": "OPENAI_API_KEY",
@@ -110,7 +126,8 @@
 				"GOOGLE_CLIENT_ID": "test-google-client-id",
 				"GOOGLE_CLIENT_SECRET": "test-google-client-secret",
 				"SUGGESTIONS_PROVIDER": "stub",
-				"AI_GATEWAY_ID": "test-gateway"
+				"AI_GATEWAY_ID": "test-gateway",
+				"CF_ACCOUNT_ID": "test-account-id"
 			},
 			"d1_databases": [
 				{
@@ -118,6 +135,12 @@
 					"database_name": "append-db",
 					"database_id": "db763705-f8d3-4d94-bda9-305ac66a7b3a",
 					"migrations_dir": "drizzle"
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "IMPORT_FILES",
+					"bucket_name": "append-imports"
 				}
 			]
 		}

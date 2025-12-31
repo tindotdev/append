@@ -35,6 +35,9 @@ export type Bindings = {
 	// Database
 	DB: D1Database;
 
+	// R2 Object Storage
+	IMPORT_FILES: R2Bucket;
+
 	// AI Gateway
 	CF_ACCOUNT_ID: string;
 	AI_GATEWAY_ID: string;

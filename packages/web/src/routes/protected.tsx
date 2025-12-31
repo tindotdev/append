@@ -4,6 +4,7 @@ import { ProtectedLayout } from '@/components/layouts/ProtectedLayout';
 import { BatchDetailPage, BatchListPage, BatchNewPage, SearchPage } from '@/features/batch';
 import { BucketFeedPage } from '@/features/bucket';
 import { ExportPage } from '@/features/export';
+import { ImportPage } from '@/features/import';
 import { SettingsPage } from '@/features/settings';
 
 export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: TParentRoute) {
@@ -56,6 +57,12 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 		component: ExportPage,
 	});
 
+	const importRoute = createRoute({
+		getParentRoute: () => protectedRoute,
+		path: '/import',
+		component: ImportPage,
+	});
+
 	const searchRoute = createRoute({
 		getParentRoute: () => protectedRoute,
 		path: '/search',
@@ -75,6 +82,7 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 		batchDetailRoute,
 		bucketFeedRoute,
 		exportRoute,
+		importRoute,
 		searchRoute,
 		settingsRoute,
 	]);

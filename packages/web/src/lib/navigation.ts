@@ -3,6 +3,7 @@ export const CAPTURE_NAV = { to: '/batch/new', label: 'Capture' } as const;
 export const HEADER_NAV = [
 	{ to: '/batch', label: 'Batches' },
 	{ to: '/search', label: 'Search' },
+	{ to: '/import', label: 'Import' },
 	{ to: '/export', label: 'Export' },
 	{ to: '/settings', label: 'Settings' },
 ] as const;
