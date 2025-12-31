@@ -5,7 +5,7 @@
 
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { bucket, term, termSense, type schema } from '../../../db';
+import { bucket, type schema, term, termSense } from '../../../db';
 
 export type DeleteBucketError =
 	| { type: 'not_found'; message: string }

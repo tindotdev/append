@@ -1,4 +1,4 @@
-import type { Context, Env, ValidationTargets } from 'hono';
+import type { Context, Env } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type * as v from 'valibot';
 

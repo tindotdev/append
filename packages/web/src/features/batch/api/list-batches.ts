@@ -1,5 +1,5 @@
 import { type QueryFunctionContext, useInfiniteQuery } from '@tanstack/react-query';
-import { api, ApiRequestError } from '@/lib/api-rpc';
+import { ApiRequestError, api } from '@/lib/api-rpc';
 import type { ListBatchesOptions, ListBatchesResponse } from '../types';
 import { batchKeys } from './get-batch';
 

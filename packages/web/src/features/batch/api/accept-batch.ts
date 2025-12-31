@@ -1,4 +1,4 @@
-import { api, ApiRequestError } from '@/lib/api-rpc';
+import { ApiRequestError, api } from '@/lib/api-rpc';
 
 /**
  * Accept summary response from the API.
