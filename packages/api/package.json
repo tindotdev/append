@@ -3,6 +3,9 @@
 	"version": "0.0.0",
 	"private": true,
 	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
 	"scripts": {
 		"deploy": "wrangler deploy -e production",
 		"dev": "wrangler dev",
@@ -28,6 +31,7 @@
 	"dependencies": {
 		"@ai-sdk/valibot": "^2.0.1",
 		"@append/contracts": "workspace:*",
+		"@hono/valibot-validator": "^0.6.1",
 		"ai": "^6.0.3",
 		"ai-gateway-provider": "^3.0.1",
 		"better-auth": "^1.4.7",

@@ -2,42 +2,35 @@
  * Suggestions routes: generate suggestions for batch candidates.
  */
 
+import { vValidator } from '@hono/valibot-validator';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
-import * as v from 'valibot';
 import { batch, schema } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
 import { sseHeaders } from '../../platform/sse';
-import { apiError } from '../../shared/api-error';
+import { apiError, validationHook } from '../../shared/api-error';
 import { createLlmClient } from './adapters';
 import { generateSuggestions } from './usecases/generateSuggestions';
 import { SuggestSchema } from './validation/suggest.schema';
 
-export const suggestionsRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 /**
+ * Suggestions routes - exported as the result of route chain for Hono RPC type inference.
+ *
  * POST /api/batch/:id/suggest - Generate suggestions with SSE streaming
+ *
+ * Note: This endpoint returns an SSE stream, not JSON.
+ * Hono RPC type inference works for the input, but output type is Response.
  */
-suggestionsRoutes.post('/batch/:id/suggest', async (c) => {
+export const suggestionsRoutes = app.post('/batch/:id/suggest', vValidator('query', SuggestSchema, validationHook), async (c) => {
 	const userId = c.get('userId');
 	const batchId = c.req.param('id');
 	const db = drizzle(c.env.DB, { schema });
+	const query = c.req.valid('query');
 
-	// Parse query parameters
-	const queryParams = {
-		limit: c.req.query('limit'),
-		regenerate: c.req.query('regenerate'),
-	};
-
-	// Validate with valibot
-	const parseResult = v.safeParse(SuggestSchema, queryParams);
-	if (!parseResult.success) {
-		const issue = parseResult.issues[0];
-		return apiError(c, 400, 'VALIDATION_ERROR', issue.message);
-	}
-
-	const { limit, regenerate } = parseResult.output;
+	const { limit, regenerate } = query;
 	const mode = regenerate ? 'regenerate' : 'fill-missing';
 
 	// Create LLM client (async due to Secrets Store)

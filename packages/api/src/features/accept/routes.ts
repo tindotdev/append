@@ -2,42 +2,30 @@
  * Accept routes: accept all candidates in a batch.
  */
 
+import { vValidator } from '@hono/valibot-validator';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
-import * as v from 'valibot';
 import { schema } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
-import { apiError } from '../../shared/api-error';
+import { apiError, validationHook } from '../../shared/api-error';
 import { acceptAll } from './usecases/acceptAll';
 import { AcceptAllSchema } from './validation/acceptAll.schema';
 
-export const acceptRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 /**
+ * Accept routes - exported as the result of route chain for Hono RPC type inference.
+ *
  * POST /api/batch/:id/accept - Accept all candidates and materialize to terms/senses
  */
-acceptRoutes.post('/batch/:id/accept', async (c) => {
+export const acceptRoutes = app.post('/batch/:id/accept', vValidator('json', AcceptAllSchema, validationHook), async (c) => {
 	const userId = c.get('userId');
 	const batchId = c.req.param('id');
 	const db = drizzle(c.env.DB, { schema });
-
-	// Parse request body
-	let body: unknown;
-	try {
-		body = await c.req.json();
-	} catch {
-		return apiError(c, 400, 'INVALID_JSON', 'Invalid JSON in request body');
-	}
-
-	// Validate with valibot
-	const parseResult = v.safeParse(AcceptAllSchema, body);
-	if (!parseResult.success) {
-		const issue = parseResult.issues[0];
-		return apiError(c, 400, 'VALIDATION_ERROR', issue.message);
-	}
+	const body = c.req.valid('json');
 
 	// Execute use case
-	const result = await acceptAll(db, c.env.DB, userId, batchId, parseResult.output);
+	const result = await acceptAll(db, c.env.DB, userId, batchId, body);
 
 	if (!result.success) {
 		switch (result.error.type) {

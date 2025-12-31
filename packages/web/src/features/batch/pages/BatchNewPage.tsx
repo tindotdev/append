@@ -5,7 +5,7 @@ import * as v from 'valibot';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
-import { ApiRequestError } from '@/lib/api-client';
+import { ApiRequestError } from '@/lib/api-rpc';
 import { createBatch } from '../api/create-batch';
 
 const TERM_MIN = 1;

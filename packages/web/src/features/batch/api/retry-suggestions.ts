@@ -1,5 +1,5 @@
 import { fetchEventSource } from '@microsoft/fetch-event-source';
-import { API_URL } from '@/lib/api-client';
+import { API_URL } from '@/lib/api-rpc';
 import type { SuggestCandidateEvent, SuggestDoneEvent, SuggestStartEvent } from '../types';
 
 export interface GenerateSuggestionsCallbacks {

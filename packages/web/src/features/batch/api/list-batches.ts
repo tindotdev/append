@@ -1,22 +1,24 @@
 import { type QueryFunctionContext, useInfiniteQuery } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/api-client';
+import { api, ApiRequestError } from '@/lib/api-rpc';
 import type { ListBatchesOptions, ListBatchesResponse } from '../types';
 import { batchKeys } from './get-batch';
 
-// Fetcher function
+// Fetcher function using Hono RPC
 export async function listBatches(options?: ListBatchesOptions): Promise<ListBatchesResponse> {
-	const params = new URLSearchParams();
-	if (options?.limit !== undefined) {
-		params.set('limit', String(options.limit));
-	}
-	if (options?.cursor) {
-		params.set('cursor', options.cursor);
+	const res = await api.api.batch.$get({
+		query: {
+			limit: options?.limit !== undefined ? String(options.limit) : undefined,
+			cursor: options?.cursor,
+		},
+	});
+
+	if (!res.ok) {
+		const errorBody = (await res.json()) as { error?: { code?: string; message?: string } };
+		throw new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
 	}
 
-	const queryString = params.toString();
-	const path = `/api/batch${queryString ? `?${queryString}` : ''}`;
-
-	return apiRequest<ListBatchesResponse>(path);
+	// Cast to expected type - API returns compatible structure
+	return res.json() as Promise<ListBatchesResponse>;
 }
 
 // React Query hook with infinite scroll support

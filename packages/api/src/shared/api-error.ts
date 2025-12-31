@@ -1,5 +1,6 @@
-import type { Context } from 'hono';
+import type { Context, Env, ValidationTargets } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import type * as v from 'valibot';
 
 /**
  * Standard API error codes for /api/* routes.
@@ -46,4 +47,25 @@ export function apiError<T extends Record<string, unknown>>(
 	details?: Record<string, unknown>
 ) {
 	return c.json<ApiErrorResponse>({ error: { code, message }, details }, status);
+}
+
+/**
+ * Validation error hook for vValidator.
+ * Returns a standardized 400 error response when validation fails.
+ *
+ * Usage:
+ * ```typescript
+ * vValidator('json', Schema, validationHook)
+ * ```
+ */
+export function validationHook<E extends Env>(
+	result: { success: boolean; data?: unknown; issues?: v.BaseIssue<unknown>[] },
+	c: Context<E>
+) {
+	if (!result.success) {
+		// Get first error message from valibot issues
+		const firstIssue = result.issues?.[0];
+		const message = firstIssue?.message ?? 'Validation failed';
+		return apiError(c, 400, 'VALIDATION_ERROR', message);
+	}
 }

@@ -1,5 +1,5 @@
 import { queryOptions, useQuery } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/api-client';
+import { api, ApiRequestError } from '@/lib/api-rpc';
 import type { BatchResponse } from '../types';
 
 // Query key factory
@@ -11,9 +11,19 @@ export const batchKeys = {
 	detail: (id: string) => [...batchKeys.details(), id] as const,
 };
 
-// Fetcher function
+// Fetcher function using Hono RPC
 export async function getBatch(id: string): Promise<BatchResponse> {
-	return apiRequest<BatchResponse>(`/api/batch/${id}`);
+	const res = await api.api.batch[':id'].$get({
+		param: { id },
+	});
+
+	if (!res.ok) {
+		const errorBody = (await res.json()) as { error?: { code?: string; message?: string } };
+		throw new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
+	}
+
+	// Cast to expected type - API returns compatible structure
+	return res.json() as Promise<BatchResponse>;
 }
 
 // Query options (composable)

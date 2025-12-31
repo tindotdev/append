@@ -1,32 +1,45 @@
-import type { Bucket } from '@append/contracts/types';
 import { type QueryFunctionContext, useInfiniteQuery } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/api-client';
-import type { BucketFeedResponse, GetBucketFeedOptions } from '../types';
+import { api, ApiRequestError, type InferResponseType } from '@/lib/api-rpc';
 
 // Query key factory
 export const bucketKeys = {
 	all: ['bucket'] as const,
-	feed: (slug: Bucket) => [...bucketKeys.all, 'feed', slug] as const,
+	feed: (slug: string) => [...bucketKeys.all, 'feed', slug] as const,
 };
 
-// Fetcher function
-export async function getBucketFeed(slug: Bucket, options?: GetBucketFeedOptions): Promise<BucketFeedResponse> {
-	const params = new URLSearchParams();
-	if (options?.limit !== undefined) {
-		params.set('limit', String(options.limit));
-	}
-	if (options?.cursor) {
-		params.set('cursor', options.cursor);
+// Infer full response type from API, then extract success type
+type FullResponse = InferResponseType<(typeof api.api.bucket)[':slug']['$get']>;
+// Extract only the success type (has 'items' property, not 'error')
+type BucketFeedResponse = Extract<FullResponse, { items: unknown }>;
+export type { BucketFeedResponse };
+
+// Options for the fetcher
+interface GetBucketFeedOptions {
+	limit?: number;
+	cursor?: string;
+}
+
+// Fetcher function using Hono RPC
+export async function getBucketFeed(slug: string, options?: GetBucketFeedOptions): Promise<BucketFeedResponse> {
+	const res = await api.api.bucket[':slug'].$get({
+		param: { slug },
+		query: {
+			limit: options?.limit !== undefined ? String(options.limit) : undefined,
+			cursor: options?.cursor,
+		},
+	});
+
+	if (!res.ok) {
+		const errorBody = (await res.json()) as { error?: { code?: string; message?: string } };
+		throw new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
 	}
 
-	const queryString = params.toString();
-	const path = `/api/bucket/${slug}${queryString ? `?${queryString}` : ''}`;
-
-	return apiRequest<BucketFeedResponse>(path);
+	// Safe to cast - we checked res.ok so this is the success response
+	return res.json() as Promise<BucketFeedResponse>;
 }
 
 // React Query hook with infinite scroll support
-export function useBucketFeed(slug: Bucket, options?: { enabled?: boolean }) {
+export function useBucketFeed(slug: string, options?: { enabled?: boolean }) {
 	return useInfiniteQuery({
 		queryKey: bucketKeys.feed(slug),
 		queryFn: ({ pageParam }: QueryFunctionContext) => getBucketFeed(slug, { cursor: pageParam as string | undefined }),

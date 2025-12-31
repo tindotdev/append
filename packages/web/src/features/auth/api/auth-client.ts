@@ -1,5 +1,5 @@
 import { createAuthClient } from 'better-auth/react';
-import { API_URL } from '@/lib/api-client';
+import { API_URL } from '@/lib/api-rpc';
 
 export const authClient = createAuthClient({
 	baseURL: API_URL,

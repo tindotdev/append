@@ -80,6 +80,9 @@ importers:
       '@append/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@hono/valibot-validator':
+        specifier: ^0.6.1
+        version: 0.6.1(hono@4.11.3)(valibot@1.2.0(typescript@5.9.3))
       ai:
         specifier: ^6.0.3
         version: 6.0.5(zod@4.2.1)
@@ -129,6 +132,9 @@ importers:
 
   packages/web:
     dependencies:
+      '@append/api':
+        specifier: workspace:*
+        version: link:../api
       '@append/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -165,6 +171,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      hono:
+        specifier: ^4.11.1
+        version: 4.11.3
       lucide-react:
         specifier: ^0.562.0
         version: 0.562.0(react@19.2.3)
@@ -181,6 +190,9 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0(typescript@5.9.3)
     devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20251219.0
+        version: 4.20251230.0
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.1.18(vite@7.3.0(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
@@ -1298,6 +1310,12 @@ packages:
 
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
+
+  '@hono/valibot-validator@0.6.1':
+    resolution: {integrity: sha512-rqKhQJI8IVR8gRRNHHf2wGtIT7sKEqV1KoGL5f2SocNytl+tBNn4EtRu4zfk/D6axgWSswnaxeiuJhM5yNFrCg==}
+    peerDependencies:
+      hono: '>=3.9.0'
+      valibot: ^1.0.0 || ^1.0.0-beta.4 || ^1.0.0-rc
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -4935,6 +4953,11 @@ snapshots:
       react-dom: 19.2.3(react@19.2.3)
 
   '@floating-ui/utils@0.2.10': {}
+
+  '@hono/valibot-validator@0.6.1(hono@4.11.3)(valibot@1.2.0(typescript@5.9.3))':
+    dependencies:
+      hono: 4.11.3
+      valibot: 1.2.0(typescript@5.9.3)
 
   '@humanfs/core@0.19.1': {}
 

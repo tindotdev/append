@@ -1,13 +1,18 @@
-import type { Bucket } from '@append/contracts/types';
-import { API_URL, type ApiErrorResponse } from '@/lib/api-client';
+import { API_URL } from '@/lib/api-rpc';
 
 export type DownloadResult = { success: true; filename: string } | { success: false; error: string };
+
+interface ApiErrorResponse {
+	error?: { code?: string; message?: string };
+}
 
 /**
  * Download a bucket export as markdown.
  * Triggers a browser download as a side-effect.
+ *
+ * Note: Can't use Hono RPC for this as it returns a blob, not JSON.
  */
-export async function downloadBucketExport(bucket: Bucket): Promise<DownloadResult> {
+export async function downloadBucketExport(bucket: string): Promise<DownloadResult> {
 	const res = await fetch(`${API_URL}/api/export/${bucket}`, {
 		credentials: 'include',
 	});
