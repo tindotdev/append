@@ -3,7 +3,7 @@
 ## Current stage
 
 - Vertical slice steps 1–7 are complete and archived (see `docs/archive/vertical-slice.md`).
-- **Phase 5 (Custom Buckets + Hono RPC)**: Phases 5A–5D complete. Remaining: 5E (testing + docs).
+- **Phase 5 (Custom Buckets + Hono RPC)**: Complete. Follow-up tests are tracked in `docs/testing.md`.
 - **Milestone 4 (Import ENG-LOG)**: Complete. See `docs/qa-import-checklist.md` for QA results.
 - Next: Milestone 5 (Explain It Myself feedback loop).
 
@@ -47,7 +47,7 @@
 - **5B**: Bucket table schema + migration. ✅
 - **5C**: Bucket CRUD API (list, create, update, delete, reorder). ✅
 - **5D**: Bucket Manager UI (settings page, drag-drop reorder). ✅
-- **5E**: Testing + docs (user-bucket tests, documentation refresh). In progress.
+- **5E**: Documentation refresh ✅; user-bucket tests tracked in `docs/testing.md`.
 
 See ADRs: `0012-custom-user-buckets.md`, `0013-hono-rpc-type-sharing.md`, `0014-module-boundaries-platform-types.md`.
 
