@@ -4,64 +4,8 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { batch, candidate, idempotencyKey, schema, user } from '../src/db';
+import { generateTerms, generateUUID, getAuthCookie } from './helpers';
 import { applyMigrations } from './setup';
-
-// =============================================================================
-// Test utilities
-// =============================================================================
-
-/**
- * Sign up and sign in a test user, returning the session cookie.
- */
-async function getAuthCookie(email: string = 'test-a@example.com', password: string = 'test-password-123'): Promise<string> {
-	// Sign up (idempotent - ignore if already exists)
-	const signUpRes = await SELF.fetch('https://example.com/auth/sign-up/email', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ email, password, name: 'Test User' }),
-	});
-
-	// Only throw for non-"already exists" errors
-	if (!signUpRes.ok) {
-		const body = await signUpRes.text();
-		if (!body.includes('already exists') && !body.includes('USER_ALREADY_EXISTS')) {
-			throw new Error(`Sign-up failed: ${body}`);
-		}
-	}
-
-	// Sign in
-	const signInRes = await SELF.fetch('https://example.com/auth/sign-in/email', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ email, password }),
-	});
-
-	if (!signInRes.ok) {
-		const body = await signInRes.text();
-		throw new Error(`Sign-in failed: ${body}`);
-	}
-
-	const setCookie = signInRes.headers.get('set-cookie');
-	if (!setCookie) {
-		throw new Error('No set-cookie header from sign-in');
-	}
-
-	return setCookie;
-}
-
-/**
- * Generate N lines of test terms.
- */
-function generateTerms(count: number): string {
-	return Array.from({ length: count }, (_, i) => `term-${i + 1}`).join('\n');
-}
-
-/**
- * Generate a valid UUID v4.
- */
-function generateUUID(): string {
-	return crypto.randomUUID();
-}
 
 /**
  * Create a batch and return the batch ID and first candidate.
