@@ -1,8 +1,12 @@
 # UI Redesign Proposal: Linear-Style Single-Page Layout
 
-> Status: **Approved**
+> Status: **Implemented (Phase 1 Complete)**
 > Created: 2026-01-01
+> Implemented: 2026-01-01 (commits: a232f06, 6b708c4)
+> Archived: 2026-01-01
 > Author: Claude (via `/tasks:do`)
+>
+> **Note**: This proposal has been implemented. Phase 1 (sidebar layout) is complete. See ADR 0015 for the canonical decision record. This document is preserved for historical reference.
 
 ## Executive Summary
 

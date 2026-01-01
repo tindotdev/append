@@ -1,7 +1,10 @@
 # ADR 0005 — Web auth gating via protected layout route
 
-Status: Accepted
+Status: Superseded by ADR 0015
 Date: 2025-12-22
+Superseded: 2026-01-01
+
+> **Note**: The protected layout **concept** (auth gating via layout route) remains valid and is still in use. However, the physical implementation component (`ProtectedLayout.tsx`) has been replaced by `AppShell.tsx` with a Linear-style sidebar. See ADR 0015 for the new UI architecture.
 
 ## Context
 

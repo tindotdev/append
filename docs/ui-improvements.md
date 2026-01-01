@@ -75,7 +75,7 @@ packages/web/src/components/ui/
 
 | Component | Current | Improvement |
 |-----------|---------|-------------|
-| **Navigation Menu** | Custom NavLink | Consider Navigation Menu |
+| **Sidebar** | Linear-style sidebar (sidebar-07) | ✅ Implemented (ADR 0015) |
 | **Breadcrumb** | None | Add for deep navigation |
 | **Kbd** | None | Keyboard shortcut hints |
 | **Sonner** | None | Global toast provider |

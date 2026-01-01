@@ -14,7 +14,7 @@ Rules:
 - `0002-term-sense-duplicates.md` — Duplicate handling via `Term` + `TermSense` (allowed-but-flagged)
 - `0003-bucket-feed-primary-sense.md` — Bucket feed shows primary sense by default (expand for more; review mode)
 - `0004-spa-hono-workers.md` — SPA (React + TanStack Router) + Hono on Workers (no SSR)
-- `0005-web-auth-gating-protected-layout.md` — Web auth gating via protected layout route
+- `0005-web-auth-gating-protected-layout.md` — Web auth gating via protected layout route _(Superseded by 0015 for UI implementation)_
 - `0006-openai-gpt-5-mini-via-ai-gateway.md` — OpenAI `gpt-5-mini` via Cloudflare AI Gateway
 - `0007-step-3-suggestions-on-candidate-plus-cache.md` — Step 3 suggestions stored on `candidate` + per-term cache
 - `0008-accept-all-idempotency-via-candidate-materialization-pointers.md` — Accept-all idempotency via candidate materialization pointers
@@ -24,3 +24,4 @@ Rules:
 - `0012-custom-user-buckets.md` — User-owned dynamic buckets (replacing static hardcoded buckets)
 - `0013-hono-rpc-type-sharing.md` — Hono RPC replaces contracts package for API type sharing
 - `0014-module-boundaries-platform-types.md` — Module boundary: `lib` must not depend on `platform`
+- `0015-web-ui-linear-sidebar-layout.md` — Linear-style sidebar navigation replacing header nav (supersedes 0005 for UI)
