@@ -59,9 +59,12 @@
 		"simple-git-hooks": "^2.13.1"
 	},
 	"simple-git-hooks": {
-		"pre-commit": "pnpm nano-staged"
+		"pre-commit": "pnpm nano-staged && pnpm lint:boundaries"
 	},
 	"nano-staged": {
-		"*.{ts,tsx,js,jsx,json,jsonc,css}": "biome format --write --files-ignore-unknown=true"
+		"*.{ts,tsx,js,jsx,json,jsonc,css}": [
+			"biome check --write --files-ignore-unknown=true --no-errors-on-unmatched",
+			"biome format --write --files-ignore-unknown=true"
+		]
 	}
 }
