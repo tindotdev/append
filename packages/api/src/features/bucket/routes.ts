@@ -8,7 +8,7 @@ import { vValidator } from '@hono/valibot-validator';
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../../platform/env';
 import { apiError, apiErrorFrom, validationHook } from '../../shared/api-error';
-import { findUserBucketBySlug } from '../../shared/queries';
+import { requireUserBucketBySlug } from '../../shared/queries';
 import { getBucketFeed } from './usecases/getBucketFeed';
 import { GetBucketFeedParamsSchema } from './validation/getBucketFeed.schema';
 
@@ -34,11 +34,11 @@ export const bucketRoutes = app.get('/:slug', vValidator('query', GetBucketFeedP
 	const query = c.req.valid('query');
 
 	// Look up bucket by slug for this user
-	const userBucket = await findUserBucketBySlug(db, userId, slugParam);
-
-	if (!userBucket) {
+	const bucketResult = await requireUserBucketBySlug(db, userId, slugParam);
+	if (!bucketResult.ok) {
 		return apiError(c, 404, 'NOT_FOUND', `Bucket not found: ${slugParam}`);
 	}
+	const userBucket = bucketResult.value;
 
 	// Call usecase
 	const result = await getBucketFeed(db, userId, userBucket.slug, query);

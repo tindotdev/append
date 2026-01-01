@@ -6,6 +6,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { bucket, type schema } from '../../../db';
+import { requireBucketOwned } from '../../../shared/queries';
 import type { UpdateBucketInput } from '../validation/bucket.schema';
 
 export type UpdateBucketError = { type: 'not_found'; message: string } | { type: 'forbidden'; message: string };
@@ -19,19 +20,12 @@ export async function updateBucket(
 	input: UpdateBucketInput
 ): Promise<UpdateBucketResult> {
 	// Fetch bucket to verify ownership
-	const [existing] = await db.select({ id: bucket.id, userId: bucket.userId }).from(bucket).where(eq(bucket.id, bucketId)).limit(1);
-
-	if (!existing) {
+	const ownership = await requireBucketOwned(db, userId, bucketId);
+	if (!ownership.ok) {
+		const message = ownership.error === 'not_found' ? 'Bucket not found' : 'Access denied';
 		return {
 			success: false,
-			error: { type: 'not_found', message: 'Bucket not found' },
-		};
-	}
-
-	if (existing.userId !== userId) {
-		return {
-			success: false,
-			error: { type: 'forbidden', message: 'Access denied' },
+			error: { type: ownership.error, message },
 		};
 	}
 
