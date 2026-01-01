@@ -3,82 +3,8 @@ import { BUCKETS } from '@append/contracts/types';
 import { drizzle } from 'drizzle-orm/d1';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { schema, term, termSense, user } from '../src/db';
+import { generateUUID, getAuthCookieAndUserId } from './helpers';
 import { applyMigrations } from './setup';
-
-// =============================================================================
-// Test utilities
-// =============================================================================
-
-/**
- * Sign up and sign in a test user, returning the session cookie and user ID.
- * Uses test-a@example.com which is on the test allowlist.
- */
-async function getAuthCookieAndUserId(
-	email: string = 'test-a@example.com',
-	password: string = 'test-password-123'
-): Promise<{ cookie: string; userId: string }> {
-	// Sign up (idempotent - ignore if already exists)
-	const signUpRes = await SELF.fetch('https://example.com/auth/sign-up/email', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ email, password, name: 'Test User' }),
-	});
-
-	// Only throw for non-"already exists" errors
-	if (!signUpRes.ok) {
-		const body = await signUpRes.text();
-		if (!body.includes('already exists') && !body.includes('USER_ALREADY_EXISTS')) {
-			throw new Error(`Sign-up failed: ${body}`);
-		}
-	}
-
-	// Sign in
-	const signInRes = await SELF.fetch('https://example.com/auth/sign-in/email', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ email, password }),
-	});
-
-	if (!signInRes.ok) {
-		const body = await signInRes.text();
-		throw new Error(`Sign-in failed: ${body}`);
-	}
-
-	const setCookie = signInRes.headers.get('set-cookie');
-	if (!setCookie) {
-		throw new Error('No set-cookie header from sign-in');
-	}
-
-	// Get session to retrieve user ID
-	const sessionRes = await SELF.fetch('https://example.com/auth/get-session', {
-		headers: { cookie: setCookie },
-	});
-
-	if (!sessionRes.ok) {
-		throw new Error('Failed to get session');
-	}
-
-	const session = (await sessionRes.json()) as { user: { id: string } };
-
-	return { cookie: setCookie, userId: session.user.id };
-}
-
-/**
- * Generate a valid UUID v4.
- */
-function generateUUID(): string {
-	return crypto.randomUUID();
-}
-
-/**
- * Encode a cursor payload to base64url (no padding).
- */
-function _encodeCursor(payload: { createdAt: number; termId: string }): string {
-	const json = JSON.stringify(payload);
-	const bytes = new TextEncoder().encode(json);
-	const base64 = btoa(String.fromCharCode(...bytes));
-	return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
 
 // =============================================================================
 // Setup

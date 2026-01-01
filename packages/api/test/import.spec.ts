@@ -4,44 +4,8 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { idempotencyKey, schema, term, termSense } from '../src/db';
 import { parseMarkdown } from '../src/features/import/parser/parseMarkdown';
 import { suggestBucketSlug } from '../src/features/import/parser/suggestBucket';
+import { getAuthCookie } from './helpers';
 import { applyMigrations } from './setup';
-
-// =============================================================================
-// Test utilities
-// =============================================================================
-
-async function getAuthCookie(email = 'test-a@example.com', password = 'test-password-123'): Promise<string> {
-	const signUpRes = await SELF.fetch('https://example.com/auth/sign-up/email', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ email, password, name: 'Test User' }),
-	});
-
-	if (!signUpRes.ok) {
-		const body = await signUpRes.text();
-		if (!body.includes('already exists') && !body.includes('USER_ALREADY_EXISTS')) {
-			throw new Error(`Sign-up failed: ${body}`);
-		}
-	}
-
-	const signInRes = await SELF.fetch('https://example.com/auth/sign-in/email', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ email, password }),
-	});
-
-	if (!signInRes.ok) {
-		const body = await signInRes.text();
-		throw new Error(`Sign-in failed: ${body}`);
-	}
-
-	const setCookie = signInRes.headers.get('set-cookie');
-	if (!setCookie) {
-		throw new Error('No set-cookie header from sign-in');
-	}
-
-	return setCookie;
-}
 
 function createMarkdownFile(content: string, filename: string): File {
 	return new File([content], filename, { type: 'text/markdown' });
