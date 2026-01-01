@@ -6,19 +6,9 @@
 
 import { and, asc, eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import {
-	type BatchStatus,
-	batch,
-	candidate,
-	idempotencyKey,
-	normalize,
-	type schema,
-	type TermSenseSource,
-	term,
-	termSense,
-} from '../../../db';
+import { type BatchStatus, batch, candidate, normalize, type schema, type TermSenseSource, term, termSense } from '../../../db';
 import { sha256Hex } from '../../../shared/crypto';
-import { checkIdempotencyKey } from '../../../shared/idempotency/keys';
+import { checkIdempotencyKey, createIdempotencyKeyStatement, findIdempotencyKey } from '../../../shared/idempotency/keys';
 import { decodeJsonResultRef, encodeJsonResultRef } from '../../../shared/idempotency/result-ref';
 import { requireBatchOwned } from '../../../shared/queries';
 import type { AcceptAllInput, AcceptSummary } from '../validation/acceptAll.schema';
@@ -99,9 +89,7 @@ export async function acceptAll(
 
 	if (idempotencyCheck.status === 'conflict') {
 		// Try to extract original batch ID from stored result
-		const existingKey = await db.query.idempotencyKey.findFirst({
-			where: and(eq(idempotencyKey.userId, userId), eq(idempotencyKey.scope, ACCEPT_ALL_SCOPE), eq(idempotencyKey.key, clientRequestId)),
-		});
+		const existingKey = await findIdempotencyKey(db, userId, ACCEPT_ALL_SCOPE, clientRequestId);
 
 		let originalBatchId = 'unknown';
 		if (existingKey) {
@@ -343,17 +331,9 @@ export async function acceptAll(
 
 	// Insert idempotency key
 	const resultRef = encodeJsonResultRef('accept_summary', summary);
-	const idempStmt = db
-		.insert(idempotencyKey)
-		.values({
-			userId,
-			scope: ACCEPT_ALL_SCOPE,
-			key: clientRequestId,
-			requestHash,
-			resultRef,
-			createdAt: now,
-		})
-		.toSQL();
+	const idempStmt = createIdempotencyKeyStatement(db, userId, ACCEPT_ALL_SCOPE, clientRequestId, requestHash, resultRef, {
+		createdAt: now,
+	}).toSQL();
 
 	statements.push(rawDb.prepare(idempStmt.sql).bind(...idempStmt.params));
 
@@ -364,9 +344,7 @@ export async function acceptAll(
 		// Handle race condition on idempotency key
 		if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
 			// Re-check idempotency key
-			const racedKey = await db.query.idempotencyKey.findFirst({
-				where: and(eq(idempotencyKey.userId, userId), eq(idempotencyKey.scope, ACCEPT_ALL_SCOPE), eq(idempotencyKey.key, clientRequestId)),
-			});
+			const racedKey = await findIdempotencyKey(db, userId, ACCEPT_ALL_SCOPE, clientRequestId);
 
 			if (racedKey) {
 				if (racedKey.requestHash === requestHash) {

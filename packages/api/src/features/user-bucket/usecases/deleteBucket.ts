@@ -6,6 +6,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { bucket, type schema, term, termSense } from '../../../db';
+import { requireBucketOwned } from '../../../shared/queries';
 
 export type DeleteBucketError =
 	| { type: 'not_found'; message: string }
@@ -16,19 +17,12 @@ export type DeleteBucketResult = { success: true } | { success: false; error: De
 
 export async function deleteBucket(db: DrizzleD1Database<typeof schema>, userId: string, bucketId: string): Promise<DeleteBucketResult> {
 	// Fetch bucket to verify ownership
-	const [existing] = await db.select({ id: bucket.id, userId: bucket.userId }).from(bucket).where(eq(bucket.id, bucketId)).limit(1);
-
-	if (!existing) {
+	const ownership = await requireBucketOwned(db, userId, bucketId);
+	if (!ownership.ok) {
+		const message = ownership.error === 'not_found' ? 'Bucket not found' : 'Access denied';
 		return {
 			success: false,
-			error: { type: 'not_found', message: 'Bucket not found' },
-		};
-	}
-
-	if (existing.userId !== userId) {
-		return {
-			success: false,
-			error: { type: 'forbidden', message: 'Access denied' },
+			error: { type: ownership.error, message },
 		};
 	}
 

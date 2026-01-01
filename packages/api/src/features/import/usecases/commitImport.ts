@@ -6,9 +6,9 @@
 
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { bucket as bucketTable, idempotencyKey, normalize, type schema, type TermSenseSource, term, termSense } from '../../../db';
+import { bucket as bucketTable, normalize, type schema, type TermSenseSource, term, termSense } from '../../../db';
 import { sha256Hex } from '../../../shared/crypto';
-import { checkIdempotencyKey } from '../../../shared/idempotency/keys';
+import { checkIdempotencyKey, createIdempotencyKeyStatement, findIdempotencyKey } from '../../../shared/idempotency/keys';
 import { decodeJsonResultRef, encodeJsonResultRef } from '../../../shared/idempotency/result-ref';
 import { parseMarkdown } from '../parser/parseMarkdown';
 import type { CommitImportInput, CommitImportResponse } from '../validation/import.schema';
@@ -303,17 +303,9 @@ export async function commitImport(
 
 	// Insert idempotency key
 	const resultRef = encodeJsonResultRef('import_summary', result);
-	const idempStmt = db
-		.insert(idempotencyKey)
-		.values({
-			userId,
-			scope: IMPORT_COMMIT_SCOPE,
-			key: clientRequestId,
-			requestHash,
-			resultRef,
-			createdAt: now,
-		})
-		.toSQL();
+	const idempStmt = createIdempotencyKeyStatement(db, userId, IMPORT_COMMIT_SCOPE, clientRequestId, requestHash, resultRef, {
+		createdAt: now,
+	}).toSQL();
 
 	statements.push(rawDb.prepare(idempStmt.sql).bind(...idempStmt.params));
 
@@ -323,9 +315,7 @@ export async function commitImport(
 	} catch (error) {
 		// Handle race condition on idempotency key
 		if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
-			const racedKey = await db.query.idempotencyKey.findFirst({
-				where: and(eq(idempotencyKey.userId, userId), eq(idempotencyKey.scope, IMPORT_COMMIT_SCOPE), eq(idempotencyKey.key, clientRequestId)),
-			});
+			const racedKey = await findIdempotencyKey(db, userId, IMPORT_COMMIT_SCOPE, clientRequestId);
 
 			if (racedKey) {
 				if (racedKey.requestHash === requestHash) {

@@ -90,7 +90,8 @@ export function createIdempotencyKeyStatement(
 	scope: IdempotencyScope,
 	key: string,
 	requestHash: string,
-	resultRef: string
+	resultRef: string,
+	options?: { createdAt?: Date; expiresAt?: Date | null }
 ) {
 	return db.insert(idempotencyKey).values({
 		userId,
@@ -98,5 +99,7 @@ export function createIdempotencyKeyStatement(
 		key,
 		requestHash,
 		resultRef,
+		...(options?.createdAt ? { createdAt: options.createdAt } : {}),
+		...(options?.expiresAt !== undefined ? { expiresAt: options.expiresAt } : {}),
 	});
 }

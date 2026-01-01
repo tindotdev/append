@@ -6,7 +6,8 @@
 
 import { asc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { type BatchStatus, batch, candidate, type SuggestionStatus, type schema } from '../../../db';
+import { type BatchStatus, candidate, type SuggestionStatus, type schema } from '../../../db';
+import { requireBatchOwned } from '../../../shared/queries';
 
 /**
  * Candidate detail for get batch response.
@@ -61,20 +62,12 @@ export async function getBatch(
 	userId: string,
 	batchId: string
 ): Promise<{ success: true; result: BatchDetail } | { success: false; error: GetBatchError }> {
-	// Lookup batch by id
-	const batchRow = await db.query.batch.findFirst({
-		where: eq(batch.id, batchId),
-	});
-
-	// 404 if missing
-	if (!batchRow) {
-		return { success: false, error: { type: 'not_found' } };
+	// Verify batch exists and user owns it
+	const batchOwnership = await requireBatchOwned(db, userId, batchId);
+	if (!batchOwnership.ok) {
+		return { success: false, error: { type: batchOwnership.error } };
 	}
-
-	// 403 if not owner
-	if (batchRow.userId !== userId) {
-		return { success: false, error: { type: 'forbidden' } };
-	}
+	const batchRow = batchOwnership.value;
 
 	// Get candidates ordered by position
 	const candidates = await db

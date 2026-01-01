@@ -4,11 +4,11 @@
  * Creates a batch with candidate rows for each term, with idempotency handling.
  */
 
-import { and, count, eq } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { type BatchStatus, batch, candidate, idempotencyKey, normalize, type schema } from '../../../db';
+import { type BatchStatus, batch, candidate, normalize, type schema } from '../../../db';
 import { generateUUID, sha256Hex } from '../../../shared/crypto';
-import { checkIdempotencyKey } from '../../../shared/idempotency/keys';
+import { checkIdempotencyKey, createIdempotencyKeyStatement, findIdempotencyKey } from '../../../shared/idempotency/keys';
 import { formatResultRef, parseResultRef } from '../../../shared/idempotency/result-ref';
 import type { CaptureTermsInput } from '../validation/captureTerms.schema';
 
@@ -117,17 +117,15 @@ export async function captureTerms(
 				.toSQL();
 		});
 
-		const idempotencyStatement = db
-			.insert(idempotencyKey)
-			.values({
-				userId,
-				scope: IDEMPOTENCY_SCOPE,
-				key: clientRequestId,
-				requestHash,
-				resultRef: formatResultRef('batch', batchId),
-				createdAt: now,
-			})
-			.toSQL();
+		const idempotencyStatement = createIdempotencyKeyStatement(
+			db,
+			userId,
+			IDEMPOTENCY_SCOPE,
+			clientRequestId,
+			requestHash,
+			formatResultRef('batch', batchId),
+			{ createdAt: now }
+		).toSQL();
 
 		// Execute all statements in a D1 batch (atomic)
 		const statements = [
@@ -149,9 +147,7 @@ export async function captureTerms(
 	} catch (error) {
 		// Handle race condition: if idempotency key insert fails due to PK conflict
 		if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
-			const racedKey = await db.query.idempotencyKey.findFirst({
-				where: and(eq(idempotencyKey.userId, userId), eq(idempotencyKey.scope, IDEMPOTENCY_SCOPE), eq(idempotencyKey.key, clientRequestId)),
-			});
+			const racedKey = await findIdempotencyKey(db, userId, IDEMPOTENCY_SCOPE, clientRequestId);
 
 			if (racedKey) {
 				if (racedKey.requestHash !== requestHash) {
