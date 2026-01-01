@@ -1,6 +1,6 @@
 import { type AnyRoute, createRoute, redirect } from '@tanstack/react-router';
 
-import { ProtectedLayout } from '@/components/layouts/ProtectedLayout';
+import { AppShell } from '@/components/layouts/AppShell';
 import { BatchDetailPage, BatchListPage, BatchNewPage, SearchPage } from '@/features/batch';
 import { BucketFeedPage } from '@/features/bucket';
 import { ExportPage } from '@/features/export';
@@ -16,7 +16,7 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 				throw redirect({ to: '/sign-in' });
 			}
 		},
-		component: ProtectedLayout,
+		component: AppShell,
 	});
 
 	const indexRoute = createRoute({
