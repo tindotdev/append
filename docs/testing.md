@@ -1,6 +1,6 @@
 # Append — Testing Strategy
 
-**Last updated**: 2025-12-23
+**Last updated**: 2026-01-01
 
 Ensure new functionality doesn't break existing foundations as the project evolves.
 
@@ -37,7 +37,6 @@ POST /api/batch
 ├── 400 missing clientRequestId
 ├── 400 invalid UUID format
 ├── 400 empty terms
-├── 400 < 20 terms
 ├── 400 > 200 terms
 ├── 400 term > 200 chars
 ├── 413 payload > 64 KiB
@@ -96,7 +95,7 @@ Root-level test scripts in `package.json`:
 
 ## Phase 2: Test Pattern Standardization
 
-**Status**: Pending
+**Status**: ✅ Complete (helpers extracted + tests refactored)
 
 ### Goal
 
@@ -107,7 +106,7 @@ Consistent test structure across all routes.
 ```
 packages/api/test/
 ├── setup.ts            # Shared: migrations, DB init
-├── helpers.ts          # Shared: auth, generators, assertions (NEW)
+├── helpers.ts          # Shared: auth, generators, assertions
 ├── index.spec.ts       # Health check
 ├── batch.spec.ts       # POST/GET /api/batch (Step 2)
 ├── candidate.spec.ts   # Candidate CRUD
@@ -116,12 +115,10 @@ packages/api/test/
 ├── export.spec.ts      # Markdown export
 ├── user-bucket.spec.ts # Bucket CRUD (Phase 5) — planned
 ├── terms.spec.ts       # Term CRUD (Milestone 1) — planned
-└── import.spec.ts      # Markdown import (Milestone 4) — planned
+└── import.spec.ts      # Markdown import (Milestone 4)
 ```
 
 ### Shared Test Helpers (`helpers.ts`)
-
-Extract from existing tests:
 
 ```typescript
 // packages/api/test/helpers.ts
@@ -383,9 +380,9 @@ Manual testing is sufficient until the app stabilizes.
 
 ### Phase 2: Standardization
 
-- [ ] Extract helpers to `packages/api/test/helpers.ts`
-- [ ] Update existing tests to use shared helpers
-- [ ] Document test patterns in this file
+- [x] Extract helpers to `packages/api/test/helpers.ts`
+- [x] Update existing tests to use shared helpers
+- [x] Document test patterns in this file
 
 ### Phase 3: Milestone Tests (Per Milestone)
 

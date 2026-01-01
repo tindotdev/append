@@ -1,5 +1,12 @@
 # Append — First vertical slice (runnable path)
 
+> Archived snapshot (historical). Some constraints/structures described below are **superseded** in the current app:
+>
+> - Batch capture minimum is now **1** term (not 20).
+> - Buckets are **user-owned and editable** (up to 20), not a fixed enum.
+>
+> For current behavior and locked decisions, see `docs/design.md` and `docs/build-plan.md`.
+
 ## Goal
 
 Ship a usable "off-load the brain" flow end-to-end, with canonical storage inside `append`.

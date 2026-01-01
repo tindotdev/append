@@ -1,8 +1,11 @@
-# Implementation Roadmap
+# Implementation Roadmap (archived)
+
+> Archived on 2026-01-01 after Phase 6 completion. Current planning now lives in `docs/build-plan.md` and `docs/testing.md`.
 
 **Created**: 2025-12-29
+**Last reviewed**: 2026-01-01
 **Based on**: User feedback (9 issues) + documentation audit
-**Production Version**: v0.3.1
+**Production Version**: v0.9.0
 
 ---
 
@@ -14,11 +17,11 @@ Phase 2: Quick UX Wins          [██████████] 100% COMPLETE
 Phase 3: Add shadcn/ui          [██████████] 100% COMPLETE
 Phase 3.5: Rate Limit Research  [██████████] 100% COMPLETE
 Phase 4: Parallel Suggestions   [██████████] 100% COMPLETE
-Phase 5: Custom Buckets         [░░░░░░░░░░]   0% Pending
-Phase 6: Documentation          [░░░░░░░░░░]   0% Pending
+Phase 5: Custom Buckets         [██████████] 100% COMPLETE
+Phase 6: Documentation          [██████████] 100% COMPLETE
 ```
 
-**We are currently at**: Ready for Phase 5 — implementing custom buckets (limit 20)
+**We are currently at**: Milestone 5 — “Explain it myself” feedback loop (see `docs/build-plan.md`)
 
 ---
 
@@ -32,7 +35,7 @@ Phase 6: Documentation          [░░░░░░░░░░]   0% Pending
 | 4   | Dropdown doesn't close on click away | Low      | **FIXED** (shadcn DropdownMenu)          |
 | 5   | Accepted terms should vanish         | Medium   | **FIXED** (collapsed in details section) |
 | 6   | No items in bucket page              | Critical | **FIXED** (Accept All button added)      |
-| 7   | Want custom buckets (not fixed 5)    | High     | Pending (Phase 5)                        |
+| 7   | Want custom buckets (not fixed 5)    | High     | **FIXED** (user-owned buckets, limit 20) |
 | 8   | Export shows empty list              | Critical | **FIXED** (same root cause as #6)        |
 | 9   | UI should fit in single page         | High     | **DEFERRED**                             |
 
@@ -139,26 +142,26 @@ Phase 6: Documentation          [░░░░░░░░░░]   0% Pending
 
 ---
 
-## Phase 5: Custom Buckets (Limit 20) ⏳ Pending
+## Phase 5: Custom Buckets (Limit 20) ✅ COMPLETE
 
-| Task                      | File(s)                                  | Description                                |
-| ------------------------- | ---------------------------------------- | ------------------------------------------ |
-| 5.1 Schema: bucket table  | `packages/api/src/db/domain.schema.ts`   | `(user_id, slug, name, color?, order)`     |
-| 5.2 Migration             | `drizzle/migrations/`                    | Create table, seed defaults per user       |
-| 5.3 API endpoints         | New `packages/api/src/features/buckets/` | CRUD for buckets                           |
-| 5.4 Update contracts      | `packages/contracts/src/types/index.ts`  | Dynamic bucket type                        |
-| 5.5 UI: bucket manager    | New component in web                     | Create/rename/delete/reorder               |
-| 5.6 Migrate existing data | Migration script                         | Ensure existing terms link to user buckets |
+| Task                      | Status | File(s)                                             | Description                                      |
+| ------------------------- | ------ | --------------------------------------------------- | ------------------------------------------------ |
+| 5.1 Schema: bucket table  | ✅ Done | `packages/api/src/db/domain.schema.ts`              | User-owned buckets (slug, name, description, …)  |
+| 5.2 Migration             | ✅ Done | `packages/api/drizzle/0003_custom_buckets.sql`      | Create table + seed defaults per user            |
+| 5.3 API endpoints         | ✅ Done | `packages/api/src/features/user-bucket/`            | CRUD + reorder for buckets (limit 20)            |
+| 5.4 Type sharing          | ✅ Done | `packages/web/src/lib/api-rpc.ts`, `packages/web/src/lib/user-buckets.ts` | Hono RPC + inferred response types               |
+| 5.5 UI: bucket manager    | ✅ Done | `packages/web/src/features/settings/`               | Create/rename/delete/reorder                     |
+| 5.6 Migrate existing data | ✅ Done | `packages/api/drizzle/0003_custom_buckets.sql`      | Backfill `*_bucket_id` from slugs for existing rows |
 
 ---
 
-## Phase 6: Documentation ⏳ Pending
+## Phase 6: Documentation ✅ COMPLETE
 
-| Task                          | File(s)                                 | Description                      |
-| ----------------------------- | --------------------------------------- | -------------------------------- |
-| 6.1 Extract test helpers      | `packages/api/src/__tests__/helpers.ts` | Complete Phase 2 from testing.md |
-| 6.2 Enhance vertical-slice.md | `docs/vertical-slice.md`                | Add summary from archive         |
-| 6.3 Update classification     | `docs/README.md`                        | Mark as production-level         |
+| Task                                | Status | File(s)                            | Description                                  |
+| ----------------------------------- | ------ | ---------------------------------- | -------------------------------------------- |
+| 6.1 Refresh capture-terms docs/tests | ✅ Done | `docs/testing.md`                  | Align docs with `MIN_TERMS=1`                |
+| 6.2 Enhance vertical-slice docs      | ✅ Done | `docs/vertical-slice.md`, `docs/archive/vertical-slice.md` | Add summary + archived snapshot caveats      |
+| 6.3 Extract shared API test helpers  | ✅ Done | `packages/api/test/helpers.ts`     | Standardize shared test helpers (testing.md) |
 
 ---
 
@@ -179,9 +182,9 @@ Phase 6: Documentation          [░░░░░░░░░░]   0% Pending
 | AGENTS.md              | ✅ Up-to-date                            |
 | docs/design.md         | ✅ Up-to-date                            |
 | docs/runbook.md        | ✅ Up-to-date                            |
-| docs/testing.md        | ⚠️ Minor drift (Phase 2 helpers pending) |
+| docs/testing.md        | ✅ Up-to-date                            |
 | docs/build-plan.md     | ✅ Up-to-date                            |
-| docs/vertical-slice.md | ⚠️ Stub only                             |
+| docs/vertical-slice.md | ✅ Up-to-date                            |
 
 ---
 
