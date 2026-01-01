@@ -1,9 +1,6 @@
 import { Outlet, useNavigate } from '@tanstack/react-router';
 import { FolderOpen, Plus, Search, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
-
-import { useAuth } from '@/features/auth';
-import { useUserBuckets } from '@/features/settings';
 import { AppSidebar } from '@/components/app-sidebar';
 import {
 	CommandDialog,
@@ -16,6 +13,8 @@ import {
 } from '@/components/ui/command';
 import { Kbd } from '@/components/ui/kbd';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { useAuth } from '@/features/auth';
+import { useUserBuckets } from '@/features/settings';
 
 export function AppShell() {
 	const { data: session, isPending } = useAuth();
