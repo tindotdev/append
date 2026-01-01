@@ -1,8 +1,5 @@
 import { Link, useLocation } from '@tanstack/react-router';
 import { Archive, FileDown, FileUp, FolderOpen, LogOut, Plus, Search, Settings } from 'lucide-react';
-
-import { signOut, useAuth } from '@/features/auth';
-import { useUserBuckets } from '@/features/settings';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
 	DropdownMenu,
@@ -25,6 +22,8 @@ import {
 	SidebarSeparator,
 	useSidebar,
 } from '@/components/ui/sidebar';
+import { signOut, useAuth } from '@/features/auth';
+import { useUserBuckets } from '@/features/settings';
 
 const NAV_ITEMS = [
 	{ to: '/batch/new', label: 'Capture', icon: Plus, shortcut: 'C' },
