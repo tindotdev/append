@@ -20,6 +20,10 @@ import { updateBucket } from './usecases/updateBucket';
 import { CreateBucketSchema, ReorderBucketsSchema, UpdateBucketSchema } from './validation/bucket.schema';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+const bucketAccessErrors = {
+	not_found: { status: 404, code: 'NOT_FOUND', message: (error: { message: string }) => error.message },
+	forbidden: { status: 403, code: 'FORBIDDEN', message: (error: { message: string }) => error.message },
+} as const;
 
 /**
  * User bucket routes - chained for Hono RPC type inference.
@@ -82,8 +86,7 @@ export const userBucketRoutes = app
 
 		if (!result.success) {
 			return apiErrorFrom(c, result.error, {
-				not_found: { status: 404, code: 'NOT_FOUND', message: (error) => error.message },
-				forbidden: { status: 403, code: 'FORBIDDEN', message: (error) => error.message },
+				...bucketAccessErrors,
 			});
 		}
 
@@ -100,8 +103,7 @@ export const userBucketRoutes = app
 
 		if (!result.success) {
 			return apiErrorFrom(c, result.error, {
-				not_found: { status: 404, code: 'NOT_FOUND', message: (error) => error.message },
-				forbidden: { status: 403, code: 'FORBIDDEN', message: (error) => error.message },
+				...bucketAccessErrors,
 				has_senses: {
 					status: 409,
 					code: 'VERSION_CONFLICT',

@@ -8,6 +8,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { bucket, type schema } from '../../../db';
 import { requireBucketOwned } from '../../../shared/queries';
 import type { UpdateBucketInput } from '../validation/bucket.schema';
+import { bucketOwnershipError } from './ownership';
 
 export type UpdateBucketError = { type: 'not_found'; message: string } | { type: 'forbidden'; message: string };
 
@@ -22,10 +23,9 @@ export async function updateBucket(
 	// Fetch bucket to verify ownership
 	const ownership = await requireBucketOwned(db, userId, bucketId);
 	if (!ownership.ok) {
-		const message = ownership.error === 'not_found' ? 'Bucket not found' : 'Access denied';
 		return {
 			success: false,
-			error: { type: ownership.error, message },
+			error: bucketOwnershipError(ownership.error),
 		};
 	}
 

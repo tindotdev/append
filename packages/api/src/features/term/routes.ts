@@ -14,6 +14,10 @@ import { updateTerm } from './usecases/updateTerm';
 import { UpdateTermSchema } from './validation/updateTerm.schema';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+const termAccessErrors = {
+	not_found: { status: 404, code: 'NOT_FOUND', message: 'Term not found' },
+	forbidden: { status: 403, code: 'FORBIDDEN', message: 'Access denied' },
+} as const;
 
 /**
  * GET /api/term/:id - Get term with all senses
@@ -28,10 +32,7 @@ app.get('/:id', async (c) => {
 
 	const result = await getTerm(db, userId, termId);
 	if (!result.success) {
-		return apiErrorFrom(c, result.error, {
-			not_found: { status: 404, code: 'NOT_FOUND', message: 'Term not found' },
-			forbidden: { status: 403, code: 'FORBIDDEN', message: 'Access denied' },
-		});
+		return apiErrorFrom(c, result.error, termAccessErrors);
 	}
 
 	return c.json(result.result);
@@ -57,8 +58,7 @@ app.patch('/:id', vValidator('json', UpdateTermSchema, validationHook), async (c
 	const result = await updateTerm(db, userId, termId, body);
 	if (!result.success) {
 		return apiErrorFrom(c, result.error, {
-			not_found: { status: 404, code: 'NOT_FOUND', message: 'Term not found' },
-			forbidden: { status: 403, code: 'FORBIDDEN', message: 'Access denied' },
+			...termAccessErrors,
 			version_conflict: {
 				status: 409,
 				code: 'VERSION_CONFLICT',

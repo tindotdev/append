@@ -64,6 +64,42 @@ interface FileInfo {
 	entriesCount: number;
 }
 
+function buildBucketMappingMap(bucketMappings: CommitImportInput['bucketMappings']): Map<string, string> {
+	const bucketMappingMap = new Map<string, string>();
+	for (const mapping of bucketMappings) {
+		bucketMappingMap.set(mapping.r2Key, mapping.bucketId);
+	}
+	return bucketMappingMap;
+}
+
+async function loadBucketSlugMap(
+	db: DrizzleD1Database<typeof schema>,
+	userId: string,
+	bucketIds: string[]
+): Promise<
+	| { ok: true; existingBuckets: { id: string; slug: string }[]; bucketIdToSlug: Map<string, string> }
+	| { ok: false; error: CommitImportError }
+> {
+	const existingBuckets = await db
+		.select({ id: bucketTable.id, slug: bucketTable.slug })
+		.from(bucketTable)
+		.where(and(eq(bucketTable.userId, userId), inArray(bucketTable.id, bucketIds)));
+
+	const existingBucketIds = new Set(existingBuckets.map((b) => b.id));
+	for (const bucketId of bucketIds) {
+		if (!existingBucketIds.has(bucketId)) {
+			return { ok: false, error: { type: 'not_found', message: `Bucket not found: ${bucketId}` } };
+		}
+	}
+
+	const bucketIdToSlug = new Map<string, string>();
+	for (const b of existingBuckets) {
+		bucketIdToSlug.set(b.id, b.slug);
+	}
+
+	return { ok: true, existingBuckets, bucketIdToSlug };
+}
+
 /**
  * Commit an import by creating terms and senses.
  *
@@ -94,10 +130,7 @@ export async function commitImport(
 	}
 
 	// Build bucket mapping lookup: r2Key → bucketId
-	const bucketMappingMap = new Map<string, string>();
-	for (const mapping of bucketMappings) {
-		bucketMappingMap.set(mapping.r2Key, mapping.bucketId);
-	}
+	const bucketMappingMap = buildBucketMappingMap(bucketMappings);
 
 	// Check idempotency key
 	const requestHash = await sha256Hex(`import:${importId}`);
@@ -121,28 +154,11 @@ export async function commitImport(
 
 	// Verify all bucket IDs exist
 	const uniqueBucketIds = [...new Set(allEntries.map((e) => e.bucketId))];
-	const existingBuckets = await db
-		.select({ id: bucketTable.id, slug: bucketTable.slug })
-		.from(bucketTable)
-		.where(and(eq(bucketTable.userId, userId), inArray(bucketTable.id, uniqueBucketIds)));
-
-	const existingBucketIds = new Set(existingBuckets.map((b) => b.id));
-
-	// Check for missing buckets
-	for (const bucketId of uniqueBucketIds) {
-		if (!existingBucketIds.has(bucketId)) {
-			return {
-				success: false,
-				error: { type: 'not_found', message: `Bucket not found: ${bucketId}` },
-			};
-		}
+	const bucketLookup = await loadBucketSlugMap(db, userId, uniqueBucketIds);
+	if (!bucketLookup.ok) {
+		return { success: false, error: bucketLookup.error };
 	}
-
-	// Build bucket ID → slug mapping for termSense.bucket field
-	const bucketIdToSlug = new Map<string, string>();
-	for (const b of existingBuckets) {
-		bucketIdToSlug.set(b.id, b.slug);
-	}
+	const { bucketIdToSlug } = bucketLookup;
 
 	// Get unique canonicals
 	const uniqueCanonicals = [...new Set(allEntries.map((e) => normalize(e.term)))];
