@@ -8,6 +8,7 @@
 		"dev:api": "pnpm --filter @append/api run dev",
 		"dev:web": "pnpm --filter @append/web run dev",
 		"build": "pnpm -r --if-present build",
+		"docs:policy": "node scripts/check-docs-policy.mjs",
 		"typecheck": "pnpm -r --if-present typecheck",
 		"lint": "biome lint --write .",
 		"format": "biome format --write .",
@@ -59,7 +60,7 @@
 		"simple-git-hooks": "^2.13.1"
 	},
 	"simple-git-hooks": {
-		"pre-commit": "pnpm nano-staged && pnpm lint:boundaries"
+		"pre-commit": "pnpm nano-staged && pnpm lint:boundaries && pnpm docs:policy"
 	},
 	"nano-staged": {
 		"*.{ts,tsx,js,jsx,json,jsonc,css}": [

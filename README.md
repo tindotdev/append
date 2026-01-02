@@ -31,13 +31,13 @@ See `docs/runbook.md` for detailed auth setup.
 
 ## Status
 
-Planning docs live in `docs/`:
+Canonical docs live in `docs/`:
 
 - `docs/design.md`
-- `docs/build-plan.md`
-- `docs/vertical-slice.md`
-- `docs/risk-register.md`
 - `docs/adr/README.md`
+
+Supporting docs:
+- `docs/runbook.md`
 
 ## Usecases
 
@@ -68,7 +68,7 @@ Planning docs live in `docs/`:
 
 ## Reference
 
-- eng-log: /mnt/68ce8b89-5b49-4f3f-857c-8c9edca5b28e/code/github/eng-log/README.md
+- eng-log (legacy format contract): https://github.com/tindotdev/eng-log
 
 ## Case3: Open in ChatGpt or Claude
 
