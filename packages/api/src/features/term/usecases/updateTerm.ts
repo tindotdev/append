@@ -5,6 +5,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type schema, term } from '../../../db';
+import { resolveOptimisticConflict } from '../../../shared/optimistic';
 import type { UpdateTermInput } from '../validation/updateTerm.schema';
 
 /**
@@ -66,18 +67,21 @@ export async function updateTerm(
 
 	// 4. Handle conflict or success
 	if (updateResult.length === 0) {
-		// Re-SELECT to get current version
-		const currentTerm = await db.query.term.findFirst({
-			where: eq(term.id, termId),
-		});
+		const conflict = await resolveOptimisticConflict(
+			() =>
+				db.query.term.findFirst({
+					where: eq(term.id, termId),
+				}),
+			(currentTerm) => currentTerm.version
+		);
 
-		if (!currentTerm) {
+		if (conflict.status === 'not_found') {
 			// Term was deleted between check and update
 			return { success: false, error: { type: 'not_found' } };
 		}
 
 		// Version conflict
-		return { success: false, error: { type: 'version_conflict', currentVersion: currentTerm.version } };
+		return { success: false, error: { type: 'version_conflict', currentVersion: conflict.currentVersion } };
 	}
 
 	// Success - return updated term
