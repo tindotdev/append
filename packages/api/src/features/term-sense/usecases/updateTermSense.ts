@@ -4,7 +4,9 @@
 
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { bucket, type schema, term, termSense } from '../../../db';
+import { type schema, term, termSense } from '../../../db';
+import { resolveOptimisticConflict } from '../../../shared/optimistic';
+import { findUserBucketBySlug } from '../../../shared/queries';
 import type { UpdateTermSenseInput } from '../validation/updateTermSense.schema';
 
 /**
@@ -66,11 +68,7 @@ export async function updateTermSense(
 
 	// 3. Validate bucket exists for user (if provided)
 	if (bucketSlug) {
-		const bucketRow = await db.query.bucket.findFirst({
-			where: and(eq(bucket.userId, userId), eq(bucket.slug, bucketSlug)),
-			columns: { id: true },
-		});
-
+		const bucketRow = await findUserBucketBySlug(db, userId, bucketSlug);
 		if (!bucketRow) {
 			return { success: false, error: { type: 'invalid_bucket', slug: bucketSlug } };
 		}
@@ -107,18 +105,21 @@ export async function updateTermSense(
 
 	// 6. Handle conflict or success
 	if (updateResult.length === 0) {
-		// Re-SELECT to get current version
-		const currentSense = await db.query.termSense.findFirst({
-			where: eq(termSense.id, senseId),
-		});
+		const conflict = await resolveOptimisticConflict(
+			() =>
+				db.query.termSense.findFirst({
+					where: eq(termSense.id, senseId),
+				}),
+			(currentSense) => currentSense.version
+		);
 
-		if (!currentSense) {
+		if (conflict.status === 'not_found') {
 			// Sense was deleted between check and update
 			return { success: false, error: { type: 'not_found' } };
 		}
 
 		// Version conflict
-		return { success: false, error: { type: 'version_conflict', currentVersion: currentSense.version } };
+		return { success: false, error: { type: 'version_conflict', currentVersion: conflict.currentVersion } };
 	}
 
 	// Success - return updated sense

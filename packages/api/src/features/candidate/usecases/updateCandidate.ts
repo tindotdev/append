@@ -2,10 +2,11 @@
  * Use case: Update a candidate's chosen bucket/text with optimistic locking.
  */
 
-import { and, eq, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { bucket, candidate, type schema } from '../../../db';
-import { requireBatchOwned } from '../../../shared/queries';
+import { candidate, type schema } from '../../../db';
+import { resolveOptimisticConflict } from '../../../shared/optimistic';
+import { findUserBucketBySlug, requireBatchOwned } from '../../../shared/queries';
 import type { UpdateCandidateInput } from '../validation/updateCandidate.schema';
 
 /**
@@ -68,11 +69,7 @@ export async function updateCandidate(
 
 	// 2. Validate bucket exists for user (if provided)
 	if (chosenBucket) {
-		const bucketRow = await db.query.bucket.findFirst({
-			where: and(eq(bucket.userId, userId), eq(bucket.slug, chosenBucket)),
-			columns: { id: true },
-		});
-
+		const bucketRow = await findUserBucketBySlug(db, userId, chosenBucket);
 		if (!bucketRow) {
 			return { success: false, error: { type: 'invalid_bucket', slug: chosenBucket } };
 		}
@@ -118,18 +115,21 @@ export async function updateCandidate(
 
 	// 6. Handle conflict or success
 	if (updateResult.length === 0) {
-		// Re-SELECT to get current version
-		const currentCandidate = await db.query.candidate.findFirst({
-			where: eq(candidate.id, candidateId),
-		});
+		const conflict = await resolveOptimisticConflict(
+			() =>
+				db.query.candidate.findFirst({
+					where: eq(candidate.id, candidateId),
+				}),
+			(currentCandidate) => currentCandidate.version
+		);
 
-		if (!currentCandidate) {
+		if (conflict.status === 'not_found') {
 			// Candidate was deleted between check and update
 			return { success: false, error: { type: 'not_found' } };
 		}
 
 		// Version conflict
-		return { success: false, error: { type: 'version_conflict', currentVersion: currentCandidate.version } };
+		return { success: false, error: { type: 'version_conflict', currentVersion: conflict.currentVersion } };
 	}
 
 	// Success - return updated candidate
