@@ -16,6 +16,14 @@
 - Type sharing: Hono RPC for end-to-end type safety between API and web (ADR: `docs/adr/0013-hono-rpc-type-sharing.md`).
 - Module boundaries: `lib` cannot depend on `platform`; shared types live in `shared` (ADR: `docs/adr/0014-module-boundaries-platform-types.md`).
 
+## Origins (ENG-LOG)
+
+This app evolved from **ENG-LOG**, a minimal, append-only engineering log:
+
+- Five bucket markdown files, bullet-only, append-only.
+- No tags, folders, or reorganization; just append and search.
+- Legacy format repo: https://github.com/tindotdev/eng-log (import/export contract).
+
 ## Current stage
 
 - Vertical slice steps 1–7 are complete and archived.
@@ -25,6 +33,7 @@
 
 ### Glossary
 
+- **ENG-LOG**: the original minimal append-only engineering log (five bucket markdown files + rules). Legacy source repo: https://github.com/tindotdev/eng-log (defines the import/export format).
 - **Term (input)**: a word/phrase you want to learn (what you paste/type).
 - **Capture batch**: a group of Term (input) captured together.
 - **Candidate**: a Term (input) inside a batch with optional suggestions/edits, not yet accepted.
