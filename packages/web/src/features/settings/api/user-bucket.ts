@@ -15,6 +15,17 @@ export type CreateBucketResponse = Extract<CreateBucketFullResponse, { id: strin
 // Import for internal use
 import { userBucketKeys } from '@/lib/user-buckets';
 
+async function parseUserBucketResponse<T>(
+	res: Response,
+	options?: { includeDetails?: boolean; includeCurrentVersion?: boolean }
+): Promise<T> {
+	if (!res.ok) {
+		throw await buildApiRequestError(res, options);
+	}
+
+	return res.json() as Promise<T>;
+}
+
 // Mutation: Create bucket
 export interface CreateBucketInput {
 	slug: string;
@@ -37,11 +48,7 @@ export function useCreateBucket() {
 				},
 			});
 
-			if (!res.ok) {
-				throw await buildApiRequestError(res);
-			}
-
-			return res.json() as Promise<CreateBucketResponse>;
+			return parseUserBucketResponse<CreateBucketResponse>(res);
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: userBucketKeys.list() });
@@ -66,11 +73,7 @@ export function useUpdateBucket() {
 				json: input,
 			});
 
-			if (!res.ok) {
-				throw await buildApiRequestError(res);
-			}
-
-			return res.json() as Promise<{ id: string }>;
+			return parseUserBucketResponse<{ id: string }>(res);
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: userBucketKeys.list() });
@@ -88,11 +91,7 @@ export function useDeleteBucket() {
 				param: { id },
 			});
 
-			if (!res.ok) {
-				throw await buildApiRequestError(res, { includeDetails: true });
-			}
-
-			return res.json() as Promise<{ success: boolean }>;
+			return parseUserBucketResponse<{ success: boolean }>(res, { includeDetails: true });
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: userBucketKeys.list() });
@@ -110,11 +109,7 @@ export function useReorderBuckets() {
 				json: { bucketIds },
 			});
 
-			if (!res.ok) {
-				throw await buildApiRequestError(res);
-			}
-
-			return res.json() as Promise<{ success: boolean }>;
+			return parseUserBucketResponse<{ success: boolean }>(res);
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: userBucketKeys.list() });
