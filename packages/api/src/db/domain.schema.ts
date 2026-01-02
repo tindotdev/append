@@ -242,3 +242,78 @@ export const suggestionCache = sqliteTable(
 		uniqueIndex('suggestion_cache_user_term_model_version_unique').on(table.userId, table.normalizedTerm, table.model, table.promptVersion),
 	]
 );
+
+// =============================================================================
+// Import/Export History Tables
+// =============================================================================
+
+/** Import run status */
+export const IMPORT_RUN_STATUS = ['pending', 'done', 'error'] as const;
+export type ImportRunStatus = (typeof IMPORT_RUN_STATUS)[number];
+
+/**
+ * ImportRun: tracks a complete import session.
+ * Created when files are uploaded, updated when import is committed.
+ */
+export const importRun = sqliteTable(
+	'import_run',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		importId: text('import_id').notNull(), // Client-provided or generated import ID (matches R2 prefix)
+		status: text('status').notNull().$type<ImportRunStatus>(),
+		termCreatedCount: integer('term_created_count').default(0).notNull(),
+		termSenseCreatedCount: integer('term_sense_created_count').default(0).notNull(),
+		flaggedCount: integer('flagged_count').default(0).notNull(),
+		skippedCount: integer('skipped_count').default(0).notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsec') * 1000 as integer))`).notNull(),
+		completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+	},
+	(table) => [
+		index('import_run_user_created_idx').on(table.userId, table.createdAt),
+		uniqueIndex('import_run_user_import_id_unique').on(table.userId, table.importId),
+		check('import_run_status_check', sql`${table.status} IN ('pending', 'done', 'error')`),
+	]
+);
+
+/**
+ * ImportFile: tracks each file within an import run.
+ */
+export const importFile = sqliteTable(
+	'import_file',
+	{
+		id: text('id').primaryKey(),
+		importRunId: text('import_run_id')
+			.notNull()
+			.references(() => importRun.id, { onDelete: 'cascade' }),
+		filename: text('filename').notNull(),
+		r2Key: text('r2_key').notNull(),
+		size: integer('size').notNull(), // File size in bytes
+		bucketId: text('bucket_id').references(() => bucket.id, { onDelete: 'set null' }), // Target bucket (null if unmapped)
+		entriesImported: integer('entries_imported').default(0).notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsec') * 1000 as integer))`).notNull(),
+	},
+	(table) => [index('import_file_run_idx').on(table.importRunId)]
+);
+
+/**
+ * ExportLog: tracks each export operation.
+ */
+export const exportLog = sqliteTable(
+	'export_log',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		bucketId: text('bucket_id').references(() => bucket.id, { onDelete: 'set null' }),
+		bucketSlug: text('bucket_slug').notNull(), // Preserved even if bucket deleted
+		bucketName: text('bucket_name').notNull(), // Preserved even if bucket renamed
+		filename: text('filename').notNull(),
+		entryCount: integer('entry_count').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsec') * 1000 as integer))`).notNull(),
+	},
+	(table) => [index('export_log_user_created_idx').on(table.userId, table.createdAt)]
+);

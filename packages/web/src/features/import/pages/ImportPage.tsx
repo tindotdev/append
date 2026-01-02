@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { type BucketMapping, type CommitResult, commitImport } from '../api/commit-import';
 import { type PreviewResult, previewImport } from '../api/preview-import';
 import { FileUploader } from '../components/FileUploader';
+import { ImportHistory } from '../components/ImportHistory';
 
 type ImportState =
 	| { step: 'idle' }
@@ -235,6 +236,11 @@ export function ImportPage() {
 					</Button>
 				</div>
 			)}
+
+			{/* Import History */}
+			<div className="mt-8">
+				<ImportHistory />
+			</div>
 		</div>
 	);
 }

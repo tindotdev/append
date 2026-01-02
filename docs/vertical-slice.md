@@ -38,10 +38,10 @@ The full, detailed vertical slice spec for steps 1–7 is archived at `docs/arch
 - [x] Edit terms (PATCH endpoint)
 - [x] Optimistic with undo (Sonner)
 
-### Phase 4: History tracking
+### Phase 4: History tracking ✓
 
-- [ ] Import history (ImportRun table + UI)
-- [ ] Export history (ExportLog table + UI)
+- [x] Import history (ImportRun + ImportFile tables, GET /api/import/history, UI)
+- [x] Export history (ExportLog table, GET /api/export/history, UI)
 
 ### Deferred (Backlog)
 
