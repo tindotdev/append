@@ -1,5 +1,5 @@
 /**
- * Import routes: upload, preview, and commit imports.
+ * Import routes: upload, preview, commit, and history.
  */
 
 import { vValidator } from '@hono/valibot-validator';
@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import type { Bindings, Variables } from '../../platform/env';
 import { apiErrorFrom, validationHook } from '../../shared/api-error';
 import { commitImport } from './usecases/commitImport';
+import { getImportHistory } from './usecases/getImportHistory';
 import { previewImport } from './usecases/previewImport';
 import { uploadFiles } from './usecases/uploadFiles';
 import { CommitImportSchema, PreviewImportSchema } from './validation/import.schema';
@@ -99,4 +100,14 @@ export const importRoutes = app
 		// Return 200 for replay, 201 for new commit
 		const status = result.isReplay ? 200 : 201;
 		return c.json(result.result, status);
+	})
+	.get('/history', async (c) => {
+		const userId = c.get('userId');
+		const db = c.get('db');
+		const limitParam = c.req.query('limit');
+		const limit = limitParam ? Math.min(Number.parseInt(limitParam, 10), 50) : 20;
+
+		const result = await getImportHistory(db, userId, limit);
+
+		return c.json(result);
 	});
