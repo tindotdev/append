@@ -14,6 +14,8 @@ const allowedDocsFiles = new Set(['docs/design.md', 'docs/README.md', 'docs/runb
 
 const allowedDocsPrefixes = ['docs/adr/'];
 
+const allowedAgentsFiles = new Set(['AGENTS.md', 'tmp/ai-sdk/AGENTS.md', 'tmp/valibot/AGENTS.md']);
+
 function isAllowedDocsMarkdown(filePath) {
 	if (!filePath.startsWith('docs/')) return true;
 	if (!filePath.endsWith('.md')) return true;
@@ -34,6 +36,44 @@ function isDisallowedTempDoc(filePath) {
 }
 
 const errors = [];
+
+// 0) Enforce a single canonical `AGENTS.md` (token-lean) + vendored refs under `tmp/`.
+function listAgentsFiles() {
+	const results = [];
+	const root = process.cwd();
+
+	function walk(dirAbs) {
+		const base = path.basename(dirAbs);
+		if (base === '.git' || base === 'node_modules') return;
+
+		for (const entry of fs.readdirSync(dirAbs, { withFileTypes: true })) {
+			const abs = path.join(dirAbs, entry.name);
+			const rel = path.relative(root, abs).replaceAll(path.sep, '/');
+			if (entry.isDirectory()) {
+				walk(abs);
+				continue;
+			}
+			if (entry.isFile() && entry.name === 'AGENTS.md') {
+				results.push(rel);
+			}
+		}
+	}
+
+	walk(root);
+	return results;
+}
+
+const agentsFiles = listAgentsFiles();
+const unexpectedAgentsFiles = agentsFiles.filter((filePath) => !allowedAgentsFiles.has(filePath));
+if (unexpectedAgentsFiles.length > 0) {
+	errors.push(
+		[
+			'AGENTS policy violation: only repo-root `AGENTS.md` is allowed (plus vendored refs under `tmp/`).',
+			'Unexpected `AGENTS.md` files:',
+			...unexpectedAgentsFiles.map((p) => `- ${p}`),
+		].join('\n')
+	);
+}
 
 // 1) Ensure the working tree under docs/ follows the policy (no archive, no extra docs).
 function listMarkdownFilesUnderDocs() {
