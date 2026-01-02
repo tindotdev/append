@@ -77,6 +77,36 @@
 	 */
 	"env": {
 		/**
+		 * Preview environment
+		 * - Used for PR preview deployments
+		 * - Uses separate preview database and R2 bucket
+		 * - Uses stub AI provider to avoid costs
+		 * - Deploy with: wrangler deploy -e preview
+		 */
+		"preview": {
+			"name": "append-api-preview",
+			"vars": {
+				"BETTER_AUTH_URL": "https://append-api-preview.tindejphachon.workers.dev",
+				"SUGGESTIONS_PROVIDER": "stub",
+				"AI_GATEWAY_ID": "append-gateway-preview",
+				"CF_ACCOUNT_ID": "d1d83d0040d3dea7df64d58cdbebe5a9"
+			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "append-db-preview",
+					"database_id": "54c8d43b-81db-49e4-84f3-5dcf4eebc302",
+					"migrations_dir": "drizzle"
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "IMPORT_FILES",
+					"bucket_name": "append-imports-preview"
+				}
+			]
+		},
+		/**
 		 * Production environment
 		 * - Uses Secrets Store for OPENAI_API_KEY
 		 * - Deploy with: wrangler deploy -e production
