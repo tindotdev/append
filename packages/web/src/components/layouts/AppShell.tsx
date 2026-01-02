@@ -57,9 +57,7 @@ export function AppShell() {
 						break;
 					case '/':
 						e.preventDefault();
-						// Focus sidebar search input
-						// @ts-expect-error - ref attached by AppSidebar
-						window.__sidebarSearchRef?.current?.focus();
+						navigate({ to: '/search' });
 						break;
 				}
 			}
