@@ -61,8 +61,8 @@ jobs:
             exit $EXIT_CODE
           fi
 
-          # Extract deployment URL from output
-          DEPLOYMENT_URL=$(echo "$DEPLOYMENT_OUTPUT" | grep -oP 'https://[^\s]+\.workers\.dev' | head -1)
+          # Extract deployment URL from output (strip ANSI codes first)
+          DEPLOYMENT_URL=$(echo "$DEPLOYMENT_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' | grep -oP 'https://[^\s]+\.workers\.dev' | head -1)
           echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
 
   preview-web:
@@ -120,8 +120,8 @@ jobs:
             exit $EXIT_CODE
           fi
 
-          # Extract deployment URL from output
-          DEPLOYMENT_URL=$(echo "$DEPLOYMENT_OUTPUT" | grep -oP 'https://[^\s]+\.pages\.dev' | head -1)
+          # Extract deployment URL from output (strip ANSI codes first)
+          DEPLOYMENT_URL=$(echo "$DEPLOYMENT_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' | grep -oP 'https://[^\s]+\.pages\.dev' | head -1)
           echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
 
   comment-preview-urls:
