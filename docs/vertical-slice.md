@@ -19,16 +19,16 @@ The full, detailed vertical slice spec for steps 1–7 is archived at `docs/arch
 
 ## UI Enhancements Vertical Slice
 
-### Phase 1: Quick wins + Capture redesign
+### Phase 1: Quick wins + Capture redesign ✓
 
-- [ ] Capture page term composer (ADR 0016)
-- [ ] Sidebar scrollbar fix
-- [ ] Favicon setup
+- [x] Capture page term composer (ADR 0016)
+- [x] Sidebar scrollbar fix
+- [x] Favicon setup
 
-### Phase 2: Search improvements
+### Phase 2: Search improvements ✓
 
-- [ ] Move global search to sidebar
-- [ ] Add search box to bucket pages
+- [x] Move global search to sidebar
+- [x] Add search box to bucket pages
 
 ### Phase 3: Core UX (bucket table + right panel)
 

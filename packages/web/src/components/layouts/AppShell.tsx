@@ -1,5 +1,5 @@
 import { Outlet, useNavigate } from '@tanstack/react-router';
-import { FolderOpen, Plus, Search, Settings } from 'lucide-react';
+import { FolderOpen, Plus, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AppSidebar } from '@/components/app-sidebar';
 import {
@@ -57,7 +57,9 @@ export function AppShell() {
 						break;
 					case '/':
 						e.preventDefault();
-						navigate({ to: '/search' });
+						// Focus sidebar search input
+						// @ts-expect-error - ref attached by AppSidebar
+						window.__sidebarSearchRef?.current?.focus();
 						break;
 				}
 			}
@@ -81,16 +83,6 @@ export function AppShell() {
 			<SidebarInset>
 				<header className="flex h-12 shrink-0 items-center gap-2 border-b border-zinc-800 px-4">
 					<SidebarTrigger className="-ml-1" />
-					<div className="flex-1" />
-					<button
-						type="button"
-						onClick={() => setCommandOpen(true)}
-						className="hidden sm:flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/50 px-3 py-1.5 text-sm text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-300 transition-colors"
-					>
-						<Search className="size-3.5" />
-						<span>Search</span>
-						<Kbd>⌘K</Kbd>
-					</button>
 				</header>
 
 				<main className="flex-1 overflow-auto p-6">
@@ -113,16 +105,6 @@ export function AppShell() {
 							<Plus className="mr-2 size-4" />
 							Capture
 							<Kbd className="ml-auto">C</Kbd>
-						</CommandItem>
-						<CommandItem
-							onSelect={() => {
-								navigate({ to: '/search' });
-								setCommandOpen(false);
-							}}
-						>
-							<Search className="mr-2 size-4" />
-							Search
-							<Kbd className="ml-auto">/</Kbd>
 						</CommandItem>
 						<CommandItem
 							onSelect={() => {
