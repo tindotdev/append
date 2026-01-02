@@ -2,7 +2,7 @@
  * Get import history: list past import runs for a user.
  */
 
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { importFile, importRun, type schema } from '../../../db';
 
@@ -82,7 +82,7 @@ export async function getImportHistory(
 
 	if (runIds.length > 0) {
 		// Fetch files for all runs in one query
-		const allFiles = await db
+		files = await db
 			.select({
 				id: importFile.id,
 				importRunId: importFile.importRunId,
@@ -91,13 +91,7 @@ export async function getImportHistory(
 				entriesImported: importFile.entriesImported,
 			})
 			.from(importFile)
-			.where(
-				// Use a subquery approach - for each run
-				eq(importFile.importRunId, importFile.importRunId)
-			);
-
-		// Filter to only the runs we care about
-		files = allFiles.filter((f) => runIds.includes(f.importRunId));
+			.where(inArray(importFile.importRunId, runIds));
 	}
 
 	// Group files by run ID

@@ -6,10 +6,10 @@ import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { schema } from '../../../db';
 import { bucket as bucketTable, normalize, term as termTable } from '../../../db/domain.schema';
-import { parseMarkdown } from '../parser/parseMarkdown';
 import { suggestBucketSlug } from '../parser/suggestBucket';
 import type { ParsedFilePreview, PreviewImportResponse } from '../validation/import.schema';
-import { getFileContent, listImportFiles } from './uploadFiles';
+import { parseImportFile } from './parseImportFile';
+import { listImportFiles } from './uploadFiles';
 
 export interface PreviewImportError {
 	type: 'not_found';
@@ -56,14 +56,9 @@ export async function previewImport(
 	const allNormalizedTerms = new Set<string>();
 
 	for (const obj of r2Objects) {
-		const content = await getFileContent(r2, obj.key);
-		if (!content) continue;
-
-		// Extract filename from R2 key
-		const filename = obj.key.split('/').pop() || obj.key;
-
-		// Parse markdown content
-		const { entries, warnings } = parseMarkdown(content);
+		const parsed = await parseImportFile(r2, obj);
+		if (!parsed) continue;
+		const { entries, warnings, filename } = parsed;
 
 		// Suggest bucket from filename
 		const suggestedBucketSlug = suggestBucketSlug(filename);

@@ -10,9 +10,9 @@ import { bucket as bucketTable, importFile, importRun, normalize, type schema, t
 import { sha256Hex } from '../../../shared/crypto';
 import { checkIdempotencyKey, createIdempotencyKeyStatement, findIdempotencyKey } from '../../../shared/idempotency/keys';
 import { decodeJsonResultRef, encodeJsonResultRef } from '../../../shared/idempotency/result-ref';
-import { parseMarkdown } from '../parser/parseMarkdown';
 import type { CommitImportInput, CommitImportResponse } from '../validation/import.schema';
-import { getFileContent, listImportFiles } from './uploadFiles';
+import { parseImportFile } from './parseImportFile';
+import { listImportFiles } from './uploadFiles';
 
 /**
  * SQLite/D1 has a limit on variables per query (~99 for D1).
@@ -397,14 +397,12 @@ async function collectImportEntries(
 	const files: FileInfo[] = [];
 
 	for (const obj of objects) {
-		const content = await getFileContent(r2, obj.key);
-		if (!content) continue;
+		const parsed = await parseImportFile(r2, obj);
+		if (!parsed) continue;
 
-		const { entries: parsedEntries } = parseMarkdown(content);
+		const { entries: parsedEntries, filename } = parsed;
 		const bucketId = bucketMappingMap.get(obj.key) ?? null;
 
-		// Extract filename from r2Key: imports/{userId}/{importId}/{filename}
-		const filename = obj.key.split('/').pop() ?? obj.key;
 		let fileEntryCount = 0;
 
 		for (const entry of parsedEntries) {
