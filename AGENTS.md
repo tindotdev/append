@@ -4,31 +4,38 @@
 
 - Workspace: `./pnpm-workspace.yaml`
 - `pnpm -r --if-present typecheck`
+- `pnpm docs:policy`
 
 ## Source of truth
 
+**Canonical (single source of truth)**
+
 - Design snapshot: `docs/design.md`
-- Build plan: `docs/build-plan.md`
-- Vertical slices: `docs/vertical-slice.md`
-- Testing strategy: `docs/testing.md`
-- Risks: `docs/risk-register.md`
-- ADRs: `docs/adr/README.md`
+- Decisions: `docs/adr/README.md` (+ individual ADRs)
+
+**Allowed supporting docs (only if essential)**
+
+- Runbook: `docs/runbook.md`
 - Documentation policy: `docs/README.md`
 
 ## Documentation is a contract
 
 - Keep `AGENTS.md` and everything under `docs/` accurate and update to date.
 
+## AGENTS.md policy (token-lean)
+
+- Keep only this repo-root `AGENTS.md` (no per-package `AGENTS.md`).
+- Prefer `pnpm --filter @append/{api,web}` scripts over local instructions.
+
 ## Working mode
 
-- Implement by milestones in `docs/build-plan.md`; keep `docs/vertical-slice.md` runnable.
+- Keep `docs/design.md` current as the snapshot; capture material decisions in ADRs.
+- Track progress/plans in PR descriptions and the issue tracker (avoid persisting plan/proposal docs).
 - Material decision change → add a new ADR and mark the old one “Superseded”.
 
 ## Current stage
 
-- Vertical slice step 7 is complete and archived.
-- Milestone 4 (Import ENG-LOG) is complete.
-- Focus: Milestone 5 (Explain It Myself feedback loop).
+- See `docs/design.md` (“Current stage”).
 
 ## Engineering defaults (unless an ADR says otherwise)
 
