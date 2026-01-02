@@ -7,11 +7,12 @@
 import { vValidator } from '@hono/valibot-validator';
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../../platform/env';
-import { apiErrorFrom, validationHook } from '../../shared/api-error';
+import { apiErrorFrom, ownershipErrorMap, validationHook } from '../../shared/api-error';
 import { updateTermSense } from './usecases/updateTermSense';
 import { UpdateTermSenseSchema } from './validation/updateTermSense.schema';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+const termSenseAccessErrors = ownershipErrorMap('Term sense');
 
 /**
  * PATCH /api/term-sense/:id - Update term sense text/bucket (owner-only)
@@ -34,8 +35,7 @@ app.patch('/:id', vValidator('json', UpdateTermSenseSchema, validationHook), asy
 	const result = await updateTermSense(db, userId, senseId, body);
 	if (!result.success) {
 		return apiErrorFrom(c, result.error, {
-			not_found: { status: 404, code: 'NOT_FOUND', message: 'Term sense not found' },
-			forbidden: { status: 403, code: 'FORBIDDEN', message: 'Access denied' },
+			...termSenseAccessErrors,
 			invalid_bucket: {
 				status: 400,
 				code: 'VALIDATION_ERROR',

@@ -7,11 +7,12 @@
 import { vValidator } from '@hono/valibot-validator';
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../../platform/env';
-import { apiErrorFrom, validationHook } from '../../shared/api-error';
+import { apiErrorFrom, ownershipErrorMap, validationHook } from '../../shared/api-error';
 import { updateCandidate } from './usecases/updateCandidate';
 import { UpdateCandidateSchema } from './validation/updateCandidate.schema';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+const candidateAccessErrors = ownershipErrorMap('Candidate');
 
 /**
  * Candidate routes - exported as the result of route chain for Hono RPC type inference.
@@ -37,8 +38,7 @@ export const candidateRoutes = app.put('/:id', vValidator('json', UpdateCandidat
 	const result = await updateCandidate(db, userId, candidateId, body);
 	if (!result.success) {
 		return apiErrorFrom(c, result.error, {
-			not_found: { status: 404, code: 'NOT_FOUND', message: 'Candidate not found' },
-			forbidden: { status: 403, code: 'FORBIDDEN', message: 'Access denied' },
+			...candidateAccessErrors,
 			invalid_bucket: {
 				status: 400,
 				code: 'VALIDATION_ERROR',

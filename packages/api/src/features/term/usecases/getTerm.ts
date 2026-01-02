@@ -4,7 +4,8 @@
 
 import { and, eq, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { type schema, term, termSense } from '../../../db';
+import { type schema, termSense } from '../../../db';
+import { requireTermOwned } from '../../../shared/queries';
 
 /**
  * Term result with all senses.
@@ -44,18 +45,11 @@ export async function getTerm(
 	termId: string
 ): Promise<{ success: true; result: TermDetailResult } | { success: false; error: GetTermError }> {
 	// 1. Lookup term
-	const termRow = await db.query.term.findFirst({
-		where: and(eq(term.id, termId), isNull(term.archivedAt)),
-	});
-
-	if (!termRow) {
-		return { success: false, error: { type: 'not_found' } };
+	const termOwnership = await requireTermOwned(db, userId, termId);
+	if (!termOwnership.ok) {
+		return { success: false, error: { type: termOwnership.error } };
 	}
-
-	// 2. Verify ownership
-	if (termRow.userId !== userId) {
-		return { success: false, error: { type: 'forbidden' } };
-	}
+	const termRow = termOwnership.value;
 
 	// 3. Get all non-archived senses for this term
 	const senses = await db.query.termSense.findMany({

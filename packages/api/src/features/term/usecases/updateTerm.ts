@@ -2,10 +2,11 @@
  * Use case: Update a term's displayTerm with optimistic locking.
  */
 
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type schema, term } from '../../../db';
 import { resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
+import { requireTermOwned } from '../../../shared/queries';
 import type { UpdateTermInput } from '../validation/updateTerm.schema';
 
 /**
@@ -36,17 +37,9 @@ export async function updateTerm(
 	const { expectedVersion, displayTerm } = input;
 
 	// 1. Lookup term and verify ownership
-	const termRow = await db.query.term.findFirst({
-		where: and(eq(term.id, termId), isNull(term.archivedAt)),
-	});
-
-	if (!termRow) {
-		return { success: false, error: { type: 'not_found' } };
-	}
-
-	// 2. Verify ownership
-	if (termRow.userId !== userId) {
-		return { success: false, error: { type: 'forbidden' } };
+	const termOwnership = await requireTermOwned(db, userId, termId);
+	if (!termOwnership.ok) {
+		return { success: false, error: { type: termOwnership.error } };
 	}
 
 	// 3. Atomic conditional update with optimistic locking
