@@ -6,6 +6,7 @@ import { vValidator } from '@hono/valibot-validator';
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../../platform/env';
 import { apiErrorFrom, validationHook } from '../../shared/api-error';
+import { parseHistoryLimit } from '../../shared/query/limits';
 import { commitImport } from './usecases/commitImport';
 import { getImportHistory } from './usecases/getImportHistory';
 import { previewImport } from './usecases/previewImport';
@@ -104,8 +105,7 @@ export const importRoutes = app
 	.get('/history', async (c) => {
 		const userId = c.get('userId');
 		const db = c.get('db');
-		const limitParam = c.req.query('limit');
-		const limit = limitParam ? Math.min(Number.parseInt(limitParam, 10), 50) : 20;
+		const limit = parseHistoryLimit(c.req.query('limit'));
 
 		const result = await getImportHistory(db, userId, limit);
 
