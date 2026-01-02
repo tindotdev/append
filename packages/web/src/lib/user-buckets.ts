@@ -4,7 +4,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { ApiRequestError, api, type InferResponseType } from '@/lib/api-rpc';
+import { api, buildApiRequestError, type InferResponseType } from '@/lib/api-rpc';
 
 // Query key factory
 export const userBucketKeys = {
@@ -22,8 +22,7 @@ export async function listUserBuckets(): Promise<ListBucketsResponse> {
 	const res = await api.api['user-bucket'].$get();
 
 	if (!res.ok) {
-		const errorBody = (await res.json()) as { error?: { code?: string; message?: string } };
-		throw new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
+		throw await buildApiRequestError(res);
 	}
 
 	return res.json() as Promise<ListBucketsResponse>;

@@ -1,5 +1,5 @@
 import { queryOptions, useQuery } from '@tanstack/react-query';
-import { ApiRequestError, api } from '@/lib/api-rpc';
+import { api, buildApiRequestError } from '@/lib/api-rpc';
 import type { BatchResponse } from '../types';
 
 // Query key factory
@@ -18,8 +18,7 @@ export async function getBatch(id: string): Promise<BatchResponse> {
 	});
 
 	if (!res.ok) {
-		const errorBody = (await res.json()) as { error?: { code?: string; message?: string } };
-		throw new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
+		throw await buildApiRequestError(res);
 	}
 
 	// Cast to expected type - API returns compatible structure
