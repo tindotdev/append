@@ -30,13 +30,13 @@ The full, detailed vertical slice spec for steps 1–7 is archived at `docs/arch
 - [x] Move global search to sidebar
 - [x] Add search box to bucket pages
 
-### Phase 3: Core UX (bucket table + right panel)
+### Phase 3: Core UX (bucket table + right panel) ✓
 
-- [ ] Bucket table with TanStack Table
-- [ ] Right-side panel for term details
-- [ ] Edit term sense (PATCH endpoint)
-- [ ] Edit terms (PATCH endpoint)
-- [ ] Optimistic with undo (Sonner)
+- [x] Bucket table with TanStack Table
+- [x] Right-side panel for term details
+- [x] Edit term sense (PATCH endpoint)
+- [x] Edit terms (PATCH endpoint)
+- [x] Optimistic with undo (Sonner)
 
 ### Phase 4: History tracking
 

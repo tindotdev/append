@@ -1,12 +1,10 @@
-import type { Bucket } from '@append/contracts/types';
-
 export interface BucketFeedItem {
 	termId: string;
 	displayTerm: string;
 	canonical: string;
 	primarySense: {
 		id: string;
-		bucket: Bucket;
+		bucket: string;
 		text: string;
 		createdAt: number;
 	};
