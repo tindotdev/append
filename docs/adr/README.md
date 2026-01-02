@@ -25,3 +25,4 @@ Rules:
 - `0013-hono-rpc-type-sharing.md` — Hono RPC replaces contracts package for API type sharing
 - `0014-module-boundaries-platform-types.md` — Module boundary: `lib` must not depend on `platform`
 - `0015-web-ui-linear-sidebar-layout.md` — Linear-style sidebar navigation replacing header nav (supersedes 0005 for UI)
+- `0016-web-ui-capture-term-composer.md` — Capture page term composer with local-only draft persistence

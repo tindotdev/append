@@ -7,6 +7,7 @@
 - Auth/access: Google SSO allowlist (ADR: `docs/adr/0001-google-allowlist-auth.md`).
 - Web auth gating: protected layout route via AppShell (ADR: `docs/adr/0005-web-auth-gating-protected-layout.md`, superseded by `docs/adr/0015-web-ui-linear-sidebar-layout.md` for UI implementation).
 - Web UI: Linear-style sidebar layout with keyboard shortcuts (ADR: `docs/adr/0015-web-ui-linear-sidebar-layout.md`).
+- Web UI: Capture page term composer with local-only draft persistence (ADR: `docs/adr/0016-web-ui-capture-term-composer.md`).
 - Duplicates: `Term` + append-only `TermSense` ("allowed-but-flagged") (ADR: `docs/adr/0002-term-sense-duplicates.md`).
 - Bucket feed UX: primary sense by default, expandable, "Needs review" view (ADR: `docs/adr/0003-bucket-feed-primary-sense.md`).
 - UX north-star: "fast capture → AI suggests → you accept → it becomes an append-only log entry".
