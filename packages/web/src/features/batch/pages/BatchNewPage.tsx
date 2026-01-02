@@ -54,6 +54,28 @@ function validateTerm(value: string, existingTerms: string[], currentIndex: numb
 	return { status: 'valid' };
 }
 
+const validationDotClass: Record<ValidationStatus, string> = {
+	valid: 'bg-green-500',
+	duplicate: 'bg-amber-500',
+	'too-long': 'bg-red-500',
+	'forbidden-delimiter': 'bg-red-500',
+	empty: 'bg-zinc-600',
+};
+
+const validationMessageClass: Partial<Record<ValidationStatus, string>> = {
+	duplicate: 'text-amber-400',
+	'too-long': 'text-red-400',
+	'forbidden-delimiter': 'text-red-400',
+};
+
+function getInputClassName(hasError: boolean): string {
+	if (!hasError) {
+		return 'pr-20';
+	}
+
+	return 'pr-20 border-red-500 focus-visible:ring-red-500';
+}
+
 // --- Local Storage ---
 function loadDraft(): TermRow[] {
 	try {
@@ -185,40 +207,6 @@ export function BatchNewPage() {
 		}
 	}, []);
 
-	const handleRowKeyDown = useCallback(
-		(id: string, e: React.KeyboardEvent<HTMLInputElement>) => {
-			if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
-				e.preventDefault();
-				// Add new row below and focus it
-				const newRow: TermRow = { id: crypto.randomUUID(), value: '' };
-				setRows((prev) => {
-					const index = prev.findIndex((r) => r.id === id);
-					if (index === -1) return prev;
-					return [...prev.slice(0, index + 1), newRow, ...prev.slice(index + 1)];
-				});
-				focusRowId.current = newRow.id;
-			} else if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-				e.preventDefault();
-				if (canSubmit) {
-					handleSubmit();
-				}
-			} else if (e.key === 'Backspace' && (e.target as HTMLInputElement).value === '') {
-				// Remove empty row on backspace and focus previous
-				e.preventDefault();
-				setRows((prev) => {
-					if (prev.length <= 1) return prev;
-					const index = prev.findIndex((r) => r.id === id);
-					if (index === -1) return prev;
-					// Focus previous row (or next if first)
-					const focusIndex = index > 0 ? index - 1 : 1;
-					focusRowId.current = prev[focusIndex]?.id ?? null;
-					return prev.filter((r) => r.id !== id);
-				});
-			}
-		},
-		[canSubmit]
-	);
-
 	const handleRemoveRow = useCallback((id: string) => {
 		setRows((prev) => {
 			if (prev.length <= 1) {
@@ -275,6 +263,40 @@ export function BatchNewPage() {
 		}
 	}, [canSubmit, rows, navigate]);
 
+	const handleRowKeyDown = useCallback(
+		(id: string, e: React.KeyboardEvent<HTMLInputElement>) => {
+			if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+				e.preventDefault();
+				// Add new row below and focus it
+				const newRow: TermRow = { id: crypto.randomUUID(), value: '' };
+				setRows((prev) => {
+					const index = prev.findIndex((r) => r.id === id);
+					if (index === -1) return prev;
+					return [...prev.slice(0, index + 1), newRow, ...prev.slice(index + 1)];
+				});
+				focusRowId.current = newRow.id;
+			} else if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+				e.preventDefault();
+				if (canSubmit) {
+					handleSubmit();
+				}
+			} else if (e.key === 'Backspace' && (e.target as HTMLInputElement).value === '') {
+				// Remove empty row on backspace and focus previous
+				e.preventDefault();
+				setRows((prev) => {
+					if (prev.length <= 1) return prev;
+					const index = prev.findIndex((r) => r.id === id);
+					if (index === -1) return prev;
+					// Focus previous row (or next if first)
+					const focusIndex = index > 0 ? index - 1 : 1;
+					focusRowId.current = prev[focusIndex]?.id ?? null;
+					return prev.filter((r) => r.id !== id);
+				});
+			}
+		},
+		[canSubmit, handleSubmit]
+	);
+
 	return (
 		<div className="max-w-2xl">
 			<div className="flex items-center justify-between">
@@ -292,23 +314,15 @@ export function BatchNewPage() {
 			<div className="mt-6 space-y-2">
 				{rows.map((row, index) => {
 					const validation = validateTerm(row.value, termValues, index);
-					const showError = validation.status === 'too-long' || validation.status === 'forbidden-delimiter';
-					const showDuplicate = validation.status === 'duplicate';
+					const hasError = validation.status === 'too-long' || validation.status === 'forbidden-delimiter';
+					const messageClass = validationMessageClass[validation.status];
+					const showMessage = Boolean(messageClass && validation.message);
+					const dotClass = validationDotClass[validation.status] ?? 'bg-zinc-600';
 
 					return (
 						<div key={row.id} className="group flex items-center gap-2">
 							<div className="flex h-8 w-8 shrink-0 items-center justify-center">
-								<span
-									className={`h-2 w-2 rounded-full ${
-										validation.status === 'valid'
-											? 'bg-green-500'
-											: validation.status === 'duplicate'
-												? 'bg-amber-500'
-												: showError
-													? 'bg-red-500'
-													: 'bg-zinc-600'
-									}`}
-								/>
+								<span className={`h-2 w-2 rounded-full ${dotClass}`} />
 							</div>
 							<div className="relative flex-1">
 								<Input
@@ -325,14 +339,10 @@ export function BatchNewPage() {
 									onKeyDown={(e) => handleRowKeyDown(row.id, e)}
 									placeholder={index === 0 ? 'Type a term or paste many...' : ''}
 									disabled={isSubmitting}
-									className={`pr-20 ${showError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-									aria-invalid={showError}
+									className={getInputClassName(hasError)}
+									aria-invalid={hasError}
 								/>
-								{(showError || showDuplicate) && (
-									<span className={`absolute right-10 top-1/2 -translate-y-1/2 text-xs ${showError ? 'text-red-400' : 'text-amber-400'}`}>
-										{validation.message}
-									</span>
-								)}
+								{showMessage && <span className={`absolute right-10 top-1/2 -translate-y-1/2 text-xs ${messageClass}`}>{validation.message}</span>}
 							</div>
 							<TooltipProvider delayDuration={300}>
 								<Tooltip>

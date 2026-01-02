@@ -64,17 +64,33 @@ interface ApiErrorBody {
 	details?: Record<string, unknown>;
 }
 
+export async function buildApiRequestError(
+	response: Response,
+	options?: { includeDetails?: boolean; includeCurrentVersion?: boolean }
+): Promise<ApiRequestError & { currentVersion?: number }> {
+	const errorBody = (await response.json()) as ApiErrorBody;
+	const error = new ApiRequestError(
+		response.status,
+		errorBody.error?.code ?? 'UNKNOWN_ERROR',
+		errorBody.error?.message ?? response.statusText,
+		options?.includeDetails ? errorBody.details : undefined
+	);
+
+	if (options?.includeCurrentVersion) {
+		const currentVersion = (errorBody.details as { currentVersion?: number } | undefined)?.currentVersion;
+		if (typeof currentVersion === 'number') {
+			(error as ApiRequestError & { currentVersion?: number }).currentVersion = currentVersion;
+		}
+	}
+
+	return error;
+}
+
 export async function handleRpcResponse<T>(response: Response): Promise<T> {
 	if (!response.ok) {
 		const contentType = response.headers.get('content-type') || '';
 		if (contentType.includes('application/json')) {
-			const errorBody = (await response.json()) as ApiErrorBody;
-			throw new ApiRequestError(
-				response.status,
-				errorBody.error?.code ?? 'UNKNOWN_ERROR',
-				errorBody.error?.message ?? response.statusText,
-				errorBody.details
-			);
+			throw await buildApiRequestError(response, { includeDetails: true });
 		}
 		throw new ApiRequestError(response.status, 'UNKNOWN_ERROR', response.statusText);
 	}

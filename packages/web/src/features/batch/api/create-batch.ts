@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiRequestError, api } from '@/lib/api-rpc';
+import { api, buildApiRequestError } from '@/lib/api-rpc';
 import type { CreateBatchRequest, CreateBatchResponse } from '../types';
 import { batchKeys } from './get-batch';
 
@@ -10,8 +10,7 @@ export async function createBatch(request: CreateBatchRequest): Promise<CreateBa
 	});
 
 	if (!res.ok) {
-		const errorBody = (await res.json()) as { error?: { code?: string; message?: string } };
-		throw new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
+		throw await buildApiRequestError(res);
 	}
 
 	// Cast to expected type - API returns compatible structure

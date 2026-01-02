@@ -4,7 +4,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiRequestError, api, type InferResponseType } from '@/lib/api-rpc';
+import { api, buildApiRequestError, type InferResponseType } from '@/lib/api-rpc';
 
 // Re-export shared types and hooks from lib
 export { type ListBucketsResponse, type UserBucket, userBucketKeys, useUserBuckets } from '@/lib/user-buckets';
@@ -38,8 +38,7 @@ export function useCreateBucket() {
 			});
 
 			if (!res.ok) {
-				const errorBody = (await res.json()) as { error?: { code?: string; message?: string } };
-				throw new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
+				throw await buildApiRequestError(res);
 			}
 
 			return res.json() as Promise<CreateBucketResponse>;
@@ -68,8 +67,7 @@ export function useUpdateBucket() {
 			});
 
 			if (!res.ok) {
-				const errorBody = (await res.json()) as { error?: { code?: string; message?: string } };
-				throw new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
+				throw await buildApiRequestError(res);
 			}
 
 			return res.json() as Promise<{ id: string }>;
@@ -91,13 +89,7 @@ export function useDeleteBucket() {
 			});
 
 			if (!res.ok) {
-				const errorBody = (await res.json()) as { error?: { code?: string; message?: string }; details?: { senseCount?: number } };
-				throw new ApiRequestError(
-					res.status,
-					errorBody.error?.code ?? 'UNKNOWN_ERROR',
-					errorBody.error?.message ?? res.statusText,
-					errorBody.details
-				);
+				throw await buildApiRequestError(res, { includeDetails: true });
 			}
 
 			return res.json() as Promise<{ success: boolean }>;
@@ -119,8 +111,7 @@ export function useReorderBuckets() {
 			});
 
 			if (!res.ok) {
-				const errorBody = (await res.json()) as { error?: { code?: string; message?: string } };
-				throw new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
+				throw await buildApiRequestError(res);
 			}
 
 			return res.json() as Promise<{ success: boolean }>;
