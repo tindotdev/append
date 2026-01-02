@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { API_URL, buildApiRequestError } from '@/lib/api-rpc';
 import { bucketKeys } from './get-bucket-feed';
 import { termKeys } from './get-term';
+import { patchJsonWithVersion } from './request';
 
 // Response type
 interface UpdateTermSenseResponse {
@@ -28,18 +28,7 @@ interface UpdateTermSenseRequest {
  * Update a term sense's text or bucket.
  */
 export async function updateTermSense(senseId: string, request: UpdateTermSenseRequest): Promise<UpdateTermSenseResponse> {
-	const res = await fetch(`${API_URL}/api/term-sense/${senseId}`, {
-		method: 'PATCH',
-		headers: { 'Content-Type': 'application/json' },
-		credentials: 'include',
-		body: JSON.stringify(request),
-	});
-
-	if (!res.ok) {
-		throw await buildApiRequestError(res, { includeCurrentVersion: true });
-	}
-
-	return res.json() as Promise<UpdateTermSenseResponse>;
+	return patchJsonWithVersion<UpdateTermSenseResponse, UpdateTermSenseRequest>(`/api/term-sense/${senseId}`, request);
 }
 
 /**
