@@ -29,6 +29,12 @@ export default [
 					type: 'lib',
 					pattern: 'lib',
 				},
+				// Shared hooks - only src/hooks/, not features/*/hooks/
+				{
+					type: 'hooks',
+					pattern: 'src/hooks/**/*',
+					mode: 'full',
+				},
 				{
 					type: 'routes',
 					pattern: 'routes',
@@ -53,34 +59,40 @@ export default [
 				{
 					default: 'disallow',
 					rules: [
-						// Features can import from the same feature, lib, and components
+						// Features can import from the same feature, lib, components, and hooks
 						{
 							from: ['feature'],
 							allow: [
 								['feature', { featureName: `\${from.featureName}` }], // Same feature only
 								'lib',
 								'components',
+								'hooks',
 							],
 						},
-						// Components can import from lib, features (for AuthProvider context), and other components (UI primitives compose)
+						// Components can import from lib, hooks, features (for AuthProvider context), and other components (UI primitives compose)
 						{
 							from: ['components'],
-							allow: ['lib', 'feature', 'components'],
+							allow: ['lib', 'hooks', 'feature', 'components'],
 						},
 						// Lib has no internal dependencies
 						{
 							from: ['lib'],
 							allow: [],
 						},
-						// Routes can import from features, components, and lib
+						// Hooks can import from lib only
+						{
+							from: ['hooks'],
+							allow: ['lib'],
+						},
+						// Routes can import from features, components, hooks, and lib
 						{
 							from: ['routes'],
-							allow: ['feature', 'components', 'lib'],
+							allow: ['feature', 'components', 'hooks', 'lib'],
 						},
 						// App-level files can import everything including each other
 						{
 							from: ['app'],
-							allow: ['feature', 'components', 'lib', 'routes', 'app'],
+							allow: ['feature', 'components', 'hooks', 'lib', 'routes', 'app'],
 						},
 					],
 				},
