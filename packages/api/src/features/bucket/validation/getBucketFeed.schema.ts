@@ -3,6 +3,7 @@
  */
 
 import * as v from 'valibot';
+import { fromBase64Url, toBase64Url } from '../../../shared/idempotency/encoding';
 
 /**
  * Default and limits for pagination.
@@ -61,9 +62,7 @@ export interface BucketFeedCursor {
  */
 export function encodeCursor(cursor: BucketFeedCursor): string {
 	const json = JSON.stringify(cursor);
-	const bytes = new TextEncoder().encode(json);
-	const base64 = btoa(String.fromCharCode(...bytes));
-	return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	return toBase64Url(json);
 }
 
 /**
@@ -71,16 +70,7 @@ export function encodeCursor(cursor: BucketFeedCursor): string {
  */
 export function decodeCursor(encoded: string): BucketFeedCursor | null {
 	try {
-		let base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
-		while (base64.length % 4 !== 0) {
-			base64 += '=';
-		}
-		const binary = atob(base64);
-		const bytes = new Uint8Array(binary.length);
-		for (let i = 0; i < binary.length; i++) {
-			bytes[i] = binary.charCodeAt(i);
-		}
-		const json = new TextDecoder().decode(bytes);
+		const json = fromBase64Url(encoded);
 		const parsed = JSON.parse(json);
 
 		if (typeof parsed.createdAt !== 'number' || typeof parsed.termId !== 'string') {
