@@ -6,7 +6,7 @@ import { vValidator } from '@hono/valibot-validator';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { Bindings, Variables } from '../../platform/env';
-import { apiError, apiErrorFrom, validationHook } from '../../shared/api-error';
+import { apiError, apiErrorFrom, ownershipErrorMap, validationHook } from '../../shared/api-error';
 import { captureTerms } from './usecases/captureTerms';
 import { getBatch } from './usecases/getBatch';
 import { listBatches } from './usecases/listBatches';
@@ -14,6 +14,7 @@ import { CaptureTermsSchema, MAX_BODY_SIZE } from './validation/captureTerms.sch
 import { ListBatchesSchema } from './validation/listBatches.schema';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+const batchAccessErrors = ownershipErrorMap('Batch');
 
 /**
  * Batch routes - chained for Hono RPC type inference.
@@ -66,10 +67,7 @@ export const batchRoutes = app
 		const result = await getBatch(db, userId, batchId);
 
 		if (!result.success) {
-			return apiErrorFrom(c, result.error, {
-				not_found: { status: 404, code: 'NOT_FOUND', message: 'Batch not found' },
-				forbidden: { status: 403, code: 'FORBIDDEN', message: 'Access denied' },
-			});
+			return apiErrorFrom(c, result.error, batchAccessErrors);
 		}
 
 		return c.json(result.result);

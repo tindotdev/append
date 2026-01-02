@@ -8,16 +8,13 @@
 import { vValidator } from '@hono/valibot-validator';
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../../platform/env';
-import { apiErrorFrom, validationHook } from '../../shared/api-error';
+import { apiErrorFrom, ownershipErrorMap, validationHook } from '../../shared/api-error';
 import { getTerm } from './usecases/getTerm';
 import { updateTerm } from './usecases/updateTerm';
 import { UpdateTermSchema } from './validation/updateTerm.schema';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
-const termAccessErrors = {
-	not_found: { status: 404, code: 'NOT_FOUND', message: 'Term not found' },
-	forbidden: { status: 403, code: 'FORBIDDEN', message: 'Access denied' },
-} as const;
+const termAccessErrors = ownershipErrorMap('Term');
 
 /**
  * GET /api/term/:id - Get term with all senses

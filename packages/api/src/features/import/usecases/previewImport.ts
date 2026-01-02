@@ -9,7 +9,7 @@ import { bucket as bucketTable, normalize, term as termTable } from '../../../db
 import { suggestBucketSlug } from '../parser/suggestBucket';
 import type { ParsedFilePreview, PreviewImportResponse } from '../validation/import.schema';
 import { parseImportFile } from './parseImportFile';
-import { listImportFiles } from './uploadFiles';
+import { requireImportFiles } from './uploadFiles';
 
 export interface PreviewImportError {
 	type: 'not_found';
@@ -34,17 +34,11 @@ export async function previewImport(
 	importId: string
 ): Promise<PreviewImportOutcome> {
 	// List files for this import
-	const r2Objects = await listImportFiles(r2, userId, importId);
-
-	if (!r2Objects) {
-		return {
-			success: false,
-			error: {
-				type: 'not_found',
-				message: 'Import not found',
-			},
-		};
+	const importFiles = await requireImportFiles(r2, userId, importId);
+	if (!importFiles.ok) {
+		return { success: false, error: importFiles.error };
 	}
+	const r2Objects = importFiles.objects;
 
 	// Parse each file
 	const parsedFiles: ParsedFilePreview[] = [];

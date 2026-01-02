@@ -11,7 +11,7 @@
 import { vValidator } from '@hono/valibot-validator';
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../../platform/env';
-import { apiErrorFrom, validationHook } from '../../shared/api-error';
+import { apiErrorFrom, ownershipErrorMapFromMessage, validationHook } from '../../shared/api-error';
 import { createBucket } from './usecases/createBucket';
 import { deleteBucket } from './usecases/deleteBucket';
 import { listBuckets } from './usecases/listBuckets';
@@ -20,10 +20,7 @@ import { updateBucket } from './usecases/updateBucket';
 import { CreateBucketSchema, ReorderBucketsSchema, UpdateBucketSchema } from './validation/bucket.schema';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
-const bucketAccessErrors = {
-	not_found: { status: 404, code: 'NOT_FOUND', message: (error: { message: string }) => error.message },
-	forbidden: { status: 403, code: 'FORBIDDEN', message: (error: { message: string }) => error.message },
-} as const;
+const bucketAccessErrors = ownershipErrorMapFromMessage();
 
 /**
  * User bucket routes - chained for Hono RPC type inference.
