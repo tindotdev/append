@@ -1,6 +1,7 @@
 import { BUCKET_TITLES, BUCKETS, type Bucket } from '@append/contracts/types';
 import { useState } from 'react';
 import { type DownloadResult, downloadBucketExport } from '../api/download-export';
+import { ExportHistory } from '../components/ExportHistory';
 
 type BucketResult = DownloadResult | null;
 
@@ -155,6 +156,11 @@ export function ExportPage() {
 						</div>
 					);
 				})}
+			</div>
+
+			{/* Export History */}
+			<div className="mt-8">
+				<ExportHistory />
 			</div>
 		</div>
 	);

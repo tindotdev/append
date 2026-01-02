@@ -6,7 +6,7 @@
 
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { bucket as bucketTable, normalize, type schema, type TermSenseSource, term, termSense } from '../../../db';
+import { bucket as bucketTable, importFile, importRun, normalize, type schema, type TermSenseSource, term, termSense } from '../../../db';
 import { sha256Hex } from '../../../shared/crypto';
 import { checkIdempotencyKey, createIdempotencyKeyStatement, findIdempotencyKey } from '../../../shared/idempotency/keys';
 import { decodeJsonResultRef, encodeJsonResultRef } from '../../../shared/idempotency/result-ref';
@@ -54,6 +54,14 @@ interface EntryWithBucket {
 	definition: string;
 	bucketId: string;
 	r2Key: string;
+}
+
+interface FileInfo {
+	r2Key: string;
+	filename: string;
+	size: number;
+	bucketId: string | null;
+	entriesCount: number;
 }
 
 /**
@@ -109,7 +117,7 @@ export async function commitImport(
 	}
 
 	// Parse all files and collect entries
-	const allEntries = await collectImportEntries(r2, r2Objects, bucketMappingMap);
+	const { entries: allEntries, files: fileInfos } = await collectImportEntries(r2, r2Objects, bucketMappingMap);
 
 	// Verify all bucket IDs exist
 	const uniqueBucketIds = [...new Set(allEntries.map((e) => e.bucketId))];
@@ -301,6 +309,45 @@ export async function commitImport(
 		bucketsCreated: [],
 	};
 
+	// Create import history records
+	const importRunId = crypto.randomUUID();
+	const importRunStmt = db
+		.insert(importRun)
+		.values({
+			id: importRunId,
+			userId,
+			importId,
+			status: 'done',
+			termCreatedCount,
+			termSenseCreatedCount,
+			flaggedCount,
+			skippedCount,
+			createdAt: now,
+			completedAt: now,
+		})
+		.onConflictDoNothing()
+		.toSQL();
+	statements.push(rawDb.prepare(importRunStmt.sql).bind(...importRunStmt.params));
+
+	// Create import file records
+	for (const file of fileInfos) {
+		const importFileId = crypto.randomUUID();
+		const importFileStmt = db
+			.insert(importFile)
+			.values({
+				id: importFileId,
+				importRunId,
+				filename: file.filename,
+				r2Key: file.r2Key,
+				size: file.size,
+				bucketId: file.bucketId,
+				entriesImported: file.entriesCount,
+				createdAt: now,
+			})
+			.toSQL();
+		statements.push(rawDb.prepare(importFileStmt.sql).bind(...importFileStmt.params));
+	}
+
 	// Insert idempotency key
 	const resultRef = encodeJsonResultRef('import_summary', result);
 	const idempStmt = createIdempotencyKeyStatement(db, userId, IMPORT_COMMIT_SCOPE, clientRequestId, requestHash, resultRef, {
@@ -336,26 +383,35 @@ export async function commitImport(
 	return { success: true, result, isReplay: false };
 }
 
+interface CollectResult {
+	entries: EntryWithBucket[];
+	files: FileInfo[];
+}
+
 async function collectImportEntries(
 	r2: R2Bucket,
-	objects: { key: string }[],
+	objects: { key: string; size: number }[],
 	bucketMappingMap: Map<string, string>
-): Promise<EntryWithBucket[]> {
+): Promise<CollectResult> {
 	const entries: EntryWithBucket[] = [];
+	const files: FileInfo[] = [];
 
 	for (const obj of objects) {
 		const content = await getFileContent(r2, obj.key);
 		if (!content) continue;
 
 		const { entries: parsedEntries } = parseMarkdown(content);
-		const bucketId = bucketMappingMap.get(obj.key);
+		const bucketId = bucketMappingMap.get(obj.key) ?? null;
 
-		// Skip files without bucket mapping
-		if (!bucketId) continue;
+		// Extract filename from r2Key: imports/{userId}/{importId}/{filename}
+		const filename = obj.key.split('/').pop() ?? obj.key;
+		let fileEntryCount = 0;
 
 		for (const entry of parsedEntries) {
 			// Skip inbox items (no definition)
 			if (entry.isInbox || !entry.definition) continue;
+			// Skip files without bucket mapping for entry collection (not for file tracking)
+			if (!bucketId) continue;
 
 			entries.push({
 				term: entry.term,
@@ -363,8 +419,17 @@ async function collectImportEntries(
 				bucketId,
 				r2Key: obj.key,
 			});
+			fileEntryCount++;
 		}
+
+		files.push({
+			r2Key: obj.key,
+			filename,
+			size: obj.size,
+			bucketId,
+			entriesCount: fileEntryCount,
+		});
 	}
 
-	return entries;
+	return { entries, files };
 }
