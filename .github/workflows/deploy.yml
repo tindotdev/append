@@ -73,7 +73,6 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CF_PAGES_PROJECT: ${{ secrets.CF_PAGES_PROJECT }}
     steps:
       - uses: actions/checkout@v6
 
@@ -106,4 +105,4 @@ jobs:
       - name: Deploy web to Pages
         working-directory: packages/web
         # Omit --branch to deploy to Production (custom domains require Production deployment)
-        run: pnpm exec wrangler pages deploy dist --project-name "$CF_PAGES_PROJECT"
+        run: pnpm exec wrangler pages deploy dist --project-name "append-web"
