@@ -5,7 +5,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type schema, term, termSense } from '../../../db';
-import { resolveOptimisticConflict } from '../../../shared/optimistic';
+import { resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
 import { findUserBucketBySlug } from '../../../shared/queries';
 import type { UpdateTermSenseInput } from '../validation/updateTermSense.schema';
 
@@ -112,14 +112,7 @@ export async function updateTermSense(
 				}),
 			(currentSense) => currentSense.version
 		);
-
-		if (conflict.status === 'not_found') {
-			// Sense was deleted between check and update
-			return { success: false, error: { type: 'not_found' } };
-		}
-
-		// Version conflict
-		return { success: false, error: { type: 'version_conflict', currentVersion: conflict.currentVersion } };
+		return { success: false, error: toOptimisticError(conflict) };
 	}
 
 	// Success - return updated sense

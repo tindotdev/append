@@ -10,6 +10,7 @@ import { exportLog } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
 import { apiError } from '../../shared/api-error';
 import { requireUserBucketBySlug } from '../../shared/queries';
+import { parseHistoryLimit } from '../../shared/query/limits';
 import { exportBucketWithCount } from './usecases/exportBucket';
 import { getExportHistory } from './usecases/getExportHistory';
 
@@ -27,8 +28,7 @@ export const exportRoutes = app
 	.get('/history', async (c) => {
 		const userId = c.get('userId');
 		const db = c.get('db');
-		const limitParam = c.req.query('limit');
-		const limit = limitParam ? Math.min(Number.parseInt(limitParam, 10), 50) : 20;
+		const limit = parseHistoryLimit(c.req.query('limit'));
 
 		const result = await getExportHistory(db, userId, limit);
 

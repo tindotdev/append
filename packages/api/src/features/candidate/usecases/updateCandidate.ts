@@ -5,7 +5,7 @@
 import { eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { candidate, type schema } from '../../../db';
-import { resolveOptimisticConflict } from '../../../shared/optimistic';
+import { resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
 import { findUserBucketBySlug, requireBatchOwned } from '../../../shared/queries';
 import type { UpdateCandidateInput } from '../validation/updateCandidate.schema';
 
@@ -122,14 +122,7 @@ export async function updateCandidate(
 				}),
 			(currentCandidate) => currentCandidate.version
 		);
-
-		if (conflict.status === 'not_found') {
-			// Candidate was deleted between check and update
-			return { success: false, error: { type: 'not_found' } };
-		}
-
-		// Version conflict
-		return { success: false, error: { type: 'version_conflict', currentVersion: conflict.currentVersion } };
+		return { success: false, error: toOptimisticError(conflict) };
 	}
 
 	// Success - return updated candidate
