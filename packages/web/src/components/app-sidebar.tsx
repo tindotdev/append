@@ -143,7 +143,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 							buckets.map((bucket) => (
 								<SidebarMenuItem key={bucket.id}>
 									<SidebarMenuButton asChild isActive={location.pathname === `/bucket/${bucket.slug}`}>
-										<Link to="/bucket/$slug" params={{ slug: bucket.slug }}>
+										<Link to="/bucket/$slug" params={{ slug: bucket.slug }} search={{ term: undefined }}>
 											<FolderOpen />
 											<span>{bucket.name}</span>
 										</Link>

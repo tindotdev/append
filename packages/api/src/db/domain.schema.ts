@@ -157,6 +157,7 @@ export const term = sqliteTable(
 		canonical: text('canonical').notNull(),
 		displayTerm: text('display_term').notNull(),
 		primarySenseId: text('primary_sense_id'), // nullable, no FK for now
+		version: integer('version').default(1).notNull(),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsec') * 1000 as integer))`).notNull(),
 		archivedAt: integer('archived_at', { mode: 'timestamp_ms' }),
 	},
@@ -182,6 +183,7 @@ export const termSense = sqliteTable(
 		source: text('source').notNull().$type<TermSenseSource>(),
 		senseLabel: text('sense_label'),
 		flaggedReason: text('flagged_reason'),
+		version: integer('version').default(1).notNull(),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsec') * 1000 as integer))`).notNull(),
 		archivedAt: integer('archived_at', { mode: 'timestamp_ms' }),
 	},
