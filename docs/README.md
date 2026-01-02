@@ -2,26 +2,25 @@
 
 Documentation in this repo is a contract.
 
+## Policy (strict)
+
+- **Canonical (single source of truth):**
+  - `docs/design.md`
+  - `docs/adr/` (ADRs)
+
+- **Allowed supporting docs (only if they directly support the canonical docs):**
+  - `docs/runbook.md` — operational setup (needed to run/deploy)
+  - Keep this list short and operational only.
+
+Everything else should be deleted or moved into:
+- an ADR (if it records a durable decision), or
+- a PR description / issue tracker (if it’s planning, notes, or progress tracking).
+
 ## Must be up-to-date
 
 - `AGENTS.md`
-- Everything under `docs/` (design, build plan, ADRs, risks, etc.)
+- Everything under `docs/`
 - `docs/runbook.md`
-- ENG-LOG legacy format reference: https://github.com/tindotdev/eng-log (import/export contract; see `docs/design.md`).
+- ENG-LOG legacy format reference: <https://github.com/tindotdev/eng-log> (import/export contract; see `docs/design.md`).
 
 If the code changes behavior, update docs in the same change (or immediately after).
-
-## Temporary files (allowed)
-
-Temporary working docs are allowed for in-flight work:
-
-- `HANDOFF.md` (hand-off notes for unfinished long tasks)
-- `ISSUE.md` (current issue being investigated/fixed)
-- `TASK.md` (current task focus)
-- `DEBUG_{problem}.md` (debug log for an unresolved bug)
-- `PLAN_{task}.md` (implementation plan for a specific task)
-- `SUMMARY_{task}.md` (session summary for handoff)
-
-## Archiving
-
-If a temporary doc becomes useful for future reference, move it to `docs/archive/` and ensure it is accurate.

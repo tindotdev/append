@@ -82,5 +82,4 @@ Architecture:
 
 ## Related
 
-- Design proposal: `docs/archive/ui-redesign-proposal.md` (archived)
 - Supersedes: ADR 0005 (protected layout route concept remains, implementation changed)

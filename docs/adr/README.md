@@ -26,3 +26,4 @@ Rules:
 - `0014-module-boundaries-platform-types.md` — Module boundary: `lib` must not depend on `platform`
 - `0015-web-ui-linear-sidebar-layout.md` — Linear-style sidebar navigation replacing header nav (supersedes 0005 for UI)
 - `0016-web-ui-capture-term-composer.md` — Capture page term composer with local-only draft persistence
+- `0017-term-and-term-sense-editing.md` — Term + TermSense edits with optimistic locking

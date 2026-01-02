@@ -67,4 +67,3 @@ Replace the `/batch/new` textarea UI with a **term list composer**:
 
 - Design snapshot: `docs/design.md`
 - Web shell + global shortcuts: `docs/adr/0015-web-ui-linear-sidebar-layout.md`
-- Detailed design proposal (archived): `docs/archive/capture-page-ui-redesign-proposal.md`
