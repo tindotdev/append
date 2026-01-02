@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, buildApiRequestError } from '@/lib/api-rpc';
+import { api, parseRpcJson } from '@/lib/api-rpc';
 import type { CreateBatchRequest, CreateBatchResponse } from '../types';
 import { batchKeys } from './get-batch';
 
@@ -9,12 +9,8 @@ export async function createBatch(request: CreateBatchRequest): Promise<CreateBa
 		json: request,
 	});
 
-	if (!res.ok) {
-		throw await buildApiRequestError(res);
-	}
-
 	// Cast to expected type - API returns compatible structure
-	return res.json() as Promise<CreateBatchResponse>;
+	return parseRpcJson<CreateBatchResponse>(res);
 }
 
 // React Query mutation hook

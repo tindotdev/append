@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { API_URL, buildApiRequestError } from '@/lib/api-rpc';
+import { apiFetch, parseRpcJson } from '@/lib/api-rpc';
 
 // Query key factory
 export const termKeys = {
@@ -33,15 +33,9 @@ export interface TermDetailResponse {
  * Fetch term details with all senses.
  */
 export async function getTerm(termId: string): Promise<TermDetailResponse> {
-	const res = await fetch(`${API_URL}/api/term/${termId}`, {
-		credentials: 'include',
-	});
+	const res = await apiFetch(`/api/term/${termId}`);
 
-	if (!res.ok) {
-		throw await buildApiRequestError(res);
-	}
-
-	return res.json() as Promise<TermDetailResponse>;
+	return parseRpcJson<TermDetailResponse>(res);
 }
 
 /**

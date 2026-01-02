@@ -5,7 +5,7 @@
  * for manual uploads if needed.
  */
 
-import { API_URL } from '@/lib/api-rpc';
+import { apiFetch } from '@/lib/api-rpc';
 
 export interface UploadedFile {
 	filename: string;
@@ -24,10 +24,9 @@ export async function uploadFiles(files: File[]): Promise<UploadResult> {
 		formData.append('files', file);
 	}
 
-	const response = await fetch(`${API_URL}/api/import/upload`, {
+	const response = await apiFetch('/api/import/upload', {
 		method: 'POST',
 		body: formData,
-		credentials: 'include',
 	});
 
 	if (!response.ok) {

@@ -12,6 +12,13 @@ import { hc, type InferRequestType, type InferResponseType } from 'hono/client';
 // Exported for use by SSE streaming and blob download functions that can't use RPC
 export const API_URL = import.meta.env.DEV ? 'http://localhost:8787' : 'https://api.append.tindev.dev';
 
+export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+	return fetch(`${API_URL}${path}`, {
+		...init,
+		credentials: init?.credentials ?? 'include',
+	});
+}
+
 /**
  * Typed API client using Hono RPC.
  *
@@ -84,6 +91,17 @@ export async function buildApiRequestError(
 	}
 
 	return error;
+}
+
+export async function parseRpcJson<T>(
+	response: Response,
+	options?: { includeDetails?: boolean; includeCurrentVersion?: boolean }
+): Promise<T> {
+	if (!response.ok) {
+		throw await buildApiRequestError(response, options);
+	}
+
+	return response.json() as Promise<T>;
 }
 
 export async function handleRpcResponse<T>(response: Response): Promise<T> {

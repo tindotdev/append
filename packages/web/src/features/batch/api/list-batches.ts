@@ -1,5 +1,5 @@
 import { type QueryFunctionContext, useInfiniteQuery } from '@tanstack/react-query';
-import { api, buildApiRequestError } from '@/lib/api-rpc';
+import { api, parseRpcJson } from '@/lib/api-rpc';
 import type { ListBatchesOptions, ListBatchesResponse } from '../types';
 import { batchKeys } from './get-batch';
 
@@ -12,12 +12,8 @@ export async function listBatches(options?: ListBatchesOptions): Promise<ListBat
 		},
 	});
 
-	if (!res.ok) {
-		throw await buildApiRequestError(res);
-	}
-
 	// Cast to expected type - API returns compatible structure
-	return res.json() as Promise<ListBatchesResponse>;
+	return parseRpcJson<ListBatchesResponse>(res);
 }
 
 // React Query hook with infinite scroll support

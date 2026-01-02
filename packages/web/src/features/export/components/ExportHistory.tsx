@@ -6,23 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Download, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatRelativeTime } from '@/lib/format-relative-time';
 import { type ExportHistoryItem, getExportHistory } from '../api/get-export-history';
-
-function formatRelativeTime(dateString: string): string {
-	const date = new Date(dateString);
-	const now = new Date();
-	const diffMs = now.getTime() - date.getTime();
-	const diffMinutes = Math.floor(diffMs / 60000);
-	const diffHours = Math.floor(diffMs / 3600000);
-	const diffDays = Math.floor(diffMs / 86400000);
-
-	if (diffMinutes < 1) return 'just now';
-	if (diffMinutes < 60) return `${diffMinutes}m ago`;
-	if (diffHours < 24) return `${diffHours}h ago`;
-	if (diffDays < 7) return `${diffDays}d ago`;
-
-	return date.toLocaleDateString();
-}
 
 function ExportHistoryItemRow({ item }: { item: ExportHistoryItem }) {
 	return (

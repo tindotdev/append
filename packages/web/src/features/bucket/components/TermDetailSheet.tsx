@@ -23,6 +23,47 @@ function formatDate(timestamp: number): string {
 	});
 }
 
+interface UpdateWithUndoOptions {
+	update: () => Promise<unknown>;
+	undo: () => Promise<unknown>;
+	onSaved: () => void;
+	onSuccess?: () => void;
+	successMessage: string;
+	conflictMessage: string;
+	failureMessage: string;
+	undoFailureMessage: string;
+}
+
+async function runUpdateWithUndo(options: UpdateWithUndoOptions): Promise<void> {
+	try {
+		await options.update();
+		options.onSuccess?.();
+		options.onSaved();
+
+		toast.success(options.successMessage, {
+			action: {
+				label: 'Undo',
+				onClick: async () => {
+					try {
+						await options.undo();
+						options.onSaved();
+						toast.success('Undone');
+					} catch {
+						toast.error(options.undoFailureMessage);
+					}
+				},
+			},
+		});
+	} catch (error) {
+		if (error instanceof ApiRequestError && error.status === 409) {
+			toast.error(options.conflictMessage);
+			options.onSaved();
+		} else {
+			toast.error(options.failureMessage);
+		}
+	}
+}
+
 interface EditableSenseProps {
 	sense: {
 		id: string;
@@ -49,46 +90,30 @@ function EditableSense({ sense, onSaved }: EditableSenseProps) {
 
 		const previousText = sense.text;
 
-		try {
-			await updateSense.mutateAsync({
-				senseId: sense.id,
-				request: {
-					expectedVersion: sense.version,
-					text: editedText.trim(),
-				},
-			});
-
-			setIsEditing(false);
-			onSaved();
-
-			toast.success('Definition updated', {
-				action: {
-					label: 'Undo',
-					onClick: async () => {
-						try {
-							await updateSense.mutateAsync({
-								senseId: sense.id,
-								request: {
-									expectedVersion: sense.version + 1,
-									text: previousText,
-								},
-							});
-							onSaved();
-							toast.success('Undone');
-						} catch {
-							toast.error('Undo failed');
-						}
+		await runUpdateWithUndo({
+			update: () =>
+				updateSense.mutateAsync({
+					senseId: sense.id,
+					request: {
+						expectedVersion: sense.version,
+						text: editedText.trim(),
 					},
-				},
-			});
-		} catch (error) {
-			if (error instanceof ApiRequestError && error.status === 409) {
-				toast.error('Conflict: someone else modified this. Please refresh.');
-				onSaved(); // Refetch
-			} else {
-				toast.error('Save failed. Please try again.');
-			}
-		}
+				}),
+			undo: () =>
+				updateSense.mutateAsync({
+					senseId: sense.id,
+					request: {
+						expectedVersion: sense.version + 1,
+						text: previousText,
+					},
+				}),
+			onSaved,
+			onSuccess: () => setIsEditing(false),
+			successMessage: 'Definition updated',
+			conflictMessage: 'Conflict: someone else modified this. Please refresh.',
+			failureMessage: 'Save failed. Please try again.',
+			undoFailureMessage: 'Undo failed',
+		});
 	};
 
 	const handleCancel = () => {
@@ -147,46 +172,30 @@ function EditableTermName({ termId, displayTerm, version, onSaved }: EditableTer
 
 		const previousName = displayTerm;
 
-		try {
-			await updateTerm.mutateAsync({
-				termId,
-				request: {
-					expectedVersion: version,
-					displayTerm: editedName.trim(),
-				},
-			});
-
-			setIsEditing(false);
-			onSaved();
-
-			toast.success('Term updated', {
-				action: {
-					label: 'Undo',
-					onClick: async () => {
-						try {
-							await updateTerm.mutateAsync({
-								termId,
-								request: {
-									expectedVersion: version + 1,
-									displayTerm: previousName,
-								},
-							});
-							onSaved();
-							toast.success('Undone');
-						} catch {
-							toast.error('Undo failed');
-						}
+		await runUpdateWithUndo({
+			update: () =>
+				updateTerm.mutateAsync({
+					termId,
+					request: {
+						expectedVersion: version,
+						displayTerm: editedName.trim(),
 					},
-				},
-			});
-		} catch (error) {
-			if (error instanceof ApiRequestError && error.status === 409) {
-				toast.error('Conflict: someone else modified this. Please refresh.');
-				onSaved();
-			} else {
-				toast.error('Save failed. Please try again.');
-			}
-		}
+				}),
+			undo: () =>
+				updateTerm.mutateAsync({
+					termId,
+					request: {
+						expectedVersion: version + 1,
+						displayTerm: previousName,
+					},
+				}),
+			onSaved,
+			onSuccess: () => setIsEditing(false),
+			successMessage: 'Term updated',
+			conflictMessage: 'Conflict: someone else modified this. Please refresh.',
+			failureMessage: 'Save failed. Please try again.',
+			undoFailureMessage: 'Undo failed',
+		});
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {

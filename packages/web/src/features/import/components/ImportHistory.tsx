@@ -6,23 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { CheckCircle, Clock, FileText, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatRelativeTime } from '@/lib/format-relative-time';
 import { getImportHistory, type ImportHistoryItem } from '../api/get-import-history';
-
-function formatRelativeTime(dateString: string): string {
-	const date = new Date(dateString);
-	const now = new Date();
-	const diffMs = now.getTime() - date.getTime();
-	const diffMinutes = Math.floor(diffMs / 60000);
-	const diffHours = Math.floor(diffMs / 3600000);
-	const diffDays = Math.floor(diffMs / 86400000);
-
-	if (diffMinutes < 1) return 'just now';
-	if (diffMinutes < 60) return `${diffMinutes}m ago`;
-	if (diffHours < 24) return `${diffHours}h ago`;
-	if (diffDays < 7) return `${diffDays}d ago`;
-
-	return date.toLocaleDateString();
-}
 
 function formatFileSize(bytes: number): string {
 	if (bytes < 1024) return `${bytes}B`;
