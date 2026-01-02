@@ -1,0 +1,183 @@
+name: Preview
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview-api:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.deployment-url }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: "package.json"
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v5
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply D1 migrations to preview
+        working-directory: packages/api
+        run: pnpm exec wrangler d1 migrations apply append-db-preview --remote --config wrangler.jsonc --env preview
+
+      - name: Deploy Worker API Preview
+        id: deploy
+        working-directory: packages/api
+        run: |
+          # Deploy to preview environment
+          set +e  # Don't exit on error yet
+          DEPLOYMENT_OUTPUT=$(pnpm exec wrangler deploy -e preview --config wrangler.jsonc 2>&1)
+          EXIT_CODE=$?
+          echo "$DEPLOYMENT_OUTPUT"
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "::error::Deployment failed with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
+
+          # Extract deployment URL from output
+          DEPLOYMENT_URL=$(echo "$DEPLOYMENT_OUTPUT" | grep -oP 'https://[^\s]+\.workers\.dev' | head -1)
+          echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+
+  preview-web:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_PAGES_PROJECT: ${{ secrets.CF_PAGES_PROJECT }}
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.deployment-url }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: "package.json"
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v5
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web
+        working-directory: packages/web
+        env:
+          VITE_API_URL: https://append-api-preview.tindejphachon.workers.dev
+        run: pnpm run build
+
+      - name: Deploy web preview to Pages
+        id: deploy
+        working-directory: packages/web
+        run: |
+          # Use --branch to create a preview deployment
+          set +e  # Don't exit on error yet
+          DEPLOYMENT_OUTPUT=$(pnpm exec wrangler pages deploy dist --project-name "$CF_PAGES_PROJECT" --branch "${{ github.head_ref }}" 2>&1)
+          EXIT_CODE=$?
+          echo "$DEPLOYMENT_OUTPUT"
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "::error::Deployment failed with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
+
+          # Extract deployment URL from output
+          DEPLOYMENT_URL=$(echo "$DEPLOYMENT_OUTPUT" | grep -oP 'https://[^\s]+\.pages\.dev' | head -1)
+          echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+
+  comment-preview-urls:
+    runs-on: ubuntu-latest
+    needs: [preview-api, preview-web]
+    if: always() && (needs.preview-api.result == 'success' || needs.preview-web.result == 'success')
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Comment PR with preview URLs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const apiUrl = '${{ needs.preview-api.outputs.deployment-url }}';
+            const webUrl = '${{ needs.preview-web.outputs.deployment-url }}';
+
+            let body = '## 🚀 Preview Deployments\n\n';
+
+            if (apiUrl) {
+              body += `**API**: ${apiUrl}\n`;
+            } else {
+              body += '**API**: ❌ Deployment failed\n';
+            }
+
+            if (webUrl) {
+              body += `**Web**: ${webUrl}\n`;
+            } else {
+              body += '**Web**: ❌ Deployment failed\n';
+            }
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('🚀 Preview Deployments')
+            );
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }

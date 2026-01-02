@@ -99,6 +99,8 @@ jobs:
 
       - name: Build web
         working-directory: packages/web
+        env:
+          VITE_API_URL: https://api.append.tindev.dev
         run: pnpm run build
 
       - name: Deploy web to Pages

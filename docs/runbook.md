@@ -96,6 +96,93 @@ pnpm --filter @append/web run build
 pnpm --filter @append/web exec wrangler pages deploy packages/web/dist --project-name "$CF_PAGES_PROJECT"
 ```
 
+## Preview deployments (PR environments)
+
+PR previews use isolated Cloudflare resources to avoid affecting production:
+
+- **Worker**: `append-api-preview` (preview environment in `wrangler.jsonc`)
+- **Database**: `append-db-preview` (D1)
+- **Storage**: `append-imports-preview` (R2)
+- **AI Provider**: Stub (no OpenAI API calls or costs)
+
+### One-time setup
+
+These steps create the isolated preview infrastructure (already completed):
+
+1. Create preview D1 database:
+
+   ```bash
+   pnpm --filter @append/api exec wrangler d1 create append-db-preview
+   ```
+
+2. Update `packages/api/wrangler.jsonc` with the database ID from step 1.
+
+3. Create preview R2 bucket:
+
+   ```bash
+   pnpm --filter @append/api exec wrangler r2 bucket create append-imports-preview
+   ```
+
+4. Apply initial schema to preview database:
+
+   ```bash
+   pnpm --filter @append/api exec wrangler d1 migrations apply append-db-preview --remote --env preview
+   ```
+
+### How PR previews work
+
+When a PR is opened against `main`:
+
+1. GitHub Actions runs `.github/workflows/preview.yml`
+2. Migrations are applied to the preview database
+3. API deploys to the preview environment: `https://append-api-preview.tindejphachon.workers.dev`
+4. Web builds with `VITE_API_URL` set to preview API
+5. Web deploys to Cloudflare Pages with branch-specific URL: `https://<branch>.<project>.pages.dev`
+6. Both URLs are posted as a comment on the PR (updated on subsequent pushes)
+
+**API URL configuration:**
+
+- Local dev: `http://localhost:8787` (default when running `pnpm dev`)
+- Preview: `https://append-api-preview.tindejphachon.workers.dev` (set via `VITE_API_URL` in preview workflow)
+- Production: `https://api.append.tindev.dev` (set via `VITE_API_URL` in deploy workflow)
+
+### Manual preview deployment
+
+To deploy manually to preview environments:
+
+```bash
+# API preview
+pnpm --filter @append/api exec wrangler d1 migrations apply append-db-preview --remote --env preview
+pnpm --filter @append/api exec wrangler deploy -e preview --config wrangler.jsonc
+
+# Web preview (branch-specific)
+VITE_API_URL=https://append-api-preview.tindejphachon.workers.dev pnpm --filter @append/web run build
+pnpm --filter @append/web exec wrangler pages deploy dist --project-name "$CF_PAGES_PROJECT" --branch <branch-name>
+```
+
+### Preview environment secrets
+
+Preview environment has Google OAuth configured for authentication:
+
+```bash
+# Secrets are already set for preview environment
+pnpm --filter @append/api exec wrangler secret list --env preview
+```
+
+Required secrets (already configured):
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `BETTER_AUTH_SECRET`
+- `ALLOWED_EMAIL` (or `ALLOWED_SUB`)
+
+### Preview environment notes
+
+- Preview database and storage accumulate data over time (cleared manually if needed)
+- Preview uses stub AI provider (no real OpenAI calls) to avoid costs
+- Google OAuth is configured and works in preview environments
+- Cloudflare Pages automatic GitHub integration works alongside GitHub Actions workflow
+
 ## Developer checks (local)
 
 From repo root:
