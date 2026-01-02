@@ -9,6 +9,7 @@
 - Web UI: Linear-style sidebar layout with keyboard shortcuts (ADR: `docs/adr/0015-web-ui-linear-sidebar-layout.md`).
 - Web UI: Capture page term composer with local-only draft persistence (ADR: `docs/adr/0016-web-ui-capture-term-composer.md`).
 - Duplicates: `Term` + append-only `TermSense` ("allowed-but-flagged") (ADR: `docs/adr/0002-term-sense-duplicates.md`).
+- Term + TermSense edits: allow in-place corrections with optimistic locking (ADR: `docs/adr/0017-term-and-term-sense-editing.md`).
 - Bucket feed UX: primary sense by default, expandable, "Needs review" view (ADR: `docs/adr/0003-bucket-feed-primary-sense.md`).
 - UX north-star: "fast capture → AI suggests → you accept → it becomes an append-only log entry".
 - LLM provider/model: OpenAI `gpt-5-mini` via Cloudflare AI Gateway (ADR: `docs/adr/0006-openai-gpt-5-mini-via-ai-gateway.md`).
@@ -27,8 +28,9 @@ This app evolved from **ENG-LOG**, a minimal, append-only engineering log:
 
 ## Current stage
 
-- Vertical slice steps 1–7 are complete and archived.
-- Focus: review all slices, refresh UI, and refactor where needed without changing locked decisions.
+- Focus: Milestone 5 (“Explain it myself” feedback loop).
+- Baseline shipped: capture → suggest → review → accept-all → bucket feed → import/export.
+- Recent: Linear-style UI enhancements, term detail panel, term + sense edits (optimistic locking), import/export history tracking.
 
 ## Phase 1 — Domain (storage-agnostic)
 
@@ -48,9 +50,9 @@ This app evolved from **ENG-LOG**, a minimal, append-only engineering log:
 ### Invariants (“must always be true”)
 
 - Every Sense belongs to exactly one Bucket.
-- Senses are append-only at the semantic level:
-  - no in-place edits to “fix” history;
-  - corrections are new entries;
+- Senses are append-only at the semantic level (preferred):
+  - new meaning/context is a new `TermSense` row;
+  - small corrections (typos, bucket fixes) may be in-place edits with optimistic locking (no silent overwrites).
   - “removal” is a soft delete/archival (audit remains).
 - Accept/accept-all is idempotent: retries must not create duplicate effects.
 - Candidate edits must never silently overwrite changes made elsewhere (detect conflicts and require explicit resolution).
@@ -65,7 +67,7 @@ This app evolved from **ENG-LOG**, a minimal, append-only engineering log:
 
 **Import run**
 
-- `queued → parsing → preview_ready → committing → done` (retry-safe)
+- `pending → done` or `pending → error` (retry-safe; preview is handled separately via import preview results)
 
 ### Domain events (optional but useful)
 
@@ -84,6 +86,8 @@ This app evolved from **ENG-LOG**, a minimal, append-only engineering log:
 - `AcceptAll(batch_id, client_request_id)` → creates/attaches Senses for all candidates (idempotent)
 - `ArchiveCandidate(candidate_id)`
 - `ImportEngLog(files_or_text, client_request_id)` → parse → preview → commit (idempotent)
+- `UpdateTerm(term_id, displayTerm, expected_version)` → optimistic locking
+- `UpdateTermSense(sense_id, patch, expected_version)` → optimistic locking (text and/or bucket)
 
 ### Queries (reads)
 
@@ -91,6 +95,7 @@ This app evolved from **ENG-LOG**, a minimal, append-only engineering log:
 - `GetBatch(batch_id)` (candidates + latest suggestion + acceptance state)
 - `SearchTerms(query, bucket?, cursor?)` (term + senses)
 - `GetBucketFeed(bucket, cursor?)` (append-only “timeline”)
+- `GetTerm(term_id)` (term + senses for detail panel)
 - `GetNeedsReview(cursor?)` (flagged/conflicting terms)
 - `ExportBuckets(format=markdown)` (download/view)
 
@@ -110,10 +115,12 @@ This app evolved from **ENG-LOG**, a minimal, append-only engineering log:
 - `Batch` (id, user_id, status, created_at)
 - `Candidate` (id, batch_id, term, normalized_term, status, chosen_bucket_id?, chosen_text?, version, suggested_bucket_id?, suggested_text?, suggestion_status?, suggestion_error?, suggestion_attempts, suggestion_model, suggestion_prompt_version, suggestion_updated_at?, materialized_term_id?, materialized_term_sense_id?, created_at)
 - `SuggestionCache` (user_id, normalized_term, model, prompt_version, suggested_bucket_id, suggested_text, created_at, updated_at)
-- `Term` (id, user_id, canonical, display_term, primary_sense_id?, created_at, archived_at?)
-- `TermSense` (id, term_id, bucket_id, text, source, sense_label?, flagged_reason?, created_at, archived_at?)
+- `Term` (id, user_id, canonical, display_term, primary_sense_id?, version, created_at, archived_at?)
+- `TermSense` (id, term_id, bucket_id, text, source, sense_label?, flagged_reason?, version, created_at, archived_at?)
 - `IdempotencyKey` (user_id, scope, key, result_ref, created_at, expires_at?)
-- `ImportRun` (id, user_id, status, idempotency_key, stats, created_at)
+- `ImportRun` (id, user_id, import_id, status, counts, created_at, completed_at?)
+- `ImportFile` (id, import_run_id, filename, r2_key, size, bucket_id?, entries_imported, created_at)
+- `ExportLog` (id, user_id, bucket_id?, bucket_slug, bucket_name, filename, entry_count, created_at)
 
 ### Derived fields
 

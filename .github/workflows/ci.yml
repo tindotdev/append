@@ -44,6 +44,9 @@ jobs:
       - name: Lint (Boundaries)
         run: pnpm lint:boundaries
 
+      - name: Docs policy
+        run: pnpm docs:policy
+
   typecheck:
     runs-on: ubuntu-latest
     steps:

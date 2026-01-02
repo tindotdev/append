@@ -5,7 +5,7 @@ Date: 2025-12-29
 
 ## Context
 
-Suggestion generation for batch terms is slow. Processing 20 terms sequentially takes ~100 seconds (5 seconds per LLM call). Users reported this as a high-impact issue (#3 in docs/archive/ROADMAP.md).
+Suggestion generation for batch terms is slow. Processing 20 terms sequentially takes ~100 seconds (5 seconds per LLM call). Users reported this as a high-impact issue.
 
 We needed to determine:
 1. Whether parallelization is safe given OpenAI rate limits

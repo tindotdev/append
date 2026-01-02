@@ -96,6 +96,31 @@ pnpm --filter @append/web run build
 pnpm --filter @append/web exec wrangler pages deploy packages/web/dist --project-name "$CF_PAGES_PROJECT"
 ```
 
+## Developer checks (local)
+
+From repo root:
+
+```bash
+pnpm docs:policy
+pnpm ci:lint
+pnpm lint:boundaries
+pnpm typecheck
+pnpm test
+```
+
+API tests live under `packages/api/test/` and run via `pnpm test:api`.
+
+### Test environment variables
+
+Tests use `cloudflare:test` and the test environment variables configured in `packages/api/wrangler.jsonc`.
+Common ones:
+
+- `ENABLE_TEST_EMAIL_PASSWORD_AUTH=1`
+- `BETTER_AUTH_URL=http://localhost:8787`
+- `BETTER_AUTH_SECRET=...` (32+ chars)
+- `ALLOWED_EMAIL=test-a@example.com`
+- `GOOGLE_CLIENT_ID=test-google-client-id` (dummy; tests don’t hit Google OAuth)
+
 ## Release tags (semver)
 
 We use annotated git tags as milestones (e.g. completing a vertical slice). Tags are created manually; CI does not auto-tag.
@@ -112,12 +137,12 @@ Process:
 
 ## Review pass (post-slice)
 
-When reviewing all 7 slices, keep the archived vertical-slice contract as the baseline.
+When doing a refactor/review pass, treat `docs/design.md` + ADRs as the baseline.
 
 Checklist:
 
 1. Re-verify critical flows: capture → suggest → review → accept-all → bucket feed → export.
-2. Confirm API contracts still match `docs/archive/vertical-slice.md` (request/response shapes, error codes, status transitions).
+2. Confirm behavior still matches `docs/design.md` invariants and relevant ADR constraints (request/response shapes, error codes, status transitions).
 3. Spot-check UI for the "calm by default" feed and explicit review affordances.
 4. If refactoring touches API behavior, update docs and add a targeted regression test.
 

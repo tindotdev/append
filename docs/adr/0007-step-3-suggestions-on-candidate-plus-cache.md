@@ -5,12 +5,12 @@ Date: 2025-12-23
 
 ## Context
 
-Step 3 in `docs/vertical-slice.md` requires:
+Step 3 requires:
 
 - `POST /api/batch/:id/suggest` calls the LLM for each candidate.
 - It writes `suggested_bucket` + `suggested_text` to the candidate record(s).
 
-The initial design snapshot (`docs/design.md`) described a separate `Suggestion` entity, but the vertical slice explicitly calls for writing suggestion fields directly to candidates.
+The initial design snapshot (`docs/design.md`) described a separate `Suggestion` entity, but the current implementation writes suggestion fields directly to candidates.
 
 We also want:
 
@@ -53,7 +53,7 @@ Retry semantics:
 
 ## Consequences
 
-- Step 3 matches the vertical-slice contract exactly (writes on `candidate` records).
+- Step 3 matches the intended contract (writes on `candidate` records).
 - UI Step 4 can render “latest suggestion” without joins.
 - Cache reduces repeated LLM calls for duplicates (especially common in captured batches).
 - We do not retain full suggestion history; we retain only the latest suggestion per candidate.
