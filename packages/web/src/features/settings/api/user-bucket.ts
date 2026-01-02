@@ -4,7 +4,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, buildApiRequestError, type InferResponseType } from '@/lib/api-rpc';
+import { api, type InferResponseType, parseRpcJson } from '@/lib/api-rpc';
 
 // Re-export shared types and hooks from lib
 export { type ListBucketsResponse, type UserBucket, userBucketKeys, useUserBuckets } from '@/lib/user-buckets';
@@ -14,17 +14,6 @@ export type CreateBucketResponse = Extract<CreateBucketFullResponse, { id: strin
 
 // Import for internal use
 import { userBucketKeys } from '@/lib/user-buckets';
-
-async function parseUserBucketResponse<T>(
-	res: Response,
-	options?: { includeDetails?: boolean; includeCurrentVersion?: boolean }
-): Promise<T> {
-	if (!res.ok) {
-		throw await buildApiRequestError(res, options);
-	}
-
-	return res.json() as Promise<T>;
-}
 
 // Mutation: Create bucket
 export interface CreateBucketInput {
@@ -48,7 +37,7 @@ export function useCreateBucket() {
 				},
 			});
 
-			return parseUserBucketResponse<CreateBucketResponse>(res);
+			return parseRpcJson<CreateBucketResponse>(res);
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: userBucketKeys.list() });
@@ -73,7 +62,7 @@ export function useUpdateBucket() {
 				json: input,
 			});
 
-			return parseUserBucketResponse<{ id: string }>(res);
+			return parseRpcJson<{ id: string }>(res);
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: userBucketKeys.list() });
@@ -91,7 +80,7 @@ export function useDeleteBucket() {
 				param: { id },
 			});
 
-			return parseUserBucketResponse<{ success: boolean }>(res, { includeDetails: true });
+			return parseRpcJson<{ success: boolean }>(res, { includeDetails: true });
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: userBucketKeys.list() });
@@ -109,7 +98,7 @@ export function useReorderBuckets() {
 				json: { bucketIds },
 			});
 
-			return parseUserBucketResponse<{ success: boolean }>(res);
+			return parseRpcJson<{ success: boolean }>(res);
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: userBucketKeys.list() });

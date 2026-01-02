@@ -1,4 +1,4 @@
-import { api, buildApiRequestError } from '@/lib/api-rpc';
+import { api, parseRpcJson } from '@/lib/api-rpc';
 
 /**
  * Accept summary response from the API.
@@ -31,10 +31,6 @@ export async function acceptBatch(batchId: string): Promise<AcceptSummary> {
 		},
 	});
 
-	if (!res.ok) {
-		throw await buildApiRequestError(res);
-	}
-
 	// Cast to expected type - API returns compatible structure
-	return res.json() as Promise<AcceptSummary>;
+	return parseRpcJson<AcceptSummary>(res);
 }

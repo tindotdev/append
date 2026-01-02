@@ -4,7 +4,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { api, buildApiRequestError, type InferResponseType } from '@/lib/api-rpc';
+import { api, type InferResponseType, parseRpcJson } from '@/lib/api-rpc';
 
 // Query key factory
 export const userBucketKeys = {
@@ -21,11 +21,7 @@ export type UserBucket = ListBucketsResponse['buckets'][number];
 export async function listUserBuckets(): Promise<ListBucketsResponse> {
 	const res = await api.api['user-bucket'].$get();
 
-	if (!res.ok) {
-		throw await buildApiRequestError(res);
-	}
-
-	return res.json() as Promise<ListBucketsResponse>;
+	return parseRpcJson<ListBucketsResponse>(res);
 }
 
 // Hook: List buckets

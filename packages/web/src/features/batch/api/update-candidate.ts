@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, buildApiRequestError } from '@/lib/api-rpc';
+import { api, parseRpcJson } from '@/lib/api-rpc';
 import type { UpdateCandidateRequest, UpdateCandidateResponse } from '../types';
 import { batchKeys } from './get-batch';
 
@@ -10,12 +10,8 @@ export async function updateCandidate(id: string, request: UpdateCandidateReques
 		json: request,
 	});
 
-	if (!res.ok) {
-		throw await buildApiRequestError(res);
-	}
-
 	// Cast to expected type - API returns compatible structure
-	return res.json() as Promise<UpdateCandidateResponse>;
+	return parseRpcJson<UpdateCandidateResponse>(res);
 }
 
 // React Query mutation hook
