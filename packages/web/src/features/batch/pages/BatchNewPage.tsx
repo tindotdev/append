@@ -1,30 +1,92 @@
-import { useForm } from '@tanstack/react-form';
 import { useNavigate } from '@tanstack/react-router';
-import { useCallback, useRef } from 'react';
-import * as v from 'valibot';
+import { X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Kbd } from '@/components/ui/kbd';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ApiRequestError } from '@/lib/api-rpc';
 import { createBatch } from '../api/create-batch';
 
+// --- Constants ---
 const TERM_MIN = 1;
 const TERM_MAX = 200;
+const TERM_CHAR_MAX = 200;
+const FORBIDDEN_DELIMITER = ': ';
+const STORAGE_KEY = 'append.captureDraft.v1';
 
-function parseTerms(input: string): string[] {
-	return input
-		.split(/\r?\n/)
-		.map((line) => line.trim())
-		.filter(Boolean);
+// --- Types ---
+interface TermRow {
+	id: string;
+	value: string;
 }
 
-const termsSchema = v.pipe(
-	v.string(),
-	v.transform((s) => parseTerms(s)),
-	v.minLength(TERM_MIN, `At least ${TERM_MIN} term is required`),
-	v.maxLength(TERM_MAX, `At most ${TERM_MAX} terms are allowed`)
-);
+type ValidationStatus = 'valid' | 'empty' | 'too-long' | 'forbidden-delimiter' | 'duplicate';
 
+interface TermValidation {
+	status: ValidationStatus;
+	message?: string;
+}
+
+// --- Validation ---
+function validateTerm(value: string, existingTerms: string[], currentIndex: number): TermValidation {
+	const trimmed = value.trim();
+
+	if (!trimmed) {
+		return { status: 'empty' };
+	}
+
+	if (trimmed.length > TERM_CHAR_MAX) {
+		return { status: 'too-long', message: `Max ${TERM_CHAR_MAX} characters` };
+	}
+
+	if (trimmed.includes(FORBIDDEN_DELIMITER)) {
+		return { status: 'forbidden-delimiter', message: 'Cannot contain ": "' };
+	}
+
+	// Check for duplicates (case-insensitive)
+	const normalized = trimmed.toLowerCase();
+	const isDuplicate = existingTerms.some((t, i) => i < currentIndex && t.trim().toLowerCase() === normalized);
+	if (isDuplicate) {
+		return { status: 'duplicate', message: 'Duplicate (allowed)' };
+	}
+
+	return { status: 'valid' };
+}
+
+// --- Local Storage ---
+function loadDraft(): TermRow[] {
+	try {
+		const stored = localStorage.getItem(STORAGE_KEY);
+		if (stored) {
+			const parsed = JSON.parse(stored);
+			if (Array.isArray(parsed) && parsed.every((r) => r.id && typeof r.value === 'string')) {
+				return parsed;
+			}
+		}
+	} catch {
+		// Ignore parse errors
+	}
+	return [{ id: crypto.randomUUID(), value: '' }];
+}
+
+function saveDraft(rows: TermRow[]): void {
+	try {
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
+	} catch {
+		// Ignore storage errors
+	}
+}
+
+function clearDraft(): void {
+	try {
+		localStorage.removeItem(STORAGE_KEY);
+	} catch {
+		// Ignore storage errors
+	}
+}
+
+// --- Error handling ---
 function getBatchErrorMessage(err: unknown): string {
 	if (err instanceof ApiRequestError) {
 		if (err.code === 'IDEMPOTENCY_CONFLICT') {
@@ -38,119 +100,291 @@ function getBatchErrorMessage(err: unknown): string {
 	return 'An unexpected error occurred. Please try again.';
 }
 
+// --- Component ---
 export function BatchNewPage() {
 	const navigate = useNavigate();
+
+	const [rows, setRows] = useState<TermRow[]>(() => loadDraft());
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [submitError, setSubmitError] = useState<string | null>(null);
 
 	// Track clientRequestId: generate once per submit attempt, regenerate on edit after failure
 	const clientRequestIdRef = useRef<string | null>(null);
 	const hasFailedRef = useRef(false);
 
-	const form = useForm({
-		defaultValues: {
-			terms: '',
-		},
-		validators: {
-			onSubmit: v.object({ terms: termsSchema }),
-		},
-		onSubmit: async ({ value }) => {
-			// Generate clientRequestId if we don't have one
-			if (!clientRequestIdRef.current) {
-				clientRequestIdRef.current = crypto.randomUUID();
-			}
+	// Refs for focus management
+	const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+	const focusRowId = useRef<string | null>(null);
 
-			try {
-				const response = await createBatch({
-					terms: value.terms,
-					clientRequestId: clientRequestIdRef.current,
-				});
+	// Save draft on changes
+	useEffect(() => {
+		saveDraft(rows);
+	}, [rows]);
 
-				// Success - navigate to the batch page
-				navigate({ to: '/batch/$batchId', params: { batchId: response.id } });
-			} catch (err: unknown) {
-				hasFailedRef.current = true;
-				throw new Error(getBatchErrorMessage(err));
+	// Focus management after state updates
+	useEffect(() => {
+		if (focusRowId.current) {
+			const input = inputRefs.current.get(focusRowId.current);
+			if (input) {
+				input.focus();
+				// Move cursor to end
+				input.setSelectionRange(input.value.length, input.value.length);
 			}
-		},
+			focusRowId.current = null;
+		}
 	});
 
-	const handleTermsChange = useCallback((_value: string) => {
-		// If user edits after a failure, clear the clientRequestId so we generate a new one
+	// Get all term values for duplicate checking
+	const termValues = rows.map((r) => r.value);
+
+	// Count valid (non-empty) terms
+	const validTermCount = rows.filter((r) => r.value.trim()).length;
+
+	// Check if form is submittable
+	const hasValidationErrors = rows.some((r, i) => {
+		const validation = validateTerm(r.value, termValues, i);
+		return validation.status === 'too-long' || validation.status === 'forbidden-delimiter';
+	});
+	const canSubmit = validTermCount >= TERM_MIN && validTermCount <= TERM_MAX && !hasValidationErrors && !isSubmitting;
+
+	const handleRowChange = useCallback((id: string, value: string) => {
+		// If user edits after a failure, clear the clientRequestId
 		if (hasFailedRef.current) {
 			clientRequestIdRef.current = null;
 			hasFailedRef.current = false;
 		}
+		setSubmitError(null);
+		setRows((prev) => prev.map((r) => (r.id === id ? { ...r, value } : r)));
 	}, []);
 
-	const termCount = parseTerms(form.state.values.terms).length;
+	const handleRowPaste = useCallback((id: string, e: React.ClipboardEvent<HTMLInputElement>) => {
+		const pastedText = e.clipboardData.getData('text');
+		const lines = pastedText.split(/\r?\n/).filter((line) => line.trim());
+
+		// If pasting multiple lines, split into rows
+		if (lines.length > 1) {
+			e.preventDefault();
+
+			setRows((prev) => {
+				const index = prev.findIndex((r) => r.id === id);
+				if (index === -1) return prev;
+
+				const newRows = lines.map((line) => ({
+					id: crypto.randomUUID(),
+					value: line.trim(),
+				}));
+
+				// Replace current row with first line, insert rest after
+				const result = [...prev.slice(0, index), ...newRows, ...prev.slice(index + 1)];
+
+				// Focus the last pasted row
+				focusRowId.current = newRows[newRows.length - 1].id;
+
+				return result;
+			});
+		}
+	}, []);
+
+	const handleRowKeyDown = useCallback(
+		(id: string, e: React.KeyboardEvent<HTMLInputElement>) => {
+			if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+				e.preventDefault();
+				// Add new row below and focus it
+				const newRow: TermRow = { id: crypto.randomUUID(), value: '' };
+				setRows((prev) => {
+					const index = prev.findIndex((r) => r.id === id);
+					if (index === -1) return prev;
+					return [...prev.slice(0, index + 1), newRow, ...prev.slice(index + 1)];
+				});
+				focusRowId.current = newRow.id;
+			} else if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+				e.preventDefault();
+				if (canSubmit) {
+					handleSubmit();
+				}
+			} else if (e.key === 'Backspace' && (e.target as HTMLInputElement).value === '') {
+				// Remove empty row on backspace and focus previous
+				e.preventDefault();
+				setRows((prev) => {
+					if (prev.length <= 1) return prev;
+					const index = prev.findIndex((r) => r.id === id);
+					if (index === -1) return prev;
+					// Focus previous row (or next if first)
+					const focusIndex = index > 0 ? index - 1 : 1;
+					focusRowId.current = prev[focusIndex]?.id ?? null;
+					return prev.filter((r) => r.id !== id);
+				});
+			}
+		},
+		[canSubmit]
+	);
+
+	const handleRemoveRow = useCallback((id: string) => {
+		setRows((prev) => {
+			if (prev.length <= 1) {
+				// If last row, just clear it
+				return [{ id: prev[0].id, value: '' }];
+			}
+			return prev.filter((r) => r.id !== id);
+		});
+	}, []);
+
+	const handleAddRow = useCallback(() => {
+		const newRow: TermRow = { id: crypto.randomUUID(), value: '' };
+		setRows((prev) => [...prev, newRow]);
+		focusRowId.current = newRow.id;
+	}, []);
+
+	const handleClearDraft = useCallback(() => {
+		clearDraft();
+		setRows([{ id: crypto.randomUUID(), value: '' }]);
+		setSubmitError(null);
+		clientRequestIdRef.current = null;
+		hasFailedRef.current = false;
+	}, []);
+
+	const handleSubmit = useCallback(async () => {
+		if (!canSubmit) return;
+
+		// Generate clientRequestId if we don't have one
+		if (!clientRequestIdRef.current) {
+			clientRequestIdRef.current = crypto.randomUUID();
+		}
+
+		setIsSubmitting(true);
+		setSubmitError(null);
+
+		try {
+			// Collect non-empty terms
+			const terms = rows.map((r) => r.value.trim()).filter(Boolean);
+			const termsInput = terms.join('\n');
+
+			const response = await createBatch({
+				terms: termsInput,
+				clientRequestId: clientRequestIdRef.current,
+			});
+
+			// Success - clear draft and navigate
+			clearDraft();
+			navigate({ to: '/batch/$batchId', params: { batchId: response.id } });
+		} catch (err: unknown) {
+			hasFailedRef.current = true;
+			setSubmitError(getBatchErrorMessage(err));
+		} finally {
+			setIsSubmitting(false);
+		}
+	}, [canSubmit, rows, navigate]);
 
 	return (
 		<div className="max-w-2xl">
-			<h2 className="text-xl font-semibold">Capture New Batch</h2>
-			<p className="mt-2 text-zinc-400">Enter your terms, one per line. Brain dump welcome — duplicates and rough ideas are fine.</p>
+			<div className="flex items-center justify-between">
+				<div>
+					<h2 className="text-xl font-semibold">Capture</h2>
+					<p className="mt-1 text-sm text-zinc-400">Enter terms, one per row. Brain dump welcome.</p>
+				</div>
+				{rows.some((r) => r.value.trim()) && (
+					<Button variant="ghost" size="sm" onClick={handleClearDraft} className="text-zinc-500 hover:text-zinc-300">
+						Clear draft
+					</Button>
+				)}
+			</div>
 
-			<form
-				className="mt-6"
-				onSubmit={(e) => {
-					e.preventDefault();
-					form.handleSubmit();
-				}}
-			>
-				<FieldGroup>
-					<form.Field name="terms">
-						{(field) => {
-							const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
-							const hasFormError = form.state.errors.length > 0;
-							return (
-								<Field data-invalid={isInvalid}>
-									<FieldLabel htmlFor={field.name} className="sr-only">
-										Terms
-									</FieldLabel>
-									<Textarea
-										id={field.name}
-										name={field.name}
-										value={field.state.value}
-										onBlur={field.handleBlur}
-										onChange={(e) => {
-											field.handleChange(e.target.value);
-											handleTermsChange(e.target.value);
-										}}
-										placeholder="Enter terms here, one per line..."
-										className="h-64 resize-none font-mono text-sm"
-										disabled={form.state.isSubmitting}
-										aria-invalid={isInvalid}
-									/>
-									<div className="flex items-center justify-between">
-										<FieldDescription className={termCount >= TERM_MIN && termCount <= TERM_MAX ? '' : 'text-amber-500'}>
-											{termCount} term{termCount !== 1 ? 's' : ''}
-										</FieldDescription>
-										<FieldDescription>
-											{TERM_MIN}–{TERM_MAX} terms required
-										</FieldDescription>
-									</div>
-									{isInvalid && <FieldError errors={field.state.meta.errors?.map((e) => (typeof e === 'string' ? e : e?.message))} />}
-									{hasFormError &&
-										(() => {
-											const err = form.state.errors[0];
-											let msg: string | undefined;
-											if (typeof err === 'string') {
-												msg = err;
-											} else if (err && typeof err === 'object' && 'message' in err) {
-												msg = typeof err.message === 'string' ? err.message : undefined;
-											}
-											return msg ? <p className="text-sm text-destructive">{msg}</p> : null;
-										})()}
-								</Field>
-							);
-						}}
-					</form.Field>
-				</FieldGroup>
+			<div className="mt-6 space-y-2">
+				{rows.map((row, index) => {
+					const validation = validateTerm(row.value, termValues, index);
+					const showError = validation.status === 'too-long' || validation.status === 'forbidden-delimiter';
+					const showDuplicate = validation.status === 'duplicate';
 
-				<div className="mt-4">
-					<Button type="submit" className="w-full" disabled={form.state.isSubmitting}>
-						{form.state.isSubmitting ? 'Submitting...' : 'Submit Batch'}
+					return (
+						<div key={row.id} className="group flex items-center gap-2">
+							<div className="flex h-8 w-8 shrink-0 items-center justify-center">
+								<span
+									className={`h-2 w-2 rounded-full ${
+										validation.status === 'valid'
+											? 'bg-green-500'
+											: validation.status === 'duplicate'
+												? 'bg-amber-500'
+												: showError
+													? 'bg-red-500'
+													: 'bg-zinc-600'
+									}`}
+								/>
+							</div>
+							<div className="relative flex-1">
+								<Input
+									ref={(el) => {
+										if (el) {
+											inputRefs.current.set(row.id, el);
+										} else {
+											inputRefs.current.delete(row.id);
+										}
+									}}
+									value={row.value}
+									onChange={(e) => handleRowChange(row.id, e.target.value)}
+									onPaste={(e) => handleRowPaste(row.id, e)}
+									onKeyDown={(e) => handleRowKeyDown(row.id, e)}
+									placeholder={index === 0 ? 'Type a term or paste many...' : ''}
+									disabled={isSubmitting}
+									className={`pr-20 ${showError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+									aria-invalid={showError}
+								/>
+								{(showError || showDuplicate) && (
+									<span className={`absolute right-10 top-1/2 -translate-y-1/2 text-xs ${showError ? 'text-red-400' : 'text-amber-400'}`}>
+										{validation.message}
+									</span>
+								)}
+							</div>
+							<TooltipProvider delayDuration={300}>
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<Button
+											variant="ghost"
+											size="icon"
+											className="h-8 w-8 shrink-0 text-zinc-500 opacity-0 transition-opacity hover:text-zinc-300 group-hover:opacity-100 focus:opacity-100"
+											onClick={() => handleRemoveRow(row.id)}
+											disabled={isSubmitting}
+											aria-label="Remove row"
+										>
+											<X className="h-4 w-4" />
+										</Button>
+									</TooltipTrigger>
+									<TooltipContent side="right">Remove</TooltipContent>
+								</Tooltip>
+							</TooltipProvider>
+						</div>
+					);
+				})}
+			</div>
+
+			<div className="mt-4">
+				<Button variant="ghost" size="sm" onClick={handleAddRow} disabled={isSubmitting} className="text-zinc-400 hover:text-zinc-200">
+					+ Add term
+				</Button>
+			</div>
+
+			{submitError && <p className="mt-4 text-sm text-red-400">{submitError}</p>}
+
+			<div className="mt-6 flex items-center justify-between">
+				<div className="text-sm text-zinc-500">
+					<span className={validTermCount < TERM_MIN || validTermCount > TERM_MAX ? 'text-amber-400' : ''}>
+						{validTermCount} term{validTermCount !== 1 ? 's' : ''}
+					</span>
+					<span className="mx-2">·</span>
+					<span>
+						{TERM_MIN}–{TERM_MAX} allowed
+					</span>
+				</div>
+				<div className="flex items-center gap-3">
+					<span className="hidden text-xs text-zinc-500 sm:inline-flex sm:items-center sm:gap-1">
+						<Kbd>⌘</Kbd>
+						<Kbd>↵</Kbd>
+						<span className="ml-1">to submit</span>
+					</span>
+					<Button onClick={handleSubmit} disabled={!canSubmit}>
+						{isSubmitting ? 'Submitting...' : 'Submit Batch'}
 					</Button>
 				</div>
-			</form>
+			</div>
 		</div>
 	);
 }
