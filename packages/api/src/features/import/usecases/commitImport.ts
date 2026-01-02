@@ -12,7 +12,7 @@ import { checkIdempotencyKey, createIdempotencyKeyStatement, findIdempotencyKey 
 import { decodeJsonResultRef, encodeJsonResultRef } from '../../../shared/idempotency/result-ref';
 import type { CommitImportInput, CommitImportResponse } from '../validation/import.schema';
 import { parseImportFile } from './parseImportFile';
-import { listImportFiles } from './uploadFiles';
+import { requireImportFiles } from './uploadFiles';
 
 /**
  * SQLite/D1 has a limit on variables per query (~99 for D1).
@@ -64,12 +64,104 @@ interface FileInfo {
 	entriesCount: number;
 }
 
+interface ExistingTermRow {
+	id: string;
+	canonical: string;
+	primarySenseId: string | null;
+}
+
+interface PrimarySenseRow {
+	id: string;
+	bucket: string;
+}
+
 function buildBucketMappingMap(bucketMappings: CommitImportInput['bucketMappings']): Map<string, string> {
 	const bucketMappingMap = new Map<string, string>();
 	for (const mapping of bucketMappings) {
 		bucketMappingMap.set(mapping.r2Key, mapping.bucketId);
 	}
 	return bucketMappingMap;
+}
+
+async function loadExistingTerms(
+	db: DrizzleD1Database<typeof schema>,
+	userId: string,
+	uniqueCanonicals: string[]
+): Promise<ExistingTermRow[]> {
+	const existingTerms: ExistingTermRow[] = [];
+	if (uniqueCanonicals.length === 0) {
+		return existingTerms;
+	}
+
+	const canonicalBatches = chunk(uniqueCanonicals, BATCH_SIZE);
+	for (const batch of canonicalBatches) {
+		const batchResults = await db
+			.select({
+				id: term.id,
+				canonical: term.canonical,
+				primarySenseId: term.primarySenseId,
+			})
+			.from(term)
+			.where(and(eq(term.userId, userId), inArray(term.canonical, batch)));
+		existingTerms.push(...batchResults);
+	}
+
+	return existingTerms;
+}
+
+async function loadPrimarySenseBuckets(db: DrizzleD1Database<typeof schema>, primarySenseIds: string[]): Promise<PrimarySenseRow[]> {
+	const primarySenses: PrimarySenseRow[] = [];
+	if (primarySenseIds.length === 0) {
+		return primarySenses;
+	}
+
+	const senseIdBatches = chunk(primarySenseIds, BATCH_SIZE);
+	for (const batch of senseIdBatches) {
+		const batchResults = await db.select({ id: termSense.id, bucket: termSense.bucket }).from(termSense).where(inArray(termSense.id, batch));
+		primarySenses.push(...batchResults);
+	}
+
+	return primarySenses;
+}
+
+function buildExistingTermMap(existingTerms: ExistingTermRow[]): Map<string, { termId: string; primarySenseId: string | null }> {
+	const existingTermMap = new Map<string, { termId: string; primarySenseId: string | null }>();
+	for (const t of existingTerms) {
+		existingTermMap.set(t.canonical, { termId: t.id, primarySenseId: t.primarySenseId });
+	}
+	return existingTermMap;
+}
+
+function buildPrimarySenseBucketMap(primarySenses: PrimarySenseRow[]): Map<string, string> {
+	const primarySenseBucketMap = new Map<string, string>();
+	for (const ps of primarySenses) {
+		primarySenseBucketMap.set(ps.id, ps.bucket);
+	}
+	return primarySenseBucketMap;
+}
+
+function buildCanonicalTermMaps(
+	entries: EntryWithBucket[],
+	existingTermMap: Map<string, { termId: string; primarySenseId: string | null }>
+): { canonicalToTermId: Map<string, string>; newTermCanonicals: Set<string> } {
+	const canonicalToTermId = new Map<string, string>();
+	const newTermCanonicals = new Set<string>();
+
+	for (const entry of entries) {
+		const canonical = normalize(entry.term);
+		if (!canonicalToTermId.has(canonical)) {
+			const existing = existingTermMap.get(canonical);
+			if (existing) {
+				canonicalToTermId.set(canonical, existing.termId);
+			} else {
+				const newTermId = crypto.randomUUID();
+				canonicalToTermId.set(canonical, newTermId);
+				newTermCanonicals.add(canonical);
+			}
+		}
+	}
+
+	return { canonicalToTermId, newTermCanonicals };
 }
 
 async function loadBucketSlugMap(
@@ -121,13 +213,11 @@ export async function commitImport(
 	const { clientRequestId, importId, bucketMappings } = input;
 
 	// Verify import exists in R2
-	const r2Objects = await listImportFiles(r2, userId, importId);
-	if (!r2Objects) {
-		return {
-			success: false,
-			error: { type: 'not_found', message: 'Import not found' },
-		};
+	const importFiles = await requireImportFiles(r2, userId, importId);
+	if (!importFiles.ok) {
+		return { success: false, error: importFiles.error };
 	}
+	const r2Objects = importFiles.objects;
 
 	// Build bucket mapping lookup: r2Key → bucketId
 	const bucketMappingMap = buildBucketMappingMap(bucketMappings);
@@ -164,71 +254,19 @@ export async function commitImport(
 	const uniqueCanonicals = [...new Set(allEntries.map((e) => normalize(e.term)))];
 
 	// Pre-fetch existing terms (batched to avoid D1 variable limit)
-	interface ExistingTermRow {
-		id: string;
-		canonical: string;
-		primarySenseId: string | null;
-	}
-	const existingTerms: ExistingTermRow[] = [];
-	if (uniqueCanonicals.length > 0) {
-		const canonicalBatches = chunk(uniqueCanonicals, BATCH_SIZE);
-		for (const batch of canonicalBatches) {
-			const batchResults = await db
-				.select({
-					id: term.id,
-					canonical: term.canonical,
-					primarySenseId: term.primarySenseId,
-				})
-				.from(term)
-				.where(and(eq(term.userId, userId), inArray(term.canonical, batch)));
-			existingTerms.push(...batchResults);
-		}
-	}
+	const existingTerms = await loadExistingTerms(db, userId, uniqueCanonicals);
 
 	// Build map of existing terms
-	const existingTermMap = new Map<string, { termId: string; primarySenseId: string | null }>();
-	for (const t of existingTerms) {
-		existingTermMap.set(t.canonical, { termId: t.id, primarySenseId: t.primarySenseId });
-	}
+	const existingTermMap = buildExistingTermMap(existingTerms);
 
 	// Pre-fetch primary sense buckets (batched to avoid D1 variable limit)
 	const primarySenseIds = existingTerms.map((t) => t.primarySenseId).filter((id): id is string => id !== null);
 
-	interface PrimarySenseRow {
-		id: string;
-		bucket: string;
-	}
-	const primarySenses: PrimarySenseRow[] = [];
-	if (primarySenseIds.length > 0) {
-		const senseIdBatches = chunk(primarySenseIds, BATCH_SIZE);
-		for (const batch of senseIdBatches) {
-			const batchResults = await db.select({ id: termSense.id, bucket: termSense.bucket }).from(termSense).where(inArray(termSense.id, batch));
-			primarySenses.push(...batchResults);
-		}
-	}
-
-	const primarySenseBucketMap = new Map<string, string>();
-	for (const ps of primarySenses) {
-		primarySenseBucketMap.set(ps.id, ps.bucket);
-	}
+	const primarySenses = await loadPrimarySenseBuckets(db, primarySenseIds);
+	const primarySenseBucketMap = buildPrimarySenseBucketMap(primarySenses);
 
 	// Build canonical → termId map
-	const canonicalToTermId = new Map<string, string>();
-	const newTermCanonicals = new Set<string>();
-
-	for (const entry of allEntries) {
-		const canonical = normalize(entry.term);
-		if (!canonicalToTermId.has(canonical)) {
-			const existing = existingTermMap.get(canonical);
-			if (existing) {
-				canonicalToTermId.set(canonical, existing.termId);
-			} else {
-				const newTermId = crypto.randomUUID();
-				canonicalToTermId.set(canonical, newTermId);
-				newTermCanonicals.add(canonical);
-			}
-		}
-	}
+	const { canonicalToTermId, newTermCanonicals } = buildCanonicalTermMaps(allEntries, existingTermMap);
 
 	// Generate D1 batch statements
 	const now = new Date();

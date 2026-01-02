@@ -1,6 +1,6 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { batch, bucket, type schema } from '../db';
+import { batch, bucket, type schema, term } from '../db';
 
 export type OwnershipResult<T> = { ok: true; value: T } | { ok: false; error: 'not_found' | 'forbidden' };
 
@@ -43,6 +43,26 @@ export async function requireBucketOwned(
 	}
 
 	return { ok: true, value: bucketRow };
+}
+
+export async function requireTermOwned(
+	db: DrizzleD1Database<typeof schema>,
+	userId: string,
+	termId: string
+): Promise<OwnershipResult<typeof term.$inferSelect>> {
+	const termRow = await db.query.term.findFirst({
+		where: and(eq(term.id, termId), isNull(term.archivedAt)),
+	});
+
+	if (!termRow) {
+		return { ok: false, error: 'not_found' };
+	}
+
+	if (termRow.userId !== userId) {
+		return { ok: false, error: 'forbidden' };
+	}
+
+	return { ok: true, value: termRow };
 }
 
 export async function findUserBucketBySlug(

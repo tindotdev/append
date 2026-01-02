@@ -93,3 +93,36 @@ export function apiErrorFrom<E extends { type: string }>(c: Context, error: E, m
 
 	return apiError(c, entry.status, entry.code, message, details);
 }
+
+type OwnershipError = { type: 'not_found' } | { type: 'forbidden' };
+type OwnershipErrorWithMessage = { type: 'not_found'; message: string } | { type: 'forbidden'; message: string };
+
+export function ownershipErrorMap(resourceLabel: string): ErrorMapping<OwnershipError> {
+	return {
+		not_found: {
+			status: 404,
+			code: 'NOT_FOUND',
+			message: `${resourceLabel} not found`,
+		},
+		forbidden: {
+			status: 403,
+			code: 'FORBIDDEN',
+			message: 'Access denied',
+		},
+	} as const;
+}
+
+export function ownershipErrorMapFromMessage(): ErrorMapping<OwnershipErrorWithMessage> {
+	return {
+		not_found: {
+			status: 404,
+			code: 'NOT_FOUND',
+			message: (error) => error.message,
+		},
+		forbidden: {
+			status: 403,
+			code: 'FORBIDDEN',
+			message: (error) => error.message,
+		},
+	} as const;
+}

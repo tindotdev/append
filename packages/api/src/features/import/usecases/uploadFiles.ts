@@ -133,6 +133,25 @@ export async function listImportFiles(r2: R2Bucket, userId: string, importId: st
 	return listed.objects.map((obj) => ({ key: obj.key, size: obj.size }));
 }
 
+export type ImportFilesResult = { ok: true; objects: ListedFile[] } | { ok: false; error: { type: 'not_found'; message: string } };
+
+/**
+ * Require import files to exist in R2.
+ *
+ * @param r2 - R2 bucket binding
+ * @param userId - Authenticated user ID
+ * @param importId - Import ID to list files for
+ * @returns Result with objects or not_found error
+ */
+export async function requireImportFiles(r2: R2Bucket, userId: string, importId: string): Promise<ImportFilesResult> {
+	const objects = await listImportFiles(r2, userId, importId);
+	if (!objects) {
+		return { ok: false, error: { type: 'not_found', message: 'Import not found' } };
+	}
+
+	return { ok: true, objects };
+}
+
 /**
  * Get file content from R2.
  *

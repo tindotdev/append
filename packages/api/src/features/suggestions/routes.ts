@@ -8,13 +8,14 @@ import { Hono } from 'hono';
 import { bucket } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
 import { sseEvent, sseResponse } from '../../platform/sse';
-import { apiError, validationHook } from '../../shared/api-error';
+import { apiError, apiErrorFrom, ownershipErrorMap, validationHook } from '../../shared/api-error';
 import { requireBatchOwned } from '../../shared/queries';
 import { createLlmClient } from './adapters';
 import { generateSuggestions } from './usecases/generateSuggestions';
 import { SuggestSchema } from './validation/suggest.schema';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+const batchAccessErrors = ownershipErrorMap('Batch');
 
 /**
  * Suggestions routes - exported as the result of route chain for Hono RPC type inference.
@@ -42,10 +43,7 @@ export const suggestionsRoutes = app.post('/batch/:id/suggest', vValidator('quer
 	// Verify batch exists and user owns it
 	const batchOwnership = await requireBatchOwned(db, userId, batchId);
 	if (!batchOwnership.ok) {
-		const status = batchOwnership.error === 'not_found' ? 404 : 403;
-		const code = batchOwnership.error === 'not_found' ? 'NOT_FOUND' : 'FORBIDDEN';
-		const message = batchOwnership.error === 'not_found' ? 'Batch not found' : 'Access denied';
-		return apiError(c, status, code, message);
+		return apiErrorFrom(c, { type: batchOwnership.error }, batchAccessErrors);
 	}
 
 	// Fetch user's buckets for dynamic prompt (Phase 5C)

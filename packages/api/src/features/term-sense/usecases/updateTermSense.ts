@@ -4,9 +4,9 @@
 
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { type schema, term, termSense } from '../../../db';
+import { type schema, termSense } from '../../../db';
 import { resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
-import { findUserBucketBySlug } from '../../../shared/queries';
+import { findUserBucketBySlug, requireTermOwned } from '../../../shared/queries';
 import type { UpdateTermSenseInput } from '../validation/updateTermSense.schema';
 
 /**
@@ -54,16 +54,9 @@ export async function updateTermSense(
 	}
 
 	// 2. Lookup parent term to verify ownership
-	const termRow = await db.query.term.findFirst({
-		where: and(eq(term.id, senseRow.termId), isNull(term.archivedAt)),
-	});
-
-	if (!termRow) {
-		return { success: false, error: { type: 'not_found' } };
-	}
-
-	if (termRow.userId !== userId) {
-		return { success: false, error: { type: 'forbidden' } };
+	const termOwnership = await requireTermOwned(db, userId, senseRow.termId);
+	if (!termOwnership.ok) {
+		return { success: false, error: { type: termOwnership.error } };
 	}
 
 	// 3. Validate bucket exists for user (if provided)
