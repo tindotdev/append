@@ -73,7 +73,6 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CF_PAGES_PROJECT: ${{ secrets.CF_PAGES_PROJECT }}
     outputs:
       deployment-url: ${{ steps.deploy.outputs.deployment-url }}
     steps:
@@ -109,19 +108,25 @@ jobs:
         id: deploy
         working-directory: packages/web
         run: |
-          # Use --branch to create a preview deployment
-          set +e  # Don't exit on error yet
-          DEPLOYMENT_OUTPUT=$(pnpm exec wrangler pages deploy dist --project-name "$CF_PAGES_PROJECT" --branch "${{ github.head_ref }}" 2>&1)
-          EXIT_CODE=$?
-          echo "$DEPLOYMENT_OUTPUT"
+          # Deploy to preview environment and capture URL
+          DEPLOY_OUTPUT=$(pnpm exec wrangler pages deploy dist --project-name "append-web" --branch "${{ github.head_ref }}" 2>&1)
+          echo "$DEPLOY_OUTPUT"
 
-          if [ $EXIT_CODE -ne 0 ]; then
-            echo "::error::Deployment failed with exit code $EXIT_CODE"
-            exit $EXIT_CODE
+          # Extract URLs (strip ANSI codes first)
+          CLEAN_OUTPUT=$(echo "$DEPLOY_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g')
+
+          # Get the alias URL (branch-specific) if available, otherwise get the primary URL
+          ALIAS_URL=$(echo "$CLEAN_OUTPUT" | grep -oP 'Deployment alias URL: \Khttps://[^\s]+\.pages\.dev' | head -1)
+          PRIMARY_URL=$(echo "$CLEAN_OUTPUT" | grep -oP 'Deployment complete.*\Khttps://[^\s]+\.pages\.dev' | head -1)
+
+          # Use alias URL if available, otherwise use primary
+          DEPLOYMENT_URL="${ALIAS_URL:-$PRIMARY_URL}"
+
+          if [ -z "$DEPLOYMENT_URL" ]; then
+            echo "::warning::Could not extract deployment URL from wrangler output"
           fi
 
-          # Extract deployment URL from output (strip ANSI codes first)
-          DEPLOYMENT_URL=$(echo "$DEPLOYMENT_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' | grep -oP 'https://[^\s]+\.pages\.dev' | head -1)
+          # Use ::set-output to avoid secret masking issues
           echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
 
   comment-preview-urls:
