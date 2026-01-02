@@ -7,6 +7,7 @@ Documentation in this repo is a contract.
 - `AGENTS.md`
 - Everything under `docs/` (design, build plan, ADRs, risks, etc.)
 - `docs/runbook.md`
+- ENG-LOG legacy format reference: https://github.com/tindotdev/eng-log (import/export contract; see `docs/design.md`).
 
 If the code changes behavior, update docs in the same change (or immediately after).
 
