@@ -8,9 +8,14 @@
 import type { AppType } from '@append/api';
 import { hc, type InferRequestType, type InferResponseType } from 'hono/client';
 
-// API URL - local dev or production
+// API URL - local dev, preview, or production
 // Exported for use by SSE streaming and blob download functions that can't use RPC
-export const API_URL = import.meta.env.DEV ? 'http://localhost:8787' : 'https://api.append.tindev.dev';
+// Priority: VITE_API_URL env var > DEV mode > production default
+export const API_URL = import.meta.env.VITE_API_URL
+	? import.meta.env.VITE_API_URL
+	: import.meta.env.DEV
+		? 'http://localhost:8787'
+		: 'https://api.append.tindev.dev';
 
 export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
 	return fetch(`${API_URL}${path}`, {
