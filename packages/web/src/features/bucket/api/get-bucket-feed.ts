@@ -1,5 +1,5 @@
 import { type QueryFunctionContext, useInfiniteQuery } from '@tanstack/react-query';
-import { ApiRequestError, api, type InferResponseType } from '@/lib/api-rpc';
+import { api, buildApiRequestError, type InferResponseType } from '@/lib/api-rpc';
 
 // Query key factory
 export const bucketKeys = {
@@ -30,8 +30,7 @@ export async function getBucketFeed(slug: string, options?: GetBucketFeedOptions
 	});
 
 	if (!res.ok) {
-		const errorBody = (await res.json()) as { error?: { code?: string; message?: string } };
-		throw new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
+		throw await buildApiRequestError(res);
 	}
 
 	// Safe to cast - we checked res.ok so this is the success response

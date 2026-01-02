@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { API_URL, ApiRequestError } from '@/lib/api-rpc';
+import { API_URL, buildApiRequestError } from '@/lib/api-rpc';
 
 // Query key factory
 export const termKeys = {
@@ -38,8 +38,7 @@ export async function getTerm(termId: string): Promise<TermDetailResponse> {
 	});
 
 	if (!res.ok) {
-		const errorBody = (await res.json()) as { error?: { code?: string; message?: string } };
-		throw new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
+		throw await buildApiRequestError(res);
 	}
 
 	return res.json() as Promise<TermDetailResponse>;

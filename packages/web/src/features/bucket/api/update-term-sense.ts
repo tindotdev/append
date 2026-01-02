@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { API_URL, ApiRequestError } from '@/lib/api-rpc';
+import { API_URL, buildApiRequestError } from '@/lib/api-rpc';
 import { bucketKeys } from './get-bucket-feed';
 import { termKeys } from './get-term';
 
@@ -36,13 +36,7 @@ export async function updateTermSense(senseId: string, request: UpdateTermSenseR
 	});
 
 	if (!res.ok) {
-		const errorBody = (await res.json()) as { error?: { code?: string; message?: string }; details?: { currentVersion?: number } };
-		const error = new ApiRequestError(res.status, errorBody.error?.code ?? 'UNKNOWN_ERROR', errorBody.error?.message ?? res.statusText);
-		// Attach currentVersion for version conflicts
-		if (errorBody.details?.currentVersion !== undefined) {
-			(error as ApiRequestError & { currentVersion?: number }).currentVersion = errorBody.details.currentVersion;
-		}
-		throw error;
+		throw await buildApiRequestError(res, { includeCurrentVersion: true });
 	}
 
 	return res.json() as Promise<UpdateTermSenseResponse>;
