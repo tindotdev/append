@@ -49,6 +49,9 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 		getParentRoute: () => protectedRoute,
 		path: '/bucket/$slug',
 		component: BucketFeedPage,
+		validateSearch: (search: Record<string, unknown>) => ({
+			term: typeof search.term === 'string' ? search.term : undefined,
+		}),
 	});
 
 	const exportRoute = createRoute({

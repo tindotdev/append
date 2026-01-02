@@ -124,7 +124,7 @@ export function AppShell() {
 									<CommandItem
 										key={bucket.id}
 										onSelect={() => {
-											navigate({ to: '/bucket/$slug', params: { slug: bucket.slug } });
+											navigate({ to: '/bucket/$slug', params: { slug: bucket.slug }, search: { term: undefined } });
 											setCommandOpen(false);
 										}}
 									>

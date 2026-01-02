@@ -1,9 +1,13 @@
-import { useParams } from '@tanstack/react-router';
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { Search } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { useUserBuckets } from '@/lib/user-buckets';
 import { useBucketFeed } from '../api/get-bucket-feed';
+import { BucketTable } from '../components/BucketTable';
+import { columns } from '../components/columns';
+import { TermDetailSheet } from '../components/TermDetailSheet';
+import type { BucketFeedItem } from '../types';
 
 function BucketLoadingState() {
 	return (
@@ -67,24 +71,24 @@ function FeedEmptyState({ title }: { title: string }) {
 	);
 }
 
-interface FeedItem {
-	termId: string;
-	displayTerm: string;
-	primarySense: { text: string };
-}
-
 function FeedContent({
 	title,
 	items,
 	hasNextPage,
 	isFetchingNextPage,
 	onFetchNextPage,
+	selectedTermId,
+	onRowClick,
+	onClosePanel,
 }: {
 	title: string;
-	items: FeedItem[];
+	items: BucketFeedItem[];
 	hasNextPage: boolean;
 	isFetchingNextPage: boolean;
 	onFetchNextPage: () => void;
+	selectedTermId: string | null;
+	onRowClick: (item: BucketFeedItem) => void;
+	onClosePanel: () => void;
 }) {
 	const [searchQuery, setSearchQuery] = useState('');
 	const deferredQuery = useDeferredValue(searchQuery);
@@ -122,17 +126,9 @@ function FeedContent({
 				<p className="text-sm text-zinc-500 mt-2">{isFiltering ? 'Filtering...' : `${filteredItems.length} of ${items.length} items`}</p>
 			)}
 
-			<div className="mt-4 border border-zinc-800 rounded-lg divide-y divide-zinc-800">
-				{filteredItems.length > 0 ? (
-					filteredItems.map((item) => (
-						<div key={item.termId} className="p-4">
-							<p className="text-white font-medium">{item.displayTerm}</p>
-							<p className="text-zinc-400 text-sm mt-1">{item.primarySense.text}</p>
-						</div>
-					))
-				) : (
-					<div className="p-4 text-center text-zinc-500">No items match your filter.</div>
-				)}
+			{/* Table */}
+			<div className="mt-4">
+				<BucketTable columns={columns} data={filteredItems} onRowClick={onRowClick} />
 			</div>
 
 			{hasNextPage && (
@@ -148,12 +144,27 @@ function FeedContent({
 					</button>
 				</div>
 			)}
+
+			{/* Term detail sheet */}
+			<TermDetailSheet termId={selectedTermId} onClose={onClosePanel} />
 		</div>
 	);
 }
 
 export function BucketFeedPage() {
 	const { slug } = useParams({ from: '/protected/bucket/$slug' });
+	const search = useSearch({ from: '/protected/bucket/$slug' });
+	const navigate = useNavigate();
+
+	const selectedTermId = search.term ?? null;
+
+	const handleRowClick = (item: BucketFeedItem) => {
+		navigate({ to: '/bucket/$slug', params: { slug }, search: { term: item.termId } });
+	};
+
+	const handleClosePanel = () => {
+		navigate({ to: '/bucket/$slug', params: { slug }, search: { term: undefined } });
+	};
 
 	const { data: bucketsData, isLoading: bucketsLoading } = useUserBuckets();
 	const userBuckets = bucketsData?.buckets ?? [];
@@ -182,6 +193,9 @@ export function BucketFeedPage() {
 			hasNextPage={!!hasNextPage}
 			isFetchingNextPage={isFetchingNextPage}
 			onFetchNextPage={fetchNextPage}
+			selectedTermId={selectedTermId}
+			onRowClick={handleRowClick}
+			onClosePanel={handleClosePanel}
 		/>
 	);
 }

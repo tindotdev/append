@@ -8,6 +8,8 @@ import { candidateRoutes } from './features/candidate/routes';
 import { exportRoutes } from './features/export/routes';
 import { importRoutes } from './features/import/routes';
 import { suggestionsRoutes } from './features/suggestions/routes';
+import { termRoutes } from './features/term/routes';
+import { termSenseRoutes } from './features/term-sense/routes';
 import { userBucketRoutes } from './features/user-bucket/routes';
 import { createAuth } from './lib/auth';
 import type { Variables as BaseVariables, Bindings } from './platform/bindings';
@@ -156,6 +158,8 @@ const apiRoutes = app
 	.route('/api/export', exportRoutes)
 	.route('/api/import', importRoutes)
 	.route('/api', suggestionsRoutes)
+	.route('/api/term', termRoutes)
+	.route('/api/term-sense', termSenseRoutes)
 	.route('/api/user-bucket', userBucketRoutes);
 
 // Export type for Hono RPC client
