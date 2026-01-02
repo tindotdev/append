@@ -1,4 +1,7 @@
 import { useParams } from '@tanstack/react-router';
+import { Search } from 'lucide-react';
+import { useDeferredValue, useMemo, useState } from 'react';
+import { Input } from '@/components/ui/input';
 import { useUserBuckets } from '@/lib/user-buckets';
 import { useBucketFeed } from '../api/get-bucket-feed';
 
@@ -83,6 +86,17 @@ function FeedContent({
 	isFetchingNextPage: boolean;
 	onFetchNextPage: () => void;
 }) {
+	const [searchQuery, setSearchQuery] = useState('');
+	const deferredQuery = useDeferredValue(searchQuery);
+
+	const filteredItems = useMemo(() => {
+		if (!deferredQuery.trim()) return items;
+		const query = deferredQuery.toLowerCase();
+		return items.filter((item) => item.displayTerm.toLowerCase().includes(query) || item.primarySense.text.toLowerCase().includes(query));
+	}, [items, deferredQuery]);
+
+	const isFiltering = searchQuery !== deferredQuery;
+
 	return (
 		<div className="max-w-4xl">
 			<h2 className="text-xl font-semibold">{title}</h2>
@@ -91,13 +105,34 @@ function FeedContent({
 				{hasNextPage ? ' (more available)' : ''}
 			</p>
 
-			<div className="mt-6 border border-zinc-800 rounded-lg divide-y divide-zinc-800">
-				{items.map((item) => (
-					<div key={item.termId} className="p-4">
-						<p className="text-white font-medium">{item.displayTerm}</p>
-						<p className="text-zinc-400 text-sm mt-1">{item.primarySense.text}</p>
-					</div>
-				))}
+			{/* Search input */}
+			<div className="mt-4 relative">
+				<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+				<Input
+					type="search"
+					placeholder="Filter items..."
+					value={searchQuery}
+					onChange={(e) => setSearchQuery(e.target.value)}
+					className="pl-9"
+				/>
+			</div>
+
+			{/* Filtered count */}
+			{searchQuery && (
+				<p className="text-sm text-zinc-500 mt-2">{isFiltering ? 'Filtering...' : `${filteredItems.length} of ${items.length} items`}</p>
+			)}
+
+			<div className="mt-4 border border-zinc-800 rounded-lg divide-y divide-zinc-800">
+				{filteredItems.length > 0 ? (
+					filteredItems.map((item) => (
+						<div key={item.termId} className="p-4">
+							<p className="text-white font-medium">{item.displayTerm}</p>
+							<p className="text-zinc-400 text-sm mt-1">{item.primarySense.text}</p>
+						</div>
+					))
+				) : (
+					<div className="p-4 text-center text-zinc-500">No items match your filter.</div>
+				)}
 			</div>
 
 			{hasNextPage && (
