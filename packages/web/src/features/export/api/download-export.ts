@@ -1,4 +1,4 @@
-import { API_URL } from '@/lib/api-rpc';
+import { apiFetch } from '@/lib/api-rpc';
 
 export type DownloadResult = { success: true; filename: string } | { success: false; error: string };
 
@@ -13,9 +13,7 @@ interface ApiErrorResponse {
  * Note: Can't use Hono RPC for this as it returns a blob, not JSON.
  */
 export async function downloadBucketExport(bucket: string): Promise<DownloadResult> {
-	const res = await fetch(`${API_URL}/api/export/${bucket}`, {
-		credentials: 'include',
-	});
+	const res = await apiFetch(`/api/export/${bucket}`);
 
 	// Handle error responses (JSON)
 	if (!res.ok) {

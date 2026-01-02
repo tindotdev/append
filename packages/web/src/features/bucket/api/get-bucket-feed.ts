@@ -1,5 +1,5 @@
 import { type QueryFunctionContext, useInfiniteQuery } from '@tanstack/react-query';
-import { api, buildApiRequestError, type InferResponseType } from '@/lib/api-rpc';
+import { api, type InferResponseType, parseRpcJson } from '@/lib/api-rpc';
 
 // Query key factory
 export const bucketKeys = {
@@ -29,12 +29,8 @@ export async function getBucketFeed(slug: string, options?: GetBucketFeedOptions
 		},
 	});
 
-	if (!res.ok) {
-		throw await buildApiRequestError(res);
-	}
-
 	// Safe to cast - we checked res.ok so this is the success response
-	return res.json() as Promise<BucketFeedResponse>;
+	return parseRpcJson<BucketFeedResponse>(res);
 }
 
 // React Query hook with infinite scroll support
