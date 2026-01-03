@@ -60,10 +60,24 @@ export default [
 					default: 'disallow',
 					rules: [
 						// Features can import from the same feature, lib, components, and hooks
+						// Also allows importing from 'outbox' feature (app-level infrastructure)
 						{
 							from: ['feature'],
 							allow: [
 								['feature', { featureName: `\${from.featureName}` }], // Same feature only
+								['feature', { featureName: 'outbox' }], // Outbox is shared infrastructure
+								'lib',
+								'components',
+								'hooks',
+							],
+						},
+						// Outbox feature can import from auth (session) and batch (query keys)
+						{
+							from: [['feature', { featureName: 'outbox' }]],
+							allow: [
+								['feature', { featureName: 'outbox' }],
+								['feature', { featureName: 'auth' }],
+								['feature', { featureName: 'batch' }],
 								'lib',
 								'components',
 								'hooks',
