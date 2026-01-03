@@ -10,7 +10,7 @@
  * - Index: by_status [status] for countByStatus and listByStatus queries
  */
 
-import { IDB_STORE_NAME, IDB_VERSION } from './constants';
+import { IDB_STORE_NAME, IDB_VERSION, LEASE_STORE_NAME } from './constants';
 import type { OutboxItem, OutboxStatus, OutboxStore } from './types';
 
 /**
@@ -32,18 +32,29 @@ function openDatabase(userScope: string): Promise<IDBDatabase> {
 
 		request.onupgradeneeded = (event) => {
 			const db = (event.target as IDBOpenDBRequest).result;
+			const oldVersion = event.oldVersion;
 
-			if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
-				const store = db.createObjectStore(IDB_STORE_NAME, { keyPath: 'id' });
+			// v1: outbox_items store
+			if (oldVersion < 1) {
+				if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
+					const store = db.createObjectStore(IDB_STORE_NAME, { keyPath: 'id' });
 
-				// Compound index for listDue: status + nextAttemptAt
-				// Allows efficient range queries for pending items that are due
-				store.createIndex('by_status_nextAttempt', ['status', 'nextAttemptAt'], {
-					unique: false,
-				});
+					// Compound index for listDue: status + nextAttemptAt
+					// Allows efficient range queries for pending items that are due
+					store.createIndex('by_status_nextAttempt', ['status', 'nextAttemptAt'], {
+						unique: false,
+					});
 
-				// Index for countByStatus and listByStatus
-				store.createIndex('by_status', 'status', { unique: false });
+					// Index for countByStatus and listByStatus
+					store.createIndex('by_status', 'status', { unique: false });
+				}
+			}
+
+			// v2: leadership_lease store for cross-tab coordination
+			if (oldVersion < 2) {
+				if (!db.objectStoreNames.contains(LEASE_STORE_NAME)) {
+					db.createObjectStore(LEASE_STORE_NAME, { keyPath: 'key' });
+				}
 			}
 		};
 	});

@@ -46,8 +46,11 @@ export const BROADCAST_CHANNEL_NAME = 'outbox';
 // IndexedDB
 // =============================================================================
 
-/** IndexedDB schema version */
-export const IDB_VERSION = 1;
+/** IndexedDB schema version (v2 adds leadership_lease store) */
+export const IDB_VERSION = 2;
 
 /** IndexedDB object store name for outbox items */
 export const IDB_STORE_NAME = 'outbox_items';
+
+/** IndexedDB object store name for leadership lease */
+export const LEASE_STORE_NAME = 'leadership_lease';

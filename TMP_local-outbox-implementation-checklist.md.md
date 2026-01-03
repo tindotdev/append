@@ -185,20 +185,26 @@ created: 2026-01-03
 
 ## 2) Cross-tab leadership (single sender)
 
-### T7. Web Locks leadership (primary)
+### T7. Web Locks leadership (primary) ✅
 
 **Scope**
 - Acquire `navigator.locks` lock `outbox-sender` (ifAvailable).
-- If leader: run “send until idle”, then release the lock (acquire again on next wake trigger).
+- If leader: run "send until idle", then release the lock (acquire again on next wake trigger).
 
 **Acceptance**
-- In two tabs, only leader sends (best-effort).
+- ✅ In two tabs, only leader sends (best-effort).
+
+**Implementation**
+- `packages/web/src/lib/outbox/leadership/web-locks.ts` - `createWebLocksProvider()`
+- Uses `navigator.locks.request()` with `{ mode: 'exclusive', ifAvailable: true }`
+- Holds lock via Promise that resolves when `release()` is called
 
 **Tests**
-- Unit: leadership session logic with mocked lock manager.
-- Manual multi-tab QA: verify only one tab sends.
+- ✅ Unit: leadership session logic with mocked lock manager.
+- See `leadership/__tests__/web-locks.test.ts` - 11 tests
+- Manual multi-tab QA: verify only one tab sends (deferred to integration).
 
-### T8. IndexedDB lease fallback (when Web Locks unavailable)
+### T8. IndexedDB lease fallback (when Web Locks unavailable) ✅
 
 **Scope**
 - Lease row in IDB:
@@ -207,10 +213,17 @@ created: 2026-01-03
 - Takeover after expiry.
 
 **Acceptance**
-- Closing leader allows takeover after `LEASE_MS`.
+- ✅ Closing leader allows takeover after `LEASE_MS`.
+
+**Implementation**
+- `packages/web/src/lib/outbox/leadership/lease.ts` - `createLeaseStore()`, `createLeaseProvider()`
+- `packages/web/src/lib/outbox/leadership/types.ts` - `LeadershipSession`, `LeadershipProvider`, `LeaseRecord`, `LeaseStore`
+- `packages/web/src/lib/outbox/leadership/index.ts` - `createLeadershipProvider()` factory with auto-fallback
+- IDB schema v2 adds `leadership_lease` object store (`constants.ts`, `store.ts`)
 
 **Tests (unit)**
-- Lease acquire/renew/expire with fake clock.
+- ✅ Lease acquire/renew/expire with fake clock.
+- See `leadership/__tests__/lease.test.ts` - 24 tests
 
 ---
 
@@ -285,13 +298,13 @@ created: 2026-01-03
 
 ## 4) Testing plan (choose the repo-appropriate path)
 
-### T14. Unit tests (web Vitest) ✅ (partial - T2-T6 coverage complete)
+### T14. Unit tests (web Vitest) ✅ (T2-T8 coverage complete)
 
 **Scope**
 - Add unit coverage for:
   - ✅ backoff + classifier
   - ✅ sender transitions
-  - lease logic (pending T7-T8)
+  - ✅ lease logic
 
 **Acceptance**
 - ✅ Covers the state machine and the high-risk error/transition paths.
@@ -299,11 +312,16 @@ created: 2026-01-03
 **Implementation**
 - `packages/web/vitest.config.ts` - Vitest configuration
 - `packages/web/src/test/setup.ts` - Test setup with fake-indexeddb + BroadcastChannel mock
-- `packages/web/src/lib/outbox/__tests__/` - 109 total tests
+- `packages/web/src/lib/outbox/__tests__/` - 109 tests (core)
   - `error-classifier.test.ts` - 39 tests
   - `store.test.ts` - 24 tests
   - `broadcast.test.ts` - 11 tests
   - `sender.test.ts` - 35 tests
+- `packages/web/src/lib/outbox/leadership/__tests__/` - 35 tests (leadership)
+  - `lease.test.ts` - 24 tests
+  - `web-locks.test.ts` - 11 tests
+
+**Total**: 144 tests
 
 ### T15. Add Playwright (minimal) to web
 
