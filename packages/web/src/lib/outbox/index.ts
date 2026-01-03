@@ -75,6 +75,7 @@ export {
 	JITTER_MAX_MS,
 	// Leadership (for cross-tab coordination)
 	LEASE_MS,
+	LEASE_STORE_NAME,
 	// Undo grace window
 	UNDO_GRACE_MS,
 } from './constants';
@@ -129,3 +130,22 @@ export {
 // =============================================================================
 
 export { type CreateOutboxOptions, createOutbox, type OutboxInstance } from './create-outbox';
+
+// =============================================================================
+// Leadership (Cross-Tab Coordination)
+// =============================================================================
+
+export {
+	createLeadershipProvider,
+	createLeaseProvider,
+	createLeaseStore,
+	createMockLeaseStore,
+	createWebLocksProvider,
+	generateTabId,
+	type LeadershipDeps,
+	type LeadershipProvider,
+	type LeadershipSession,
+	type LeaseRecord,
+	type LeaseStore,
+	type LeaseStoreOptions,
+} from './leadership';
