@@ -89,15 +89,9 @@ async function sendCaptureTerms(command: CaptureTermsCommand): Promise<SendResul
 export function createCommandSender(): CommandSender {
 	return {
 		async send(command: OutboxCommand): Promise<SendResult> {
-			switch (command.type) {
-				case 'capture_terms':
-					return sendCaptureTerms(command);
-				default: {
-					// Exhaustive check
-					const _exhaustive: never = command;
-					throw new Error(`Unknown command type: ${(_exhaustive as { type: string }).type}`);
-				}
-			}
+			// v1: Only capture_terms is supported
+			// When more command types are added, use a switch statement
+			return sendCaptureTerms(command);
 		},
 	};
 }
