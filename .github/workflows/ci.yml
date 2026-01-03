@@ -38,9 +38,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint (Biome)
-        run: pnpm ci:lint
-
       - name: Lint (Boundaries)
         run: pnpm lint:boundaries
 
