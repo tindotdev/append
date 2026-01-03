@@ -1,7 +1,10 @@
 # ADR 0016 — Web UI: Capture page term composer (local draft)
 
-Status: Accepted  
+Status: Accepted (Partially superseded by ADR 0018)  
 Date: 2026-01-02
+Superseded: 2026-01-03
+
+> **Note**: The row-composer UI and validation behavior described here remain valid, but the **submit semantics** are superseded by ADR 0018 (outbox-backed capture: clear on enqueue, short Undo window, and “Batch ready → Open” instead of auto-redirect).
 
 ## Context
 
