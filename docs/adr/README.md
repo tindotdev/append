@@ -27,3 +27,4 @@ Rules:
 - `0015-web-ui-linear-sidebar-layout.md` — Linear-style sidebar navigation replacing header nav (supersedes 0005 for UI)
 - `0016-web-ui-capture-term-composer.md` — Capture page term composer with local-only draft persistence
 - `0017-term-and-term-sense-editing.md` — Term + TermSense edits with optimistic locking
+- `0018-outbox-backed-capture-semantics.md` — Outbox-backed capture semantics (queue now, open later, undo)

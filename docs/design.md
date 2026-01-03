@@ -8,6 +8,7 @@
 - Web auth gating: protected layout route via AppShell (ADR: `docs/adr/0005-web-auth-gating-protected-layout.md`, superseded by `docs/adr/0015-web-ui-linear-sidebar-layout.md` for UI implementation).
 - Web UI: Linear-style sidebar layout with keyboard shortcuts (ADR: `docs/adr/0015-web-ui-linear-sidebar-layout.md`).
 - Web UI: Capture page term composer with local-only draft persistence (ADR: `docs/adr/0016-web-ui-capture-term-composer.md`).
+- Web UI: Outbox-backed capture submit (queue now, open later, undo) (ADR: `docs/adr/0018-outbox-backed-capture-semantics.md`).
 - Duplicates: `Term` + append-only `TermSense` ("allowed-but-flagged") (ADR: `docs/adr/0002-term-sense-duplicates.md`).
 - Term + TermSense edits: allow in-place corrections with optimistic locking (ADR: `docs/adr/0017-term-and-term-sense-editing.md`).
 - Bucket feed UX: primary sense by default, expandable, "Needs review" view (ADR: `docs/adr/0003-bucket-feed-primary-sense.md`).
