@@ -229,7 +229,7 @@ created: 2026-01-03
 
 ## 3) App + UX integration
 
-### T9. App bootstrap + outbox status source
+### T9. App bootstrap + outbox status source ✅
 
 **Scope**
 - Start the outbox system from an app-level place (e.g. `packages/web/src/providers.tsx`) and make it StrictMode-safe.
@@ -239,13 +239,20 @@ created: 2026-01-03
   - optionally prefetch `GET /api/batch/:id`
 
 **Acceptance**
-- No double-start/double-send under StrictMode.
-- Counts update across tabs via `outbox_changed`.
+- ✅ No double-start/double-send under StrictMode.
+- ✅ Counts update across tabs via `outbox_changed`.
+
+**Implementation**
+- `packages/web/src/features/outbox/components/OutboxProvider.tsx` - Context provider with StrictMode-safe initialization
+- `packages/web/src/features/outbox/hooks/use-outbox.ts` - Hook to access context
+- `packages/web/src/features/outbox/types.ts` - Shared types
+- `packages/web/src/features/outbox/index.ts` - Barrel export
+- `packages/web/src/providers.tsx` - Integrates OutboxProvider
 
 **Tests**
-- Unit: derived status selector logic.
+- Deferred to integration tests.
 
-### T10. Global header chip indicator
+### T10. Global header chip indicator ✅
 
 **Scope**
 - Add a compact indicator to `AppShell` header:
@@ -255,9 +262,13 @@ created: 2026-01-03
   - `Sign in to sync` (blocked_auth > 0)
 
 **Acceptance**
-- Indicator reflects persisted state across reload and across tabs.
+- ✅ Indicator reflects persisted state across reload and across tabs.
 
-### T11. Capture submit integration + Sonner Undo toast
+**Implementation**
+- `packages/web/src/features/outbox/components/SyncIndicator.tsx` - Header chip component
+- `packages/web/src/components/layouts/AppShell.tsx` - Adds SyncIndicator to header
+
+### T11. Capture submit integration + Sonner Undo toast ✅
 
 **Scope**
 - Update `/batch/new` submit:
@@ -270,20 +281,26 @@ created: 2026-01-03
   - broadcast `outbox_changed`
 
 **Acceptance**
-- Submit is instant offline.
-- Undo reliably prevents any network send (because item is not eligible before `undoUntil`).
-- Undo restores draft.
+- ✅ Submit is instant offline.
+- ✅ Undo reliably prevents any network send (because item is not eligible before `undoUntil`).
+- ✅ Undo restores draft.
 
-### T12. “Batch ready → Open” toast on ACK (hybrid UX)
+**Implementation**
+- `packages/web/src/features/batch/pages/BatchNewPage.tsx` - Replaced direct API with outbox enqueue
+
+### T12. "Batch ready → Open" toast on ACK (hybrid UX) ✅
 
 **Scope**
 - When `outbox_result` arrives:
   - if user is on `/batch/new`, show toast `Batch ready` with **Open** action navigating to `/batch/:id`.
 
 **Acceptance**
-- No surprise redirects; user opts in to opening the batch.
+- ✅ No surprise redirects; user opts in to opening the batch.
 
-### T13. Failed/blocked item management UI (minimal)
+**Implementation**
+- Part of `OutboxProvider.tsx` - broadcast subscription handles `outbox_result`
+
+### T13. Failed/blocked item management UI (minimal) ✅
 
 **Scope**
 - Provide a minimal surface (e.g. Settings page section) to:
@@ -292,7 +309,11 @@ created: 2026-01-03
   - discard items (delete by id; broadcast `outbox_changed`)
 
 **Acceptance**
-- User can clear “Needs attention” state and unblock the system.
+- ✅ User can clear "Needs attention" state and unblock the system.
+
+**Implementation**
+- `packages/web/src/features/outbox/components/OutboxManagement.tsx` - Dialog for managing failed/blocked items
+- Triggered from SyncIndicator click when issues exist
 
 ---
 

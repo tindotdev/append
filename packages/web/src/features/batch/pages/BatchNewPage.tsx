@@ -1,12 +1,12 @@
-import { useNavigate } from '@tanstack/react-router';
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ApiRequestError } from '@/lib/api-rpc';
-import { createBatch } from '../api/create-batch';
+import { useOutbox } from '@/features/outbox';
+import { UNDO_GRACE_MS } from '@/lib/outbox';
 
 // --- Constants ---
 const TERM_MIN = 1;
@@ -108,31 +108,12 @@ function clearDraft(): void {
 	}
 }
 
-// --- Error handling ---
-function getBatchErrorMessage(err: unknown): string {
-	if (err instanceof ApiRequestError) {
-		if (err.code === 'IDEMPOTENCY_CONFLICT') {
-			return 'Request conflict. Please modify your input and try again.';
-		}
-		if (err.code === 'UNAUTHORIZED') {
-			return 'Your session has expired. Please sign in again.';
-		}
-		return err.message;
-	}
-	return 'An unexpected error occurred. Please try again.';
-}
-
 // --- Component ---
 export function BatchNewPage() {
-	const navigate = useNavigate();
+	const { enqueue, undo } = useOutbox();
 
 	const [rows, setRows] = useState<TermRow[]>(() => loadDraft());
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [submitError, setSubmitError] = useState<string | null>(null);
-
-	// Track clientRequestId: generate once per submit attempt, regenerate on edit after failure
-	const clientRequestIdRef = useRef<string | null>(null);
-	const hasFailedRef = useRef(false);
 
 	// Refs for focus management
 	const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
@@ -170,12 +151,6 @@ export function BatchNewPage() {
 	const canSubmit = validTermCount >= TERM_MIN && validTermCount <= TERM_MAX && !hasValidationErrors && !isSubmitting;
 
 	const handleRowChange = useCallback((id: string, value: string) => {
-		// If user edits after a failure, clear the clientRequestId
-		if (hasFailedRef.current) {
-			clientRequestIdRef.current = null;
-			hasFailedRef.current = false;
-		}
-		setSubmitError(null);
 		setRows((prev) => prev.map((r) => (r.id === id ? { ...r, value } : r)));
 	}, []);
 
@@ -226,42 +201,56 @@ export function BatchNewPage() {
 	const handleClearDraft = useCallback(() => {
 		clearDraft();
 		setRows([{ id: crypto.randomUUID(), value: '' }]);
-		setSubmitError(null);
-		clientRequestIdRef.current = null;
-		hasFailedRef.current = false;
+	}, []);
+
+	// Helper to restore draft from terms string
+	const restoreDraft = useCallback((termsString: string) => {
+		const lines = termsString.split('\n').filter(Boolean);
+		const newRows =
+			lines.length > 0 ? lines.map((line) => ({ id: crypto.randomUUID(), value: line })) : [{ id: crypto.randomUUID(), value: '' }];
+		setRows(newRows);
+		saveDraft(newRows);
 	}, []);
 
 	const handleSubmit = useCallback(async () => {
 		if (!canSubmit) return;
 
-		// Generate clientRequestId if we don't have one
-		if (!clientRequestIdRef.current) {
-			clientRequestIdRef.current = crypto.randomUUID();
-		}
-
 		setIsSubmitting(true);
-		setSubmitError(null);
 
 		try {
 			// Collect non-empty terms
 			const terms = rows.map((r) => r.value.trim()).filter(Boolean);
 			const termsInput = terms.join('\n');
 
-			const response = await createBatch({
-				terms: termsInput,
-				clientRequestId: clientRequestIdRef.current,
-			});
+			// Enqueue to outbox (instant, durable)
+			const { item } = await enqueue({ terms: termsInput });
 
-			// Success - clear draft and navigate
+			// Clear composer immediately, stay on page
 			clearDraft();
-			navigate({ to: '/batch/$batchId', params: { batchId: response.id } });
-		} catch (err: unknown) {
-			hasFailedRef.current = true;
-			setSubmitError(getBatchErrorMessage(err));
+			setRows([{ id: crypto.randomUUID(), value: '' }]);
+
+			// Show toast with Undo action
+			toast.info('Queued for sync', {
+				duration: UNDO_GRACE_MS,
+				action: {
+					label: 'Undo',
+					onClick: async () => {
+						const result = await undo(item.id);
+						if (result.success && result.terms) {
+							restoreDraft(result.terms);
+							toast.success('Restored to composer');
+						} else {
+							toast.error('Cannot undo — already sent');
+						}
+					},
+				},
+			});
+		} catch {
+			toast.error('Failed to queue. Please try again.');
 		} finally {
 			setIsSubmitting(false);
 		}
-	}, [canSubmit, rows, navigate]);
+	}, [canSubmit, rows, enqueue, undo, restoreDraft]);
 
 	const handleRowKeyDown = useCallback(
 		(id: string, e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -371,8 +360,6 @@ export function BatchNewPage() {
 					+ Add term
 				</Button>
 			</div>
-
-			{submitError && <p className="mt-4 text-sm text-red-400">{submitError}</p>}
 
 			<div className="mt-6 flex items-center justify-between">
 				<div className="text-sm text-zinc-500">

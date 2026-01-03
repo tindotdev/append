@@ -14,12 +14,14 @@ import {
 import { Kbd } from '@/components/ui/kbd';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { useAuth } from '@/features/auth';
+import { OutboxManagement, SyncIndicator } from '@/features/outbox';
 import { useUserBuckets } from '@/features/settings';
 
 export function AppShell() {
 	const { data: session, isPending } = useAuth();
 	const navigate = useNavigate();
 	const [commandOpen, setCommandOpen] = useState(false);
+	const [outboxManageOpen, setOutboxManageOpen] = useState(false);
 
 	const isAuthenticated = !!session;
 
@@ -81,6 +83,9 @@ export function AppShell() {
 			<SidebarInset>
 				<header className="flex h-12 shrink-0 items-center gap-2 border-b border-zinc-800 px-4">
 					<SidebarTrigger className="-ml-1" />
+					<div className="ml-auto">
+						<SyncIndicator onManageClick={() => setOutboxManageOpen(true)} />
+					</div>
 				</header>
 
 				<main className="flex-1 overflow-auto p-6">
@@ -135,6 +140,9 @@ export function AppShell() {
 					)}
 				</CommandList>
 			</CommandDialog>
+
+			{/* Outbox management dialog */}
+			<OutboxManagement open={outboxManageOpen} onOpenChange={setOutboxManageOpen} />
 		</SidebarProvider>
 	);
 }
