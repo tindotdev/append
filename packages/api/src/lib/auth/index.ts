@@ -208,6 +208,12 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 									return;
 								}
 
+								// E2E provider (ADR 0019): bypass allowlist check here since
+								// the E2E endpoint performs its own validation before reaching this point
+								if (account.providerId === 'e2e') {
+									return;
+								}
+
 								// Non-Google providers: sub allowlist does not apply.
 								// Require ALLOWED_EMAIL match (fail closed if missing).
 								if (!env.ALLOWED_EMAIL) {
