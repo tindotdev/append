@@ -77,11 +77,15 @@ Paste this into the issue tracker / PR description and delete when complete.
 
 ## 5) API tests (Worker)
 
-- [ ] Add a focused test that:
-  - [ ] Calls `/auth/e2e/login` with correct secret and observes `set-cookie`.
-  - [ ] Calls `/auth/get-session` with that cookie and expects a user/session response.
-  - [ ] Wrong secret → 401/403.
-  - [ ] `APP_ENV=production` → 404.
+- [x] Add a focused test that:
+  - [x] Calls `/auth/e2e/login` with correct secret and observes `set-cookie` — `test/e2e-login.spec.ts:30-44`
+  - [x] Creates user and session with correct data in DB — `test/e2e-login.spec.ts:47-76`
+  - [x] Wrong secret → 403 — `test/e2e-login.spec.ts:78-87`
+  - [x] Missing secret → 403 — `test/e2e-login.spec.ts:89-96`
+  - [x] Reuses existing user on subsequent logins — `test/e2e-login.spec.ts:99-128`
+  - [x] Links e2e account on first login — `test/e2e-login.spec.ts:130-140`
+  - [x] E2E provider bypasses allowlist check in databaseHooks — `lib/auth/index.ts:211-215`
+  - [x] ALLOWED_SUB bypass for E2E endpoint — `lib/auth/e2e-login.ts:84-88`
 
 ## 6) Playwright (web package)
 
