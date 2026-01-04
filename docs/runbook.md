@@ -135,7 +135,7 @@ When a PR is opened against `main`:
 
 1. GitHub Actions runs `.github/workflows/preview.yml`
 2. Migrations are applied to the preview database
-3. API deploys to the preview environment: `https://append-api-preview.tindejphachon.workers.dev`
+3. API deploys to the preview environment: `https://append-api-preview.tindotdev.workers.dev`
 4. Web builds with `VITE_API_URL` set to preview API
 5. Web deploys to Cloudflare Pages with branch-specific URL: `https://<branch>.<project>.pages.dev`
 6. Both URLs are posted as a comment on the PR (updated on subsequent pushes)
@@ -143,7 +143,7 @@ When a PR is opened against `main`:
 **API URL configuration:**
 
 - Local dev: `http://localhost:8787` (default when running `pnpm dev`)
-- Preview: `https://append-api-preview.tindejphachon.workers.dev` (set via `VITE_API_URL` in preview workflow)
+- Preview: `https://append-api-preview.tindotdev.workers.dev` (set via `VITE_API_URL` in preview workflow)
 - Production: `https://api.append.tindev.dev` (set via `VITE_API_URL` in deploy workflow)
 
 ### Manual preview deployment
@@ -156,7 +156,7 @@ pnpm --filter @append/api exec wrangler d1 migrations apply append-db-preview --
 pnpm --filter @append/api exec wrangler deploy -e preview --config wrangler.jsonc
 
 # Web preview (branch-specific)
-VITE_API_URL=https://append-api-preview.tindejphachon.workers.dev pnpm --filter @append/web run build
+VITE_API_URL=https://append-api-preview.tindotdev.workers.dev pnpm --filter @append/web run build
 pnpm --filter @append/web exec wrangler pages deploy dist --project-name "$CF_PAGES_PROJECT" --branch <branch-name>
 ```
 
@@ -187,28 +187,43 @@ Preview web runs on `*.pages.dev` while preview API runs on `*.workers.dev`
 (`pages.dev` → `workers.dev` is cross-site). To make preview auth work, the API
 must allow the preview Pages origin and use preview-only cookie settings per ADR 0019.
 
-Required preview configuration (once ADR 0019 is implemented):
+Required preview configuration for E2E tests (ADR 0019):
 
-- Secrets (preview Worker):
+- Secrets (preview Worker) — **not yet set**:
   - `E2E_AUTH_SECRET` — secret required by `x-e2e-secret` header
-- Vars/secrets (preview Worker):
-  - `APP_ENV=preview`
-  - `E2E_AUTH_EMAIL=<dedicated e2e email>`
-- Allowlist:
-  - Set `ALLOWED_EMAIL` to the E2E email (and optionally set `ALLOWED_SUB` for the owner Google account).
+  - `E2E_AUTH_EMAIL` — dedicated email for E2E test user
+- Vars (preview Worker) — already configured:
+  - `APP_ENV=preview` (set in `wrangler.jsonc`)
+- Allowlist — already configured:
+  - `ALLOWED_EMAIL` is set for the owner's Google account
 
-Set preview secret (example):
+Set E2E secrets (required for Playwright tests):
 
 ```bash
 pnpm --filter @append/api exec wrangler secret put E2E_AUTH_SECRET --env preview
+pnpm --filter @append/api exec wrangler secret put E2E_AUTH_EMAIL --env preview
 ```
+
+Also add `E2E_AUTH_SECRET` to GitHub Actions secrets for the workflow to use.
 
 ### Preview environment notes
 
 - Preview database and storage accumulate data over time (cleared manually if needed)
 - Preview uses stub AI provider (no real OpenAI calls) to avoid costs
-- Google OAuth secrets are configured for preview API; end-to-end auth from Pages previews requires ADR 0019 (cross-site cookies + origins)
-- Cloudflare Pages automatic GitHub integration works alongside GitHub Actions workflow
+- Google OAuth secrets are configured for preview API; end-to-end auth from Pages previews is enabled via ADR 0019 (cross-site cookies + origins)
+
+### Cloudflare Pages deployment
+
+Cloudflare Pages has **automatic Git integration** that deploys separately from GitHub Actions:
+
+- **Automatic deployment**: Triggered by Cloudflare when you push to GitHub. Uses environment variables from the **Cloudflare Pages dashboard**.
+- **GitHub Actions workflow**: Defined in `.github/workflows/preview.yml`. Uses environment variables from the workflow file.
+
+For preview builds to call the correct API, `VITE_API_URL` must be set in **both** places:
+1. Cloudflare Pages dashboard → Settings → Environment variables → Preview
+2. GitHub Actions workflow (already configured in `preview.yml`)
+
+**Recommended**: After merging the preview workflow to main, disable Cloudflare's automatic Git integration (Settings → Builds & deployments → Disconnect Git) to use only GitHub Actions for deployments.
 
 ## Developer checks (local)
 
