@@ -20,15 +20,26 @@ import { apiError } from './shared/api-error';
 /**
  * Check if origin matches allowed origins (ADR 0019).
  * Supports wildcard patterns like https://*.append-web.pages.dev
+ *
+ * Uses simple string matching instead of regex to avoid ReDoS attacks.
  */
 function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
+	// Validate origin is a reasonable URL format (prevent malformed input)
+	if (!origin || origin.length > 256 || !origin.startsWith('http')) {
+		return false;
+	}
+
 	for (const allowed of allowedOrigins) {
 		if (allowed.includes('*')) {
-			// Convert wildcard to regex: https://*.domain.com -> ^https://[^/]+\.domain\.com$
-			const pattern = allowed
-				.replace(/[.+?^${}()|[\]\\]/g, '\\$&') // Escape regex special chars
-				.replace(/\\\*/g, '[^/]+'); // Replace \* with [^/]+
-			if (new RegExp(`^${pattern}$`).test(origin)) {
+			// Simple wildcard matching: split on * and check prefix/suffix
+			const parts = allowed.split('*');
+			if (parts.length !== 2) {
+				// Only support single wildcard
+				continue;
+			}
+			const [prefix, suffix] = parts;
+			// Origin must start with prefix, end with suffix, and have content between
+			if (origin.startsWith(prefix) && origin.endsWith(suffix) && origin.length > prefix.length + suffix.length) {
 				return true;
 			}
 		} else if (allowed === origin) {
