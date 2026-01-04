@@ -12,6 +12,7 @@ import { termRoutes } from './features/term/routes';
 import { termSenseRoutes } from './features/term-sense/routes';
 import { userBucketRoutes } from './features/user-bucket/routes';
 import { createAuth, getAllowedOrigins, isPreviewEnv } from './lib/auth';
+import { e2eLoginRoute } from './lib/auth/e2e-login';
 import type { Variables as BaseVariables, Bindings } from './platform/bindings';
 import { attachDb } from './platform/context';
 import { apiError } from './shared/api-error';
@@ -183,6 +184,12 @@ app.use('/api/*', async (c, next) => {
 // =============================================================================
 
 app.use('/api/*', attachDb);
+
+// =============================================================================
+// E2E Auth Bootstrap (ADR 0019) - must be BEFORE generic /auth/* handler
+// =============================================================================
+
+app.route('/auth/e2e', e2eLoginRoute);
 
 // =============================================================================
 // Handle all auth routes (Better Auth)

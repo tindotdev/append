@@ -77,10 +77,10 @@ export default [
 							from: ['db'],
 							allow: [],
 						},
-						// Lib can import from shared and db
+						// Lib can import from shared, db, and platform (for bindings types)
 						{
 							from: ['lib'],
-							allow: ['shared', 'db'],
+							allow: ['shared', 'db', 'platform'],
 						},
 						// Platform can import from shared and db
 						{

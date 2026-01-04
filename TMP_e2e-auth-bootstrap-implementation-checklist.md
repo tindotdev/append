@@ -56,22 +56,24 @@ Paste this into the issue tracker / PR description and delete when complete.
 
 ## 4) Implement `POST /auth/e2e/login` (Better Auth plugin endpoint)
 
-- [ ] Implement endpoint under Better Auth `/auth/*` (plugin endpoint), not Hono `/api/*`.
-- [ ] Runtime gating:
-  - [ ] If `APP_ENV === 'production'` → 404
-  - [ ] If `E2E_AUTH_SECRET` missing → 404 (or 403)
-- [ ] AuthZ gating:
-  - [ ] Require header `x-e2e-secret` to match secret (timing-safe compare).
-  - [ ] Require `ALLOWED_EMAIL` configured and equals `E2E_AUTH_EMAIL` (case-insensitive).
-  - [ ] Do not accept arbitrary email input.
-- [ ] User provisioning:
-  - [ ] `findUserByEmail(E2E_AUTH_EMAIL)`; if missing, `createUser(...)`
-  - [ ] Ensure default bucket seeding runs (avoid raw DB inserts).
-- [ ] Session provisioning:
-  - [ ] `createSession(userId)` and `setSessionCookie(...)`
-  - [ ] Return `204 No Content`
-- [ ] Logging:
-  - [ ] Log endpoint invocation (env + IP + UA + success/failure) without logging secret.
+- [x] Implement endpoint under Better Auth `/auth/*` — standalone Hono route at `/auth/e2e/login` (`lib/auth/e2e-login.ts`)
+- [x] Runtime gating:
+  - [x] If `APP_ENV === 'production'` → 404 — `e2e-login.ts:59-61`
+  - [x] If `E2E_AUTH_SECRET` missing → 404 — `e2e-login.ts:64-67`
+- [x] AuthZ gating:
+  - [x] Require header `x-e2e-secret` to match secret (timing-safe compare) — `e2e-login.ts:70-74` + `secureCompare()` function
+  - [x] Require `ALLOWED_EMAIL` configured and equals `E2E_AUTH_EMAIL` (case-insensitive) — `e2e-login.ts:77-86`
+  - [x] Do not accept arbitrary email input — uses configured `E2E_AUTH_EMAIL` only
+- [x] User provisioning:
+  - [x] `findUserByEmail(E2E_AUTH_EMAIL)`; if missing, `createUser(...)` — `e2e-login.ts:98-121`
+  - [x] Ensure default bucket seeding runs (via internalAdapter.createUser triggering databaseHooks)
+- [x] Session provisioning:
+  - [x] `createSession(userId)` — `e2e-login.ts:123-128`
+  - [x] Set session cookie manually with proper attributes — `e2e-login.ts:130-145`
+  - [x] Return `204 No Content` — `e2e-login.ts:148`
+- [x] Logging:
+  - [x] Log endpoint invocation (env + IP + UA + success/failure) without logging secret — `e2e-login.ts:91-93`
+- [x] Mounted in `index.ts:192` before generic `/auth/*` handler
 
 ## 5) API tests (Worker)
 
