@@ -101,7 +101,7 @@ jobs:
       - name: Build web
         working-directory: packages/web
         env:
-          VITE_API_URL: https://append-api-preview.tindejphachon.workers.dev
+          VITE_API_URL: https://append-api-preview.tindotdev.workers.dev
         run: pnpm run build
 
       - name: Deploy web preview to Pages
