@@ -36,6 +36,7 @@
 	// - Local: .dev.vars file (git-ignored)
 	// - Production: `wrangler secret put <NAME>` or Doppler integration
 	"vars": {
+		"APP_ENV": "production",
 		"BETTER_AUTH_URL": "https://api.append.tindev.dev",
 		// AI Gateway configuration for OpenAI routing (Step 3)
 		"SUGGESTIONS_PROVIDER": "openai",
@@ -86,6 +87,7 @@
 		"preview": {
 			"name": "append-api-preview",
 			"vars": {
+				"APP_ENV": "preview",
 				"BETTER_AUTH_URL": "https://append-api-preview.tindejphachon.workers.dev",
 				"SUGGESTIONS_PROVIDER": "stub",
 				"AI_GATEWAY_ID": "append-gateway-preview",
@@ -114,6 +116,7 @@
 		"production": {
 			"name": "append-api",
 			"vars": {
+				"APP_ENV": "production",
 				"BETTER_AUTH_URL": "https://api.append.tindev.dev",
 				"SUGGESTIONS_PROVIDER": "openai",
 				"AI_GATEWAY_ID": "append-gateway",
@@ -149,6 +152,7 @@
 		 */
 		"test": {
 			"vars": {
+				"APP_ENV": "test",
 				"ENABLE_TEST_EMAIL_PASSWORD_AUTH": "1",
 				"BETTER_AUTH_URL": "http://localhost:8787",
 				"BETTER_AUTH_SECRET": "test-secret-min-32-chars-for-cookie-signing",
