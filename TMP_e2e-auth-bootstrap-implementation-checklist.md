@@ -13,8 +13,10 @@ Paste this into the issue tracker / PR description and delete when complete.
 
 ## 0) Inputs (fill in)
 
-- [ ] `E2E_AUTH_EMAIL`: ______________________________
-- [ ] `E2E_AUTH_SECRET` created (32+ random bytes): ✅/❌
+- [x] `E2E_AUTH_EMAIL`: <e2e-bot@append.test>
+  - Prove: Create on Cloudflare dashboard (human)
+- [x] `E2E_AUTH_SECRET` created (32+ random bytes): ✅/❌
+  - Prove: Create on Cloudflare dashboard (human)
 - [ ] Preview allowlist strategy:
   - [ ] Owner Google access via `ALLOWED_SUB`
   - [ ] E2E access via `ALLOWED_EMAIL == E2E_AUTH_EMAIL`
@@ -124,4 +126,3 @@ Paste this into the issue tracker / PR description and delete when complete.
 
 - [ ] Rollout: deploy API preview first; validate manual login in preview web; then enable Playwright.
 - [ ] Rollback: unset `E2E_AUTH_SECRET` in preview to disable endpoint immediately; revert preview cookie change if needed.
-
