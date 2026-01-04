@@ -1,7 +1,7 @@
 import { env, SELF } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { account, schema, session, user } from '../src/db';
 import { applyMigrations } from './setup';
 
@@ -14,6 +14,13 @@ let db: ReturnType<typeof drizzle>;
 beforeAll(async () => {
 	await applyMigrations();
 	db = drizzle(env.DB, { schema }) as ReturnType<typeof drizzle>;
+});
+
+beforeEach(async () => {
+	// Ensure clean state before each test (in case previous test failed)
+	await db.delete(session);
+	await db.delete(account);
+	await db.delete(user);
 });
 
 afterEach(async () => {
