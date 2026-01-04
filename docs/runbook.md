@@ -176,11 +176,38 @@ Required secrets (already configured):
 - `BETTER_AUTH_SECRET`
 - `ALLOWED_EMAIL` (or `ALLOWED_SUB`)
 
+### E2E authentication for Playwright (ADR 0019)
+
+Playwright E2E tests should not automate Google login UI flows. Instead, use the
+non-production auth bootstrap endpoint:
+
+- `POST /auth/e2e/login` (sets Better Auth session cookies; returns 204)
+
+Preview web runs on `*.pages.dev` while preview API runs on `*.workers.dev`
+(`pages.dev` → `workers.dev` is cross-site). To make preview auth work, the API
+must allow the preview Pages origin and use preview-only cookie settings per ADR 0019.
+
+Required preview configuration (once ADR 0019 is implemented):
+
+- Secrets (preview Worker):
+  - `E2E_AUTH_SECRET` — secret required by `x-e2e-secret` header
+- Vars/secrets (preview Worker):
+  - `APP_ENV=preview`
+  - `E2E_AUTH_EMAIL=<dedicated e2e email>`
+- Allowlist:
+  - Set `ALLOWED_EMAIL` to the E2E email (and optionally set `ALLOWED_SUB` for the owner Google account).
+
+Set preview secret (example):
+
+```bash
+pnpm --filter @append/api exec wrangler secret put E2E_AUTH_SECRET --env preview
+```
+
 ### Preview environment notes
 
 - Preview database and storage accumulate data over time (cleared manually if needed)
 - Preview uses stub AI provider (no real OpenAI calls) to avoid costs
-- Google OAuth is configured and works in preview environments
+- Google OAuth secrets are configured for preview API; end-to-end auth from Pages previews requires ADR 0019 (cross-site cookies + origins)
 - Cloudflare Pages automatic GitHub integration works alongside GitHub Actions workflow
 
 ## Developer checks (local)
