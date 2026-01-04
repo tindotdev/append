@@ -29,6 +29,11 @@ export type Bindings = {
 	GOOGLE_CLIENT_ID?: string;
 	GOOGLE_CLIENT_SECRET?: string;
 	ENABLE_TEST_EMAIL_PASSWORD_AUTH?: string;
+
+	// E2E Auth Bootstrap (ADR 0019)
+	APP_ENV?: string; // 'production' | 'preview' | 'local' | 'test'
+	E2E_AUTH_SECRET?: string;
+	E2E_AUTH_EMAIL?: string;
 };
 
 export type Variables = {
