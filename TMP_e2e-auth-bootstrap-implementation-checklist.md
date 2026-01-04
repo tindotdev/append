@@ -25,11 +25,11 @@ Paste this into the issue tracker / PR description and delete when complete.
   - [ ] local/dev (e.g. `local`)
   - [ ] preview (`preview`)
   - [ ] production (`production`)
-- [ ] Add bindings to `packages/api/src/platform/bindings.ts`:
-  - [ ] `APP_ENV`
-  - [ ] `E2E_AUTH_EMAIL`
-  - [ ] `E2E_AUTH_SECRET`
-- [ ] Ensure secrets are server-only (no `VITE_*` usage).
+- [x] Add bindings to `packages/api/src/platform/bindings.ts`:
+  - [x] `APP_ENV` — `bindings.ts:34`
+  - [x] `E2E_AUTH_EMAIL` — `bindings.ts:36`
+  - [x] `E2E_AUTH_SECRET` — `bindings.ts:35`
+- [x] Ensure secrets are server-only (no `VITE_*` usage) — confirmed, all in Bindings type only.
 
 ## 2) Preview origins + CORS (Pages → Workers)
 
