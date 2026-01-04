@@ -21,10 +21,11 @@ Paste this into the issue tracker / PR description and delete when complete.
 
 ## 1) Worker env + bindings
 
-- [ ] Add `APP_ENV` to `packages/api/wrangler.jsonc` vars for:
-  - [ ] local/dev (e.g. `local`)
-  - [ ] preview (`preview`)
-  - [ ] production (`production`)
+- [x] Add `APP_ENV` to `packages/api/wrangler.jsonc` vars for:
+  - [x] local/dev — via .dev.vars (gitignored), default vars line 39 fallback
+  - [x] preview (`preview`) — `wrangler.jsonc:90`
+  - [x] production (`production`) — `wrangler.jsonc:39` (default) + `wrangler.jsonc:119` (explicit env)
+  - [x] test (`test`) — `wrangler.jsonc:155`
 - [x] Add bindings to `packages/api/src/platform/bindings.ts`:
   - [x] `APP_ENV` — `bindings.ts:34`
   - [x] `E2E_AUTH_EMAIL` — `bindings.ts:36`
