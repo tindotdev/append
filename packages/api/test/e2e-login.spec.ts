@@ -150,25 +150,28 @@ describe('POST /auth/e2e/login', () => {
 
 // =============================================================================
 // Production Guard Tests
-// These tests verify the endpoint is blocked in production.
-// Note: We can't easily test APP_ENV=production in the same test run since
-// env vars are set at worker initialization. These tests document the expected
-// behavior and the guards are validated in the endpoint implementation.
+//
+// IMPORTANT: The production guard (APP_ENV=production → 404) cannot be tested
+// automatically because environment variables are set at worker initialization.
+//
+// MANUAL VERIFICATION REQUIRED BEFORE MERGE:
+// 1. Deploy to production (or use production Worker URL)
+// 2. Run: curl -X POST https://append-api.tindotdev.workers.dev/auth/e2e/login \
+//         -H 'x-e2e-secret: any-value'
+// 3. Verify response is 404 Not Found (endpoint should not exist in production)
+// 4. Confirm E2E_AUTH_SECRET is NOT configured in production Cloudflare dashboard
+//
+// The guards that ARE tested automatically:
+// - Invalid/missing secret → 403 (tested in main describe block)
+// - Allowlist validation → 403 (tested in Allowlist Guards block)
 // =============================================================================
 
 describe('E2E Login Production Guards', () => {
-	it('returns 404 when E2E_AUTH_SECRET is not configured', async () => {
-		// This tests the guard when secret is missing
-		// In the test environment, we verify this by checking the endpoint exists
-		// The actual production guard (APP_ENV=production) cannot be tested
-		// in the same test run since env is set at initialization
+	it('endpoint exists and works in non-production environment', async () => {
+		// This test verifies the endpoint is available in test environment
+		// (APP_ENV=test). The production guard (APP_ENV=production → 404)
+		// must be verified manually - see checklist above.
 
-		// For now, document that the endpoint should 404 in production:
-		// - When APP_ENV === 'production' → 404
-		// - When E2E_AUTH_SECRET is missing → 404
-		// - When E2E_AUTH_EMAIL is missing → 404
-
-		// This test verifies the endpoint works in test environment
 		const res = await SELF.fetch('https://example.com/auth/e2e/login', {
 			method: 'POST',
 			headers: { 'x-e2e-secret': env.E2E_AUTH_SECRET! },
