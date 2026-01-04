@@ -17,6 +17,9 @@ import type { Variables as BaseVariables, Bindings } from './platform/bindings';
 import { attachDb } from './platform/context';
 import { apiError } from './shared/api-error';
 
+/** Max length for wildcard segment (DNS label limit) */
+const MAX_WILDCARD_SEGMENT_LENGTH = 63;
+
 /**
  * Check if origin matches allowed origins (ADR 0019).
  * Supports wildcard patterns like https://*.append-web.pages.dev
@@ -40,7 +43,11 @@ function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
 			const [prefix, suffix] = parts;
 			// Origin must start with prefix, end with suffix, and have content between
 			if (origin.startsWith(prefix) && origin.endsWith(suffix) && origin.length > prefix.length + suffix.length) {
-				return true;
+				// Validate wildcard segment length (DNS label limit: 63 chars)
+				const wildcardSegment = origin.slice(prefix.length, origin.length - suffix.length);
+				if (wildcardSegment.length <= MAX_WILDCARD_SEGMENT_LENGTH) {
+					return true;
+				}
 			}
 		} else if (allowed === origin) {
 			return true;
