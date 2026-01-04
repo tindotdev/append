@@ -75,14 +75,15 @@ e2eLoginRoute.post('/login', async (c) => {
 	}
 
 	// Guard 4: Allowlist validation → 403
-	// E2E_AUTH_EMAIL must be in allowlist (matches ALLOWED_EMAIL or this check is bypassed if ALLOWED_SUB is set)
+	// E2E_AUTH_EMAIL must be in allowlist. Bypass if ALLOWED_SUB is set (owner has sub-based access).
 	if (!env.ALLOWED_EMAIL && !env.ALLOWED_SUB) {
 		console.warn('[E2E Auth] No allowlist configured');
 		return c.text('Forbidden', 403);
 	}
 
-	// If ALLOWED_EMAIL is set, it must match E2E_AUTH_EMAIL
-	if (env.ALLOWED_EMAIL && env.ALLOWED_EMAIL.toLowerCase() !== env.E2E_AUTH_EMAIL.toLowerCase()) {
+	// If ALLOWED_SUB is set, bypass email check (owner has sub-based access, E2E can use any email)
+	// Otherwise, ALLOWED_EMAIL must match E2E_AUTH_EMAIL
+	if (!env.ALLOWED_SUB && env.ALLOWED_EMAIL && env.ALLOWED_EMAIL.toLowerCase() !== env.E2E_AUTH_EMAIL.toLowerCase()) {
 		console.warn('[E2E Auth] E2E_AUTH_EMAIL does not match ALLOWED_EMAIL');
 		return c.text('Forbidden', 403);
 	}
@@ -120,30 +121,28 @@ e2eLoginRoute.post('/login', async (c) => {
 			console.log(`[E2E Auth] Created new user: ${user.id}`);
 		}
 
-		// Create session
+		// Create session using internal adapter
 		const session = await ctx.internalAdapter.createSession(user.id, false);
 		if (!session) {
 			console.error('[E2E Auth] Failed to create session');
 			return c.text('Internal Server Error', 500);
 		}
 
-		// Get cookie configuration from Better Auth context
-		const cookieOptions = ctx.options.advanced?.defaultCookieAttributes || {};
-		const secureCookie = ctx.options.advanced?.useSecureCookies ?? !env.BETTER_AUTH_URL?.startsWith('http://localhost');
-		// Better Auth default session cookie name
-		const cookieName = 'better-auth.session_token';
+		// Use Better Auth's createAuthCookie to get the properly configured cookie settings
+		const cookieConfig = ctx.createAuthCookie('session_token', {
+			maxAge: 60 * 60 * 24 * 7, // 7 days
+		});
 
-		// Build cookie attributes
-		const maxAge = 60 * 60 * 24 * 7; // 7 days (Better Auth default)
-		const sameSite = cookieOptions.sameSite || 'lax';
-		const secure = secureCookie ? '; Secure' : '';
-		const httpOnly = '; HttpOnly';
-		const path = '; Path=/';
-		const sameSiteAttr = `; SameSite=${sameSite}`;
+		// Build cookie string from the config
+		const attrs = cookieConfig.attributes;
+		const parts = [`${cookieConfig.name}=${session.token}`];
+		if (attrs.maxAge) parts.push(`Max-Age=${attrs.maxAge}`);
+		if (attrs.path) parts.push(`Path=${attrs.path}`);
+		if (attrs.httpOnly) parts.push('HttpOnly');
+		if (attrs.sameSite) parts.push(`SameSite=${attrs.sameSite}`);
+		if (attrs.secure) parts.push('Secure');
 
-		// Set session cookie header manually
-		const cookieValue = `${cookieName}=${session.token}; Max-Age=${maxAge}${path}${httpOnly}${sameSiteAttr}${secure}`;
-		c.header('Set-Cookie', cookieValue);
+		c.header('Set-Cookie', parts.join('; '));
 
 		console.log(`[E2E Auth] Session created for user: ${user.id}`);
 		return c.body(null, 204);
