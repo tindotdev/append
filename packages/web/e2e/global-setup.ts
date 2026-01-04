@@ -14,11 +14,26 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
 
-// API URL for E2E login endpoint (Worker)
+// API URL for E2E login endpoint (Worker) - used for login request and cookie domain
 const API_URL = process.env.PLAYWRIGHT_API_URL ?? 'http://localhost:8787';
 
-// Web URL for setting cookies in the browser
+// Web URL for setting cookies in the browser (fallback domain if API_URL not set)
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173';
+
+/**
+ * Get the domain to use for cookies.
+ * In preview environments, cookies should match the API domain since the API sets them.
+ * For local development, use the web URL domain (localhost).
+ */
+function getCookieDomain(): string {
+	const apiUrl = new URL(API_URL);
+	// For preview (cross-site), use API domain
+	if (apiUrl.hostname !== 'localhost') {
+		return apiUrl.hostname;
+	}
+	// For local dev, use web domain
+	return new URL(BASE_URL).hostname;
+}
 
 async function globalSetup(): Promise<void> {
 	const secret = process.env.E2E_AUTH_SECRET;
@@ -49,7 +64,8 @@ async function globalSetup(): Promise<void> {
 
 	// Parse the cookie from the set-cookie header
 	// Format: better-auth.session_token=VALUE; Path=/; HttpOnly; SameSite=...
-	const cookies = parseCookies(setCookieHeader, BASE_URL);
+	const cookieDomain = getCookieDomain();
+	const cookies = parseCookies(setCookieHeader, cookieDomain);
 
 	console.log(`[E2E Setup] Got ${cookies.length} cookie(s), saving to storageState`);
 
@@ -130,12 +146,14 @@ function parseSingleCookie(cookieStr: string, domain: string): PlaywrightCookie 
 
 /**
  * Parse Set-Cookie header into Playwright cookie format.
+ *
+ * Note: We expect a single cookie from the E2E endpoint, but handle the
+ * multi-cookie case (comma-separated) for robustness. The regex split
+ * looks for commas followed by a cookie name=value pattern.
  */
-function parseCookies(setCookieHeader: string, baseUrl: string): PlaywrightCookie[] {
-	const url = new URL(baseUrl);
-	const domain = url.hostname;
-
+function parseCookies(setCookieHeader: string, domain: string): PlaywrightCookie[] {
 	// Split multiple cookies (may be separated by comma in some implementations)
+	// The regex looks for comma followed by text that contains = but no ; before it
 	const cookieStrings = setCookieHeader.split(/,(?=[^;]*=)/);
 
 	return cookieStrings.map((cookieStr) => parseSingleCookie(cookieStr, domain));
