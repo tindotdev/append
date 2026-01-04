@@ -147,16 +147,13 @@ function parseSingleCookie(cookieStr: string, domain: string): PlaywrightCookie 
 /**
  * Parse Set-Cookie header into Playwright cookie format.
  *
- * Note: We expect a single cookie from the E2E endpoint, but handle the
- * multi-cookie case (comma-separated) for robustness. The regex split
- * looks for commas followed by a cookie name=value pattern.
+ * The E2E endpoint returns a single session cookie, so we parse it directly
+ * without attempting to split multiple cookies. This avoids edge cases with
+ * comma-separated cookies where values might contain commas.
  */
 function parseCookies(setCookieHeader: string, domain: string): PlaywrightCookie[] {
-	// Split multiple cookies (may be separated by comma in some implementations)
-	// The regex looks for comma followed by text that contains = but no ; before it
-	const cookieStrings = setCookieHeader.split(/,(?=[^;]*=)/);
-
-	return cookieStrings.map((cookieStr) => parseSingleCookie(cookieStr, domain));
+	// E2E endpoint returns single cookie - parse directly
+	return [parseSingleCookie(setCookieHeader, domain)];
 }
 
 export default globalSetup;
