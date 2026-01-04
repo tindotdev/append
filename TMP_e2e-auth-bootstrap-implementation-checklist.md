@@ -34,25 +34,25 @@ Paste this into the issue tracker / PR description and delete when complete.
 
 ## 2) Preview origins + CORS (Pages → Workers)
 
-- [ ] Define allowed web origins:
-  - [ ] local: `http://localhost:5173`
-  - [ ] prod: `https://append.tindev.dev`
-  - [ ] preview Pages: `https://*.append-web.pages.dev` (or the actual Pages project hostname)
-- [ ] Update `packages/api/src/index.ts` CORS middleware for `/auth/*` and `/api/*`:
-  - [ ] Do not use `*` with credentials
-  - [ ] Use dynamic origin allowlist (function) if wildcard support is needed
-  - [ ] Include `x-e2e-secret` in allowed headers for `/auth/*` (optional but helpful)
-- [ ] Add preview-only CSRF mitigation for `/api/*` state changes:
-  - [ ] For `POST|PUT|DELETE /api/*`, require `Origin` header
-  - [ ] Reject if origin not in the allowlist above
+- [x] Define allowed web origins:
+  - [x] local: `http://localhost:5173` — `lib/auth/index.ts:33`
+  - [x] prod: `https://append.tindev.dev` — `lib/auth/index.ts:33`
+  - [x] preview Pages: `https://*.append-web.pages.dev` — `lib/auth/index.ts:36`
+- [x] Update `packages/api/src/index.ts` CORS middleware for `/auth/*` and `/api/*`:
+  - [x] Do not use `*` with credentials — uses function-based origin matching
+  - [x] Use dynamic origin allowlist (function) if wildcard support is needed — `index.ts:23-38` `isOriginAllowed()`
+  - [x] Include `x-e2e-secret` in allowed headers for `/auth/*` — `index.ts:86`
+- [x] Add preview-only CSRF mitigation for `/api/*` state changes:
+  - [x] For `POST|PUT|DELETE /api/*`, require `Origin` header — `index.ts:116-140`
+  - [x] Reject if origin not in the allowlist above — `index.ts:135-136`
 
 ## 3) Better Auth: trusted origins + preview cookie attributes
 
-- [ ] Update `packages/api/src/lib/auth/index.ts` Better Auth config:
-  - [ ] Add preview Pages origin(s) to `trustedOrigins` (wildcard pattern ok for Better Auth).
-  - [ ] Configure **preview-only** session cookie attributes:
-    - [ ] `SameSite=None`
-    - [ ] `Secure` (do not break local http dev)
+- [x] Update `packages/api/src/lib/auth/index.ts` Better Auth config:
+  - [x] Add preview Pages origin(s) to `trustedOrigins` — `lib/auth/index.ts:134` uses `getAllowedOrigins(env)`
+  - [x] Configure **preview-only** session cookie attributes:
+    - [x] `SameSite=None` — `lib/auth/index.ts:112`
+    - [x] `Secure` — `lib/auth/index.ts:109-111` (only in preview)
 
 ## 4) Implement `POST /auth/e2e/login` (Better Auth plugin endpoint)
 
