@@ -7,3 +7,8 @@ node_modules
 
 # Temporary dir
 tmp/
+
+# Playwright
+packages/web/e2e/.auth/
+packages/web/playwright-report/
+packages/web/test-results/
