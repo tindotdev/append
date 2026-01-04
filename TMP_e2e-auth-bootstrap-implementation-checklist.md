@@ -89,20 +89,28 @@ Paste this into the issue tracker / PR description and delete when complete.
 
 ## 6) Playwright (web package)
 
-- [ ] Add Playwright `globalSetup`:
-  - [ ] Call `POST /auth/e2e/login` with `x-e2e-secret` (Node-side request)
-  - [ ] Save `storageState` to a file
-- [ ] Update Playwright config to support both modes:
-  - [ ] Local dev mode: start web server as today, run against localhost
-  - [ ] Preview mode: `baseURL` is the deployed Pages URL, no local webServer
-- [ ] Remove auth stubbing once real auth is used (or keep only for unit-ish UI tests).
+- [x] Add Playwright `globalSetup`:
+  - [x] Call `POST /auth/e2e/login` with `x-e2e-secret` (Node-side request) — `e2e/global-setup.ts:29-41`
+  - [x] Save `storageState` to a file — `e2e/global-setup.ts:55-64`
+- [x] Update Playwright config to support both modes:
+  - [x] Local dev mode: start web server as today, run against localhost — `playwright.config.ts:43-48`
+  - [x] Preview mode: `baseURL` is the deployed Pages URL, no local webServer — `playwright.config.ts:19-20`
+- [x] Created E2E test files:
+  - [x] Auth smoke test — `e2e/auth-smoke.spec.ts`
+  - [x] Outbox happy path — `e2e/outbox-happy-path.spec.ts`
+  - [x] Single sender (Web Locks) — `e2e/outbox-single-sender-locks.spec.ts`
+  - [x] Single sender (Lease fallback) — `e2e/outbox-single-sender-lease.spec.ts`
+  - [x] Offline retry — `e2e/outbox-offline-retry.spec.ts`
+- [x] Test helpers — `e2e/helpers.ts`
 
 ## 7) CI (preview)
 
-- [ ] Add a Playwright job after preview deploy:
-  - [ ] Use deployed Pages URL as `baseURL`
-  - [ ] Provide `E2E_AUTH_SECRET` via GitHub Actions secrets
-  - [ ] Fail the PR check if E2E fails
+- [x] Add a Playwright job after preview deploy:
+  - [x] Use deployed Pages URL as `baseURL` — `.github/workflows/preview.yml:169-170`
+  - [x] Provide `E2E_AUTH_SECRET` via GitHub Actions secrets — `.github/workflows/preview.yml:168`
+  - [x] Fail the PR check if E2E fails — E2E job runs in pipeline
+  - [x] Upload playwright-report artifact — `.github/workflows/preview.yml:173-179`
+  - [x] Update PR comment with E2E status — `.github/workflows/preview.yml:210-219`
 
 ## 8) Security verification (pre-merge)
 
