@@ -9,6 +9,12 @@
  * - Only enabled when APP_ENV !== 'production'
  * - Creates session for configured E2E_AUTH_EMAIL
  * - Returns 204 with session cookie
+ *
+ * Security notes:
+ * - Rate limiting is not implemented as this endpoint is only available in
+ *   non-production environments and requires a secret. Constant-time comparison
+ *   prevents timing attacks. If abuse becomes a concern in preview, consider
+ *   Cloudflare's built-in rate limiting or Durable Objects for state tracking.
  */
 
 import { Hono } from 'hono';
@@ -53,10 +59,20 @@ async function secureCompare(a: string, b: string): Promise<boolean> {
 	return match;
 }
 
+/** Valid APP_ENV values */
+const VALID_APP_ENVS = ['production', 'preview', 'local', 'test'] as const;
+
+/** Session max age in seconds (7 days) */
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+
 e2eLoginRoute.post('/login', async (c) => {
 	const env = c.env;
 
-	// Guard 1: Production environment check → 404 (pretend endpoint doesn't exist)
+	// Guard 1: APP_ENV validation + production check → 404 (pretend endpoint doesn't exist)
+	if (!VALID_APP_ENVS.includes(env.APP_ENV as (typeof VALID_APP_ENVS)[number])) {
+		console.warn('[E2E Auth] Invalid APP_ENV:', env.APP_ENV);
+		return c.notFound();
+	}
 	if (env.APP_ENV === 'production') {
 		return c.notFound();
 	}
@@ -130,7 +146,7 @@ e2eLoginRoute.post('/login', async (c) => {
 
 		// Use Better Auth's createAuthCookie to get the properly configured cookie settings
 		const cookieConfig = ctx.createAuthCookie('session_token', {
-			maxAge: 60 * 60 * 24 * 7, // 7 days
+			maxAge: SESSION_MAX_AGE_SECONDS,
 		});
 
 		// Build cookie string from the config
