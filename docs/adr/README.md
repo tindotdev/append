@@ -28,3 +28,4 @@ Rules:
 - `0016-web-ui-capture-term-composer.md` — Capture page term composer with local-only draft persistence
 - `0017-term-and-term-sense-editing.md` — Term + TermSense edits with optimistic locking
 - `0018-outbox-backed-capture-semantics.md` — Outbox-backed capture semantics (queue now, open later, undo)
+- `0019-e2e-auth-bootstrap-preview.md` — E2E auth bootstrap endpoint for preview + Playwright (non-prod only)

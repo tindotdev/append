@@ -5,6 +5,7 @@
 - Canonical store: `append` (do not write to the ENG-LOG GitHub repo).
 - App architecture: SPA (React + TanStack Router) + Hono on Cloudflare Workers (ADR: `docs/adr/0004-spa-hono-workers.md`).
 - Auth/access: Google SSO allowlist (ADR: `docs/adr/0001-google-allowlist-auth.md`).
+- E2E auth: non-prod bootstrap for preview + Playwright (ADR: `docs/adr/0019-e2e-auth-bootstrap-preview.md`).
 - Web auth gating: protected layout route via AppShell (ADR: `docs/adr/0005-web-auth-gating-protected-layout.md`, superseded by `docs/adr/0015-web-ui-linear-sidebar-layout.md` for UI implementation).
 - Web UI: Linear-style sidebar layout with keyboard shortcuts (ADR: `docs/adr/0015-web-ui-linear-sidebar-layout.md`).
 - Web UI: Capture page term composer with local-only draft persistence (ADR: `docs/adr/0016-web-ui-capture-term-composer.md`).
