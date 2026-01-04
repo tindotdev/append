@@ -11,10 +11,31 @@ import { suggestionsRoutes } from './features/suggestions/routes';
 import { termRoutes } from './features/term/routes';
 import { termSenseRoutes } from './features/term-sense/routes';
 import { userBucketRoutes } from './features/user-bucket/routes';
-import { createAuth } from './lib/auth';
+import { createAuth, getAllowedOrigins, isPreviewEnv } from './lib/auth';
 import type { Variables as BaseVariables, Bindings } from './platform/bindings';
 import { attachDb } from './platform/context';
 import { apiError } from './shared/api-error';
+
+/**
+ * Check if origin matches allowed origins (ADR 0019).
+ * Supports wildcard patterns like https://*.append-web.pages.dev
+ */
+function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
+	for (const allowed of allowedOrigins) {
+		if (allowed.includes('*')) {
+			// Convert wildcard to regex: https://*.domain.com -> ^https://[^/]+\.domain\.com$
+			const pattern = allowed
+				.replace(/[.+?^${}()|[\]\\]/g, '\\$&') // Escape regex special chars
+				.replace(/\\\*/g, '[^/]+'); // Replace \* with [^/]+
+			if (new RegExp(`^${pattern}$`).test(origin)) {
+				return true;
+			}
+		} else if (allowed === origin) {
+			return true;
+		}
+	}
+	return false;
+}
 
 type Variables = BaseVariables & {
 	auth: ReturnType<typeof createAuth>;
@@ -54,35 +75,69 @@ app.notFound((c) => {
 
 // =============================================================================
 // CORS for auth routes (web app needs to call these)
+// Uses dynamic origins for preview environment (ADR 0019)
 // =============================================================================
 
-app.use(
-	'/auth/*',
-	cors({
-		origin: ['http://localhost:5173', 'https://append.tindev.dev'],
+app.use('/auth/*', async (c, next) => {
+	const allowedOrigins = getAllowedOrigins(c.env);
+	return cors({
+		origin: (origin) => (isOriginAllowed(origin, allowedOrigins) ? origin : null),
 		allowMethods: ['POST', 'GET', 'OPTIONS'],
+		allowHeaders: ['Content-Type', 'x-e2e-secret'],
 		credentials: true,
-	})
-);
+	})(c, next);
+});
 
 // =============================================================================
 // CORS for API routes (§3.1)
 // Must be registered BEFORE auth guard middleware
+// Uses dynamic origins for preview environment (ADR 0019)
 // =============================================================================
 
-app.use(
-	'/api/*',
-	cors({
-		origin: ['http://localhost:5173', 'https://append.tindev.dev'],
+app.use('/api/*', async (c, next) => {
+	const allowedOrigins = getAllowedOrigins(c.env);
+	return cors({
+		origin: (origin) => (isOriginAllowed(origin, allowedOrigins) ? origin : null),
 		allowMethods: ['POST', 'GET', 'PUT', 'DELETE', 'OPTIONS'],
 		allowHeaders: ['Content-Type', 'X-Import-Id'],
 		credentials: true,
-	})
-);
+	})(c, next);
+});
 
 // Explicit OPTIONS preflight handler for /api/* (§3.1)
 // Prevents auth middleware from intercepting preflight requests
 app.options('/api/*', (c) => c.body(null, 204));
+
+// =============================================================================
+// Preview-only origin validation for state-changing requests (ADR 0019)
+// Defense-in-depth: SameSite=None cookies are cross-site sendable
+// =============================================================================
+
+app.use('/api/*', async (c, next) => {
+	// Only apply in preview environment
+	if (!isPreviewEnv(c.env)) {
+		return next();
+	}
+
+	// Only apply to state-changing methods
+	const method = c.req.method;
+	if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+		return next();
+	}
+
+	// Require valid Origin header for POST/PUT/DELETE in preview
+	const origin = c.req.header('origin');
+	if (!origin) {
+		return apiError(c, 403, 'FORBIDDEN', 'Origin header required');
+	}
+
+	const allowedOrigins = getAllowedOrigins(c.env);
+	if (!isOriginAllowed(origin, allowedOrigins)) {
+		return apiError(c, 403, 'FORBIDDEN', 'Invalid origin');
+	}
+
+	return next();
+});
 
 // =============================================================================
 // Auth instance initializer (must be early so c.get("auth") is available)

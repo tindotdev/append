@@ -19,7 +19,31 @@ type Env = {
 	ALLOWED_EMAIL?: string;
 	// Test-only: enable email/password auth (§5.2)
 	ENABLE_TEST_EMAIL_PASSWORD_AUTH?: string;
+	// E2E Auth Bootstrap (ADR 0019)
+	APP_ENV?: string;
+	E2E_AUTH_SECRET?: string;
+	E2E_AUTH_EMAIL?: string;
 };
+
+/**
+ * Get allowed origins based on environment (ADR 0019).
+ * Preview environment includes Pages preview origin pattern.
+ */
+function getAllowedOrigins(env?: Env): string[] {
+	const origins = ['http://localhost:5173', 'https://append.tindev.dev'];
+	if (env?.APP_ENV === 'preview') {
+		// Cloudflare Pages preview URLs (wildcard pattern for Better Auth)
+		origins.push('https://*.append-web.pages.dev');
+	}
+	return origins;
+}
+
+/**
+ * Check if we're in preview environment (ADR 0019).
+ */
+function isPreviewEnv(env?: Env): boolean {
+	return env?.APP_ENV === 'preview';
+}
 
 /**
  * Check if email matches the allowlist (case-insensitive).
@@ -77,6 +101,20 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 	// Email/password auth is only enabled in test environment (§5.2)
 	const emailPasswordEnabled = isEmailPasswordAuthEnabled(env);
 
+	// Preview-only cookie config (ADR 0019): SameSite=None for cross-site pages.dev → workers.dev
+	const isPreview = isPreviewEnv(env);
+	const previewCookieConfig = isPreview
+		? {
+				advanced: {
+					useSecureCookies: true,
+					defaultCookieAttributes: {
+						secure: true,
+						sameSite: 'none' as const,
+					},
+				},
+			}
+		: {};
+
 	return betterAuth({
 		...withCloudflare(
 			{
@@ -93,7 +131,7 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 				secret: env?.BETTER_AUTH_SECRET,
 				baseURL: env?.BETTER_AUTH_URL,
 				basePath: '/auth',
-				trustedOrigins: ['http://localhost:5173', 'https://append.tindev.dev'],
+				trustedOrigins: getAllowedOrigins(env),
 				socialProviders: {
 					google: {
 						clientId: env?.GOOGLE_CLIENT_ID || '',
@@ -108,6 +146,8 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 							},
 						}
 					: {}),
+				// Preview cookie configuration (ADR 0019)
+				...previewCookieConfig,
 			}
 		),
 		// Allowlist enforcement (ADR 0001)
@@ -206,6 +246,6 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 export const auth = createAuth();
 
 // Export for runtime usage
-export { createAuth };
+export { createAuth, getAllowedOrigins, isPreviewEnv };
 
 export type Auth = ReturnType<typeof createAuth>;
