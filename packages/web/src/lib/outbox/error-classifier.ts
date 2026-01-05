@@ -70,6 +70,12 @@ export function classifyResponse(status: number, code?: string, batchId?: string
 		return { type: 'success', batchId: batchId ?? '' };
 	}
 
+	// 404: Treat as permanent failure (endpoint/version mismatch).
+	// If we ever see transient 404s (e.g., during deploy propagation), revisit this.
+	if (status === 404) {
+		return { type: 'failed' };
+	}
+
 	// Origin validation failures are permanent (re-auth won't fix)
 	if (status === 403 && code === 'ORIGIN_FORBIDDEN') {
 		return { type: 'failed' };

@@ -9,7 +9,7 @@
  */
 
 import { AlertCircle, Loader2, WifiOff } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useOutboxCounts } from '../hooks/use-outbox';
@@ -23,6 +23,7 @@ export function SyncIndicator({ onManageClick }: SyncIndicatorProps) {
 	// Use the safe hook that won't throw during initialization
 	const { counts, isReady } = useOutboxCounts();
 	const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+	const tooltipId = useId();
 
 	// Listen for online/offline events
 	useEffect(() => {
@@ -56,12 +57,12 @@ export function SyncIndicator({ onManageClick }: SyncIndicatorProps) {
 		return (
 			<Tooltip>
 				<TooltipTrigger asChild>
-					<Badge variant="secondary" className="cursor-default gap-1.5">
+					<Badge variant="secondary" className="cursor-default gap-1.5" aria-describedby={tooltipId}>
 						<WifiOff className="h-3 w-3" />
 						<span>Offline</span>
 					</Badge>
 				</TooltipTrigger>
-				<TooltipContent side="bottom">
+				<TooltipContent id={tooltipId} side="bottom">
 					<p>You're offline. Changes will sync when connected.</p>
 				</TooltipContent>
 			</Tooltip>
@@ -72,14 +73,14 @@ export function SyncIndicator({ onManageClick }: SyncIndicatorProps) {
 		return (
 			<Tooltip>
 				<TooltipTrigger asChild>
-					<Badge variant="destructive" className="cursor-pointer gap-1.5" onClick={onManageClick}>
+					<Badge variant="destructive" className="cursor-pointer gap-1.5" onClick={onManageClick} aria-describedby={tooltipId}>
 						<AlertCircle className="h-3 w-3" />
 						<span>
 							{issueCount} {issueCount === 1 ? 'issue' : 'issues'}
 						</span>
 					</Badge>
 				</TooltipTrigger>
-				<TooltipContent side="bottom">
+				<TooltipContent id={tooltipId} side="bottom">
 					<div className="space-y-1">
 						{counts.failed > 0 && (
 							<p>
@@ -98,12 +99,12 @@ export function SyncIndicator({ onManageClick }: SyncIndicatorProps) {
 		return (
 			<Tooltip>
 				<TooltipTrigger asChild>
-					<Badge variant="warning" className="cursor-default gap-1.5">
+					<Badge variant="warning" className="cursor-default gap-1.5" aria-describedby={tooltipId}>
 						<Loader2 className="h-3 w-3 animate-spin" />
 						<span>Syncing {counts.pending}</span>
 					</Badge>
 				</TooltipTrigger>
-				<TooltipContent side="bottom">
+				<TooltipContent id={tooltipId} side="bottom">
 					<p>
 						{counts.pending} {counts.pending === 1 ? 'item' : 'items'} syncing...
 					</p>

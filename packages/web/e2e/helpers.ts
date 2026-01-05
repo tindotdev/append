@@ -25,8 +25,8 @@ export function interceptBatchPosts(page: Page): {
 
 			// Resolve the oldest pending waiter (FIFO)
 			if (pendingResolvers.length > 0) {
-				const resolver = pendingResolvers.shift()!;
-				resolver(captured);
+				const resolver = pendingResolvers.shift();
+				resolver?.(captured);
 			}
 		}
 
