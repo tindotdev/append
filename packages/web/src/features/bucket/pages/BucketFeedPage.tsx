@@ -2,12 +2,17 @@ import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import type { RowSelectionState } from '@tanstack/react-table';
 import { Search } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
+import { ApiRequestError } from '@/lib/api-rpc';
 import { useUserBuckets } from '@/lib/user-buckets';
+import { useArchiveTerm, useRestoreTerm } from '../api/archive-term';
 import { useBucketFeed } from '../api/get-bucket-feed';
+import { useUpdateTermSense } from '../api/update-term-sense';
 import { BucketTable } from '../components/BucketTable';
 import { BulkActionBar } from '../components/BulkActionBar';
 import { type ColumnMeta, getColumns } from '../components/columns';
+import { MoveToBucketDialog } from '../components/MoveToBucketDialog';
 import { TermDetailSheet } from '../components/TermDetailSheet';
 import type { BucketFeedItem } from '../types';
 
@@ -182,6 +187,11 @@ function FeedContent({
 	);
 }
 
+interface MoveDialogState {
+	open: boolean;
+	items: BucketFeedItem[];
+}
+
 export function BucketFeedPage() {
 	const { slug } = useParams({ from: '/protected/bucket/$slug' });
 	const search = useSearch({ from: '/protected/bucket/$slug' });
@@ -189,6 +199,12 @@ export function BucketFeedPage() {
 
 	const selectedTermId = search.term ?? null;
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+	const [moveDialog, setMoveDialog] = useState<MoveDialogState>({ open: false, items: [] });
+
+	// Mutations
+	const archiveTerm = useArchiveTerm();
+	const restoreTerm = useRestoreTerm();
+	const updateTermSense = useUpdateTermSense();
 
 	const handleRowClick = (item: BucketFeedItem) => {
 		navigate({ to: '/bucket/$slug', params: { slug }, search: { term: item.termId } });
@@ -198,25 +214,164 @@ export function BucketFeedPage() {
 		navigate({ to: '/bucket/$slug', params: { slug }, search: { term: undefined } });
 	};
 
-	// Stub handlers - will be wired to mutations in a later task
-	const handleDelete = (_item: BucketFeedItem) => {
-		// TODO: Wire to useArchiveTerm mutation with Undo toast
+	// Delete a single term with Undo
+	const handleDelete = async (item: BucketFeedItem) => {
+		try {
+			const result = await archiveTerm.mutateAsync({
+				termId: item.termId,
+				expectedVersion: item.termVersion,
+			});
+
+			toast.success('Term deleted', {
+				action: {
+					label: 'Undo',
+					onClick: async () => {
+						try {
+							await restoreTerm.mutateAsync({
+								termId: item.termId,
+								expectedVersion: result.term.version,
+							});
+							toast.success('Restored');
+						} catch {
+							toast.error('Undo failed');
+						}
+					},
+				},
+			});
+		} catch (error) {
+			if (error instanceof ApiRequestError && error.status === 409) {
+				toast.error('Conflict: Please refresh the page');
+			} else {
+				toast.error('Delete failed');
+			}
+		}
 	};
 
-	const handleMove = (_item: BucketFeedItem) => {
-		// TODO: Open MoveToBucketDialog
+	// Open move dialog for a single term
+	const handleMove = (item: BucketFeedItem) => {
+		setMoveDialog({ open: true, items: [item] });
 	};
 
 	const handleClearSelection = () => {
 		setRowSelection({});
 	};
 
-	const handleBulkDelete = () => {
-		// TODO: Wire to bulk archive with Undo toast
+	// Bulk delete with single Undo toast
+	const handleBulkDelete = async () => {
+		const selectedItems = items.filter((item) => rowSelection[item.termId]);
+		if (selectedItems.length === 0) return;
+
+		const results: Array<{ termId: string; version: number }> = [];
+		let hasConflict = false;
+
+		for (const item of selectedItems) {
+			try {
+				const result = await archiveTerm.mutateAsync({
+					termId: item.termId,
+					expectedVersion: item.termVersion,
+				});
+				results.push({ termId: item.termId, version: result.term.version });
+			} catch (error) {
+				if (error instanceof ApiRequestError && error.status === 409) {
+					hasConflict = true;
+				}
+			}
+		}
+
+		setRowSelection({});
+
+		if (hasConflict) {
+			toast.error('Some items had conflicts. Please refresh the page.');
+		} else if (results.length > 0) {
+			toast.success(`${results.length} ${results.length === 1 ? 'term' : 'terms'} deleted`, {
+				action: {
+					label: 'Undo',
+					onClick: async () => {
+						let restored = 0;
+						for (const { termId, version } of results) {
+							try {
+								await restoreTerm.mutateAsync({ termId, expectedVersion: version });
+								restored++;
+							} catch {
+								// Continue with other restores
+							}
+						}
+						if (restored === results.length) {
+							toast.success('Restored');
+						} else {
+							toast.error(`Only restored ${restored} of ${results.length}`);
+						}
+					},
+				},
+			});
+		}
 	};
 
+	// Open move dialog for bulk move
 	const handleBulkMove = () => {
-		// TODO: Open MoveToBucketDialog for bulk move
+		const selectedItems = items.filter((item) => rowSelection[item.termId]);
+		if (selectedItems.length === 0) return;
+		setMoveDialog({ open: true, items: selectedItems });
+	};
+
+	// Handle move confirmation
+	const handleMoveConfirm = async (targetBucket: string) => {
+		const itemsToMove = moveDialog.items;
+		const results: Array<{ senseId: string; previousBucket: string; version: number }> = [];
+		let hasConflict = false;
+
+		for (const item of itemsToMove) {
+			try {
+				const result = await updateTermSense.mutateAsync({
+					senseId: item.primarySense.id,
+					request: {
+						expectedVersion: item.primarySense.version,
+						bucket: targetBucket,
+					},
+				});
+				results.push({
+					senseId: item.primarySense.id,
+					previousBucket: item.primarySense.bucket,
+					version: result.sense.version,
+				});
+			} catch (error) {
+				if (error instanceof ApiRequestError && error.status === 409) {
+					hasConflict = true;
+				}
+			}
+		}
+
+		setMoveDialog({ open: false, items: [] });
+		setRowSelection({});
+
+		if (hasConflict) {
+			toast.error('Some items had conflicts. Please refresh the page.');
+		} else if (results.length > 0) {
+			toast.success(`${results.length} ${results.length === 1 ? 'term' : 'terms'} moved`, {
+				action: {
+					label: 'Undo',
+					onClick: async () => {
+						let restored = 0;
+						for (const { senseId, previousBucket, version } of results) {
+							try {
+								await updateTermSense.mutateAsync({
+									senseId,
+									request: { expectedVersion: version, bucket: previousBucket },
+								});
+								restored++;
+							} catch {
+								// Continue with other restores
+							}
+						}
+						if (restored === results.length) {
+							toast.success('Moved back');
+						} else {
+							toast.error(`Only moved back ${restored} of ${results.length}`);
+						}
+					},
+				},
+			});
+		}
 	};
 
 	const { data: bucketsData, isLoading: bucketsLoading } = useUserBuckets();
@@ -240,22 +395,33 @@ export function BucketFeedPage() {
 	if (items.length === 0) return <FeedEmptyState title={title} />;
 
 	return (
-		<FeedContent
-			title={title}
-			items={items}
-			hasNextPage={!!hasNextPage}
-			isFetchingNextPage={isFetchingNextPage}
-			onFetchNextPage={fetchNextPage}
-			selectedTermId={selectedTermId}
-			onRowClick={handleRowClick}
-			onClosePanel={handleClosePanel}
-			rowSelection={rowSelection}
-			onRowSelectionChange={setRowSelection}
-			onDelete={handleDelete}
-			onMove={handleMove}
-			onClearSelection={handleClearSelection}
-			onBulkDelete={handleBulkDelete}
-			onBulkMove={handleBulkMove}
-		/>
+		<>
+			<FeedContent
+				title={title}
+				items={items}
+				hasNextPage={!!hasNextPage}
+				isFetchingNextPage={isFetchingNextPage}
+				onFetchNextPage={fetchNextPage}
+				selectedTermId={selectedTermId}
+				onRowClick={handleRowClick}
+				onClosePanel={handleClosePanel}
+				rowSelection={rowSelection}
+				onRowSelectionChange={setRowSelection}
+				onDelete={handleDelete}
+				onMove={handleMove}
+				onClearSelection={handleClearSelection}
+				onBulkDelete={handleBulkDelete}
+				onBulkMove={handleBulkMove}
+			/>
+
+			<MoveToBucketDialog
+				open={moveDialog.open}
+				onClose={() => setMoveDialog({ open: false, items: [] })}
+				onConfirm={handleMoveConfirm}
+				currentBucket={slug}
+				itemCount={moveDialog.items.length}
+				isPending={updateTermSense.isPending}
+			/>
+		</>
 	);
 }

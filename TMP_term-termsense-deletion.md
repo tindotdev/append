@@ -236,8 +236,8 @@ Web tests:
 - [x] Add bulk action bar component (local to bucket feature; fixed bottom) — `packages/web/src/features/bucket/components/BulkActionBar.tsx`
 - [x] Add term archive + restore client API helpers + mutations — `packages/web/src/features/bucket/api/archive-term.ts`
 - [x] Add term-sense archive + restore client API helpers + mutations — `packages/web/src/features/bucket/api/archive-term-sense.ts`
-- [ ] Wire per-row Delete + Move, and bulk Delete + Move
-- [ ] Add Sonner Undo for move/delete (single toast per bulk operation)
+- [x] Wire per-row Delete + Move, and bulk Delete + Move — `packages/web/src/features/bucket/pages/BucketFeedPage.tsx:217-375`
+- [x] Add Sonner Undo for move/delete (single toast per bulk operation) — `packages/web/src/features/bucket/pages/BucketFeedPage.tsx:225-240,285-306,349-373`
 - [ ] Add sense delete + term delete actions in `TermDetailSheet`
 - [ ] Add E2E test: delete + undo happy path
 
