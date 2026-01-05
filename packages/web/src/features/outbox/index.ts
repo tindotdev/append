@@ -14,7 +14,7 @@ export { OutboxProvider } from './components/OutboxProvider';
 export { SyncIndicator } from './components/SyncIndicator';
 
 // Hooks
-export { useOutbox, useOutboxCounts } from './hooks/use-outbox';
+export { useOutbox, useOutboxCounts, useOutboxSafe } from './hooks/use-outbox';
 
 // Types
 export type {
