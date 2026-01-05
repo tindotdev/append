@@ -8,8 +8,8 @@
  * A tab can take over if: no lease, lease expired, or it already owns the lease.
  */
 
-import { IDB_VERSION, LEASE_MS, LEASE_STORE_NAME } from '../constants';
-import { getDatabaseName } from '../store';
+import { LEASE_MS, LEASE_STORE_NAME } from '../constants';
+import { openDatabase } from '../store';
 import type { Clock } from '../types';
 import type { LeadershipDeps, LeadershipProvider, LeadershipSession, LeaseRecord, LeaseStore } from './types';
 
@@ -32,19 +32,11 @@ export function createLeaseStore(options: LeaseStoreOptions): LeaseStore {
 	const { userScope, clock = { now: () => Date.now() } } = options;
 	let dbPromise: Promise<IDBDatabase> | null = null;
 
-	async function getDb(): Promise<IDBDatabase> {
+	// Use shared openDatabase to ensure all stores are created
+	// regardless of whether lease or outbox opens the DB first
+	function getDb(): Promise<IDBDatabase> {
 		if (!dbPromise) {
-			dbPromise = new Promise((resolve, reject) => {
-				const request = indexedDB.open(getDatabaseName(userScope), IDB_VERSION);
-				request.onerror = () => reject(request.error);
-				request.onsuccess = () => resolve(request.result);
-				request.onupgradeneeded = (event) => {
-					const db = (event.target as IDBOpenDBRequest).result;
-					if (!db.objectStoreNames.contains(LEASE_STORE_NAME)) {
-						db.createObjectStore(LEASE_STORE_NAME, { keyPath: 'key' });
-					}
-				};
-			});
+			dbPromise = openDatabase(userScope);
 		}
 		return dbPromise;
 	}
