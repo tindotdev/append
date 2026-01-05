@@ -91,7 +91,9 @@
 				"BETTER_AUTH_URL": "https://append-api-preview.tindotdev.workers.dev",
 				"SUGGESTIONS_PROVIDER": "stub",
 				"AI_GATEWAY_ID": "append-gateway-preview",
-				"CF_ACCOUNT_ID": "d1d83d0040d3dea7df64d58cdbebe5a9"
+				"CF_ACCOUNT_ID": "d1d83d0040d3dea7df64d58cdbebe5a9",
+				// E2E Auth: wildcard pattern allows per-PR emails like e2e-bot+pr-123@append.test
+				"ALLOWED_EMAIL": "e2e-bot+*@append.test"
 			},
 			"d1_databases": [
 				{

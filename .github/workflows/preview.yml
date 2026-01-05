@@ -46,6 +46,14 @@ jobs:
         working-directory: packages/api
         run: pnpm exec wrangler d1 migrations apply append-db-preview --remote --config wrangler.jsonc --env preview
 
+      - name: Set PR-specific E2E auth email
+        working-directory: packages/api
+        run: |
+          # Set E2E_AUTH_EMAIL with PR-specific suffix for environment isolation
+          # This matches the wildcard pattern in ALLOWED_EMAIL (e2e-bot+*@append.test)
+          echo "e2e-bot+pr-${{ github.event.pull_request.number }}@append.test" | \
+            pnpm exec wrangler secret put E2E_AUTH_EMAIL -e preview --config wrangler.jsonc
+
       - name: Deploy Worker API Preview
         id: deploy
         working-directory: packages/api
