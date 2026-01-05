@@ -22,23 +22,34 @@ const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173';
 
 /**
  * Get the domain to use for cookies.
- * In preview environments, cookies should match the API domain since the API sets them.
- * For local development, use the web URL domain (localhost).
+ *
+ * For cross-site preview environments (web on Pages, API on Workers):
+ * - Cookie domain must be the API domain since that's where authenticated
+ *   requests are sent and where the cookie needs to be included
+ * - With SameSite=None; Secure, the browser will send the cookie cross-origin
+ *   from the web app to the API
+ *
+ * For local development (same-origin):
+ * - Use localhost since both web and API are on localhost
  */
 function getCookieDomain(): string {
 	const apiUrl = new URL(API_URL);
-	// For preview (cross-site), use API domain
+	// For preview (cross-site), use API domain - cookies are sent TO the API
 	if (apiUrl.hostname !== 'localhost') {
 		return apiUrl.hostname;
 	}
-	// For local dev, use web domain
+	// For local dev (same-origin), use localhost
 	return new URL(BASE_URL).hostname;
 }
 
 async function globalSetup(): Promise<void> {
 	const secret = process.env.E2E_AUTH_SECRET;
 	if (!secret) {
-		throw new Error('E2E_AUTH_SECRET environment variable is required for E2E tests');
+		throw new Error(
+			'E2E_AUTH_SECRET environment variable is required for E2E tests.\n' +
+				'For local development: set E2E_AUTH_SECRET in packages/api/.dev.vars\n' +
+				'For CI: ensure E2E_AUTH_SECRET is configured in GitHub Actions secrets'
+		);
 	}
 
 	console.log(`[E2E Setup] Authenticating via ${API_URL}/auth/e2e/login`);
@@ -53,7 +64,13 @@ async function globalSetup(): Promise<void> {
 
 	if (!response.ok) {
 		const text = await response.text();
-		throw new Error(`E2E login failed: ${response.status} ${response.statusText} - ${text}`);
+		const hints =
+			response.status === 404
+				? '\nHint: 404 means endpoint unavailable. Check APP_ENV is not "production" and E2E_AUTH_SECRET/E2E_AUTH_EMAIL are configured.'
+				: response.status === 403
+					? '\nHint: 403 means auth failed. Verify E2E_AUTH_SECRET matches between client and server, and E2E_AUTH_EMAIL is on the allowlist.'
+					: '';
+		throw new Error(`E2E login failed: ${response.status} ${response.statusText} - ${text}${hints}\nAPI URL: ${API_URL}`);
 	}
 
 	// Extract cookies from response
