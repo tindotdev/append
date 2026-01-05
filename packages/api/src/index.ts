@@ -25,8 +25,11 @@ const MAX_WILDCARD_SEGMENT_LENGTH = 63;
  * Supports wildcard patterns like https://*.append-web.pages.dev
  *
  * Uses simple string matching instead of regex to avoid ReDoS attacks.
+ *
+ * @internal Exported for testing only
  */
-function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Simple conditional logic, not actually complex
+export function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
 	// Validate origin is a reasonable URL format (prevent malformed input)
 	if (!origin || origin.length > 256 || !origin.startsWith('http')) {
 		return false;
