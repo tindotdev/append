@@ -45,6 +45,12 @@ export default [
 					pattern: 'src/*.{ts,tsx}',
 					mode: 'full',
 				},
+				// Test setup/support files
+				{
+					type: 'test',
+					pattern: 'src/test/**/*',
+					mode: 'full',
+				},
 			],
 			'boundaries/ignore': ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/routeTree.gen.ts'],
 			'import/resolver': {
@@ -107,6 +113,11 @@ export default [
 						{
 							from: ['app'],
 							allow: ['feature', 'components', 'hooks', 'lib', 'routes', 'app'],
+						},
+						// Test utilities can import from anywhere
+						{
+							from: ['test'],
+							allow: ['feature', 'components', 'hooks', 'lib', 'routes', 'app', 'test'],
 						},
 					],
 				},
