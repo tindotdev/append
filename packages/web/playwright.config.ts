@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
 /**
@@ -7,11 +10,31 @@ import { defineConfig, devices } from '@playwright/test';
  * - Local dev: starts vite dev server, runs against localhost
  * - Preview: uses deployed Pages URL, no local server
  *
- * Environment variables:
+ * Environment variables (auto-loaded from .env):
+ * - E2E_AUTH_SECRET: Required for globalSetup auth bootstrap
+ *
+ * Override variables (command line only):
  * - PLAYWRIGHT_BASE_URL: Override the base URL (e.g., preview Pages URL)
  * - PLAYWRIGHT_API_URL: Override the API URL (e.g., preview Worker URL)
- * - E2E_AUTH_SECRET: Required for globalSetup auth bootstrap
  */
+
+// Load .env file for local development (E2E_AUTH_SECRET, etc.)
+// This allows running `pnpm test:e2e` without manually specifying env vars
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+	const envContent = fs.readFileSync(envPath, 'utf-8');
+	for (const line of envContent.split('\n')) {
+		const trimmed = line.trim();
+		if (!trimmed || trimmed.startsWith('#')) continue;
+		const [key, ...valueParts] = trimmed.split('=');
+		const value = valueParts.join('=');
+		// Don't override existing env vars (allows CLI overrides)
+		if (key && value && !process.env[key]) {
+			process.env[key] = value;
+		}
+	}
+}
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173';
 const isPreview = baseURL.includes('pages.dev');
