@@ -7,7 +7,7 @@
  */
 
 import { createLeaseProvider } from './lease';
-import type { LeadershipDeps, LeadershipProvider } from './types';
+import type { LeadershipDeps, LeadershipProvider, LeadershipSession } from './types';
 import { createWebLocksProvider } from './web-locks';
 
 // =============================================================================
@@ -48,7 +48,28 @@ export function createLeadershipProvider(deps: LeadershipDeps): LeadershipProvid
 	const webLocksProvider = createWebLocksProvider(deps);
 
 	if (webLocksProvider.isAvailable()) {
-		return webLocksProvider;
+		const leaseProvider = createLeaseProvider(deps);
+		let forceLease = false;
+
+		return {
+			type: 'web-locks',
+			isAvailable(): boolean {
+				return true;
+			},
+			async tryAcquire(): Promise<LeadershipSession | null> {
+				if (forceLease) {
+					return leaseProvider.tryAcquire();
+				}
+
+				try {
+					return await webLocksProvider.tryAcquire();
+				} catch {
+					// Web Locks failed - fall back to the lease provider for this attempt.
+					forceLease = true;
+					return leaseProvider.tryAcquire();
+				}
+			},
+		};
 	}
 
 	// Fall back to lease
