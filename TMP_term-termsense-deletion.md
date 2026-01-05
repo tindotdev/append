@@ -234,8 +234,8 @@ Web tests:
 - [ ] Add TanStack Table row selection to `BucketTable`
 - [ ] Add selection + actions columns to `packages/web/src/features/bucket/components/columns.tsx`
 - [ ] Add bulk action bar component (local to bucket feature; fixed bottom)
-- [ ] Add term archive + restore client API helpers + mutations
-- [ ] Add term-sense archive + restore client API helpers + mutations
+- [x] Add term archive + restore client API helpers + mutations — `packages/web/src/features/bucket/api/archive-term.ts`
+- [x] Add term-sense archive + restore client API helpers + mutations — `packages/web/src/features/bucket/api/archive-term-sense.ts`
 - [ ] Wire per-row Delete + Move, and bulk Delete + Move
 - [ ] Add Sonner Undo for move/delete (single toast per bulk operation)
 - [ ] Add sense delete + term delete actions in `TermDetailSheet`
