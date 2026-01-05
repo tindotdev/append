@@ -11,7 +11,7 @@ import { AlertCircle, LogIn, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useOutbox } from '../hooks/use-outbox';
+import { useOutboxSafe } from '../hooks/use-outbox';
 import type { OutboxItem } from '../types';
 
 interface OutboxManagementProps {
@@ -20,16 +20,17 @@ interface OutboxManagementProps {
 }
 
 export function OutboxManagement({ open, onOpenChange }: OutboxManagementProps) {
-	const { listByStatus, discardItem, counts } = useOutbox();
+	const outbox = useOutboxSafe();
 	const [failedItems, setFailedItems] = useState<OutboxItem[]>([]);
 	const [blockedItems, setBlockedItems] = useState<OutboxItem[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 
 	// Refresh items from store
 	const refreshItems = useCallback(async () => {
+		if (!outbox) return;
 		setIsLoading(true);
 		try {
-			const [failed, blocked] = await Promise.all([listByStatus('failed'), listByStatus('blocked_auth')]);
+			const [failed, blocked] = await Promise.all([outbox.listByStatus('failed'), outbox.listByStatus('blocked_auth')]);
 			setFailedItems(failed);
 			setBlockedItems(blocked);
 		} catch {
@@ -37,21 +38,36 @@ export function OutboxManagement({ open, onOpenChange }: OutboxManagementProps) 
 		} finally {
 			setIsLoading(false);
 		}
-	}, [listByStatus]);
+	}, [outbox]);
 
 	// Refresh when opened or counts change (counts triggers refresh after discard)
 	// biome-ignore lint/correctness/useExhaustiveDependencies: counts is used to trigger refresh
 	useEffect(() => {
-		if (open) {
+		if (open && outbox) {
 			refreshItems();
 		}
-	}, [open, counts, refreshItems]);
+	}, [open, outbox?.counts, refreshItems]);
 
 	// Handle discard
 	const handleDiscard = async (itemId: string) => {
-		await discardItem(itemId);
+		if (!outbox) return;
+		await outbox.discardItem(itemId);
 		// Item will be removed from list via counts change triggering refresh
 	};
+
+	// Don't render dialog content if outbox not ready
+	if (!outbox) {
+		return (
+			<Dialog open={open} onOpenChange={onOpenChange}>
+				<DialogContent className="max-w-md">
+					<DialogHeader>
+						<DialogTitle>Sync Issues</DialogTitle>
+						<DialogDescription>Loading...</DialogDescription>
+					</DialogHeader>
+				</DialogContent>
+			</Dialog>
+		);
+	}
 
 	// Handle sign in redirect
 	const handleSignIn = () => {
