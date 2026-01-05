@@ -206,6 +206,57 @@ pnpm --filter @append/api exec wrangler secret put E2E_AUTH_EMAIL --env preview
 
 Also add `E2E_AUTH_SECRET` to GitHub Actions secrets for the workflow to use.
 
+### Running E2E tests locally
+
+To run Playwright E2E tests against local development servers:
+
+1. Configure E2E secrets in `packages/api/.dev.vars`:
+
+   ```bash
+   E2E_AUTH_SECRET=your-local-e2e-secret-at-least-32-chars
+   E2E_AUTH_EMAIL=your-test-email@example.com
+   ```
+
+2. Ensure the email is on your allowlist (`ALLOWED_EMAIL` or `ALLOWED_SUB`).
+
+3. Start the API and web dev servers:
+
+   ```bash
+   # Terminal 1: API
+   pnpm --filter @append/api dev
+
+   # Terminal 2: Web
+   pnpm --filter @append/web dev
+   ```
+
+4. Run Playwright tests:
+
+   ```bash
+   cd packages/web
+   E2E_AUTH_SECRET=your-local-e2e-secret-at-least-32-chars pnpm test:e2e
+   ```
+
+5. For interactive debugging:
+
+   ```bash
+   E2E_AUTH_SECRET=your-local-e2e-secret-at-least-32-chars pnpm test:e2e:ui
+   ```
+
+### E2E secret rotation
+
+To rotate the E2E secret in preview:
+
+```bash
+# Generate a new secret
+openssl rand -base64 32
+
+# Update in Cloudflare Worker
+pnpm --filter @append/api exec wrangler secret put E2E_AUTH_SECRET --env preview
+
+# Update in GitHub Actions secrets
+# (manual step in GitHub repository settings)
+```
+
 ### Preview environment notes
 
 - Preview database and storage accumulate data over time (cleared manually if needed)
