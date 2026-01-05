@@ -2,11 +2,13 @@ export interface BucketFeedItem {
 	termId: string;
 	displayTerm: string;
 	canonical: string;
+	termVersion: number;
 	primarySense: {
 		id: string;
 		bucket: string;
 		text: string;
 		createdAt: number;
+		version: number;
 	};
 }
 

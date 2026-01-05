@@ -230,6 +230,7 @@ Web tests:
 
 ### Web (SPA)
 
+- [x] Update web types to include `termVersion` and `primarySense.version` — `packages/web/src/features/bucket/types/index.ts`
 - [ ] Add TanStack Table row selection to `BucketTable`
 - [ ] Add selection + actions columns to `packages/web/src/features/bucket/components/columns.tsx`
 - [ ] Add bulk action bar component (local to bucket feature; fixed bottom)
