@@ -78,9 +78,11 @@ describe('POST /auth/e2e/login', () => {
 		expect(sessions[0].userId).toBe(users[0].id);
 
 		// Verify cookie token matches session token in database
+		// Cookie format is "<token>.<signature>" (signed by Better Auth)
 		const tokenMatch = setCookie.match(/better-auth\.session_token=([^;]+)/);
 		expect(tokenMatch).toBeTruthy();
-		expect(tokenMatch![1]).toBe(sessions[0].token);
+		const [cookieToken] = tokenMatch![1].split('.');
+		expect(cookieToken).toBe(sessions[0].token);
 	});
 
 	it('returns 403 with wrong secret', async () => {
