@@ -164,7 +164,7 @@ describe('createWebLocksProvider', () => {
 			expect(mockRequest).toHaveBeenCalledWith('outbox-sender', { mode: 'exclusive', ifAvailable: true }, expect.any(Function));
 		});
 
-		it('returns null when navigator.locks.request throws', async () => {
+		it('rejects when navigator.locks.request throws', async () => {
 			const mockRequest = vi.fn().mockRejectedValue(new Error('Lock API error'));
 
 			vi.stubGlobal('navigator', {
@@ -179,8 +179,7 @@ describe('createWebLocksProvider', () => {
 				userScope: 'user-1',
 			});
 
-			const session = await provider.tryAcquire();
-			expect(session).toBeNull();
+			await expect(provider.tryAcquire()).rejects.toThrow('Lock API error');
 		});
 	});
 

@@ -33,13 +33,27 @@ export function createWebLocksProvider(deps: LeadershipDeps): LeadershipProvider
 		async tryAcquire(): Promise<LeadershipSession | null> {
 			if (!this.isAvailable()) return null;
 
-			return new Promise((resolve) => {
-				// Use ifAvailable: true for non-blocking acquisition
-				navigator.locks
-					.request(LOCK_NAME, { mode: 'exclusive', ifAvailable: true }, async (lock) => {
+			return new Promise((resolve, reject) => {
+				let settled = false;
+
+				const resolveOnce = (value: LeadershipSession | null) => {
+					if (settled) return;
+					settled = true;
+					resolve(value);
+				};
+
+				const rejectOnce = (error: unknown) => {
+					if (settled) return;
+					settled = true;
+					reject(error);
+				};
+
+				try {
+					// Use ifAvailable: true for non-blocking acquisition
+					const requestPromise = navigator.locks.request(LOCK_NAME, { mode: 'exclusive', ifAvailable: true }, async (lock) => {
 						if (!lock) {
 							// Lock is held by another tab
-							resolve(null);
+							resolveOnce(null);
 							return;
 						}
 
@@ -62,16 +76,20 @@ export function createWebLocksProvider(deps: LeadershipDeps): LeadershipProvider
 							},
 						};
 
-						resolve(session);
+						resolveOnce(session);
 
 						// Hold the lock until release() is called
 						// The lock is automatically released when this callback resolves
 						await releasePromise;
-					})
-					.catch(() => {
-						// Web Locks threw - return null (caller should fall back to lease)
-						resolve(null);
 					});
+
+					requestPromise.catch((error) => {
+						// Bubble acquisition errors so the caller can fall back to the lease provider.
+						rejectOnce(error);
+					});
+				} catch (error) {
+					rejectOnce(error);
+				}
 			});
 		},
 	};

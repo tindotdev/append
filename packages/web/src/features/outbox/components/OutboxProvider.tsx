@@ -32,8 +32,17 @@ import type { OutboxContextValue } from '../types';
 // Session storage key for tab ID (persists across page refreshes)
 const TAB_ID_KEY = 'outbox_tab_id';
 
+// Sender loop poll interval when idle or not leader
+const SENDER_POLL_INTERVAL_MS = 5_000;
+
+// Debounce refresh to reduce cross-tab churn
+const REFRESH_DEBOUNCE_MS = 500;
+
 // Default counts when not initialized
 const DEFAULT_COUNTS: OutboxCounts = { pending: 0, failed: 0, blocked_auth: 0 };
+
+// Batch IDs are UUID v4s; avoid navigation if format is unexpected
+const BATCH_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface OutboxProviderProps {
 	children: React.ReactNode;
@@ -52,6 +61,38 @@ function getTabId(): string {
 	return tabId;
 }
 
+type AuthSession = {
+	user?: { id?: string | null };
+	session?: { id?: string | null; expiresAt?: string | number | null; updatedAt?: string | number | null };
+	expiresAt?: string | number | null;
+};
+
+function getAuthSessionKey(session: AuthSession | null | undefined): string | null {
+	if (!session) return null;
+
+	const parts: string[] = [];
+
+	if (session.user?.id) {
+		parts.push(`user:${session.user.id}`);
+	}
+
+	if (session.session?.id) {
+		parts.push(`sid:${session.session.id}`);
+	}
+
+	if (session.session?.expiresAt) {
+		parts.push(`exp:${session.session.expiresAt}`);
+	} else if (session.expiresAt) {
+		parts.push(`exp:${session.expiresAt}`);
+	}
+
+	if (session.session?.updatedAt) {
+		parts.push(`upd:${session.session.updatedAt}`);
+	}
+
+	return parts.length > 0 ? parts.join('|') : null;
+}
+
 export function OutboxProvider({ children }: OutboxProviderProps) {
 	const { data: session } = useAuth();
 	const userId = session?.user?.id;
@@ -65,20 +106,36 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 	const leadershipRef = useRef<LeadershipProvider | null>(null);
 	const cleanupRef = useRef<(() => void) | null>(null);
 	const initUserScopeRef = useRef<string | null>(null);
+	const lastAuthSessionKeyRef = useRef<string | null>(null);
+	const lastUserIdRef = useRef<string | null>(null);
+	const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const isMountedRef = useRef(true);
+	const authSessionKey = useMemo(() => getAuthSessionKey(session as AuthSession), [session]);
 
 	// Refresh counts from store
 	const refreshCounts = useCallback(async () => {
-		if (!outboxRef.current || !initUserScopeRef.current) return;
+		if (!isMountedRef.current || !outboxRef.current || !initUserScopeRef.current) return;
 		try {
 			const newCounts = await outboxRef.current.store.countByStatus(initUserScopeRef.current);
-			setCounts(newCounts);
-		} catch {
-			// Ignore errors during refresh
+			if (isMountedRef.current) {
+				setCounts(newCounts);
+			}
+		} catch (err) {
+			console.warn('[Outbox] Failed to refresh counts:', err);
 		}
 	}, []);
 
+	const refreshCountsDebounced = useCallback(() => {
+		if (refreshTimeoutRef.current) return;
+		refreshTimeoutRef.current = setTimeout(() => {
+			refreshTimeoutRef.current = null;
+			refreshCounts();
+		}, REFRESH_DEBOUNCE_MS);
+	}, [refreshCounts]);
+
 	// Initialize/reinitialize when user changes
 	useEffect(() => {
+		isMountedRef.current = true;
 		// Skip if no user (sign-out or not authenticated)
 		if (!userId) {
 			// Clean up if was initialized (user signed out)
@@ -149,17 +206,19 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 		async function runSenderLoop() {
 			if (!isMounted || !outboxRef.current || !leadershipRef.current) return;
 
-			const session = await leadershipRef.current.tryAcquire();
-			if (!session) {
-				// Not leader, try again later
-				senderLoopTimeoutId = setTimeout(runSenderLoop, 5000);
-				return;
-			}
-
+			let session: Awaited<ReturnType<LeadershipProvider['tryAcquire']>> = null;
 			try {
+				session = await leadershipRef.current.tryAcquire();
+				if (!session) {
+					// Not leader, try again later
+					senderLoopTimeoutId = setTimeout(runSenderLoop, SENDER_POLL_INTERVAL_MS);
+					return;
+				}
+
 				let hasMore = true;
 				while (hasMore && isMounted) {
 					hasMore = await outboxRef.current.senderLoop.processOnce();
+					if (!isMounted) break;
 					if (hasMore) {
 						// Renew lease between iterations
 						await session.renew();
@@ -174,11 +233,22 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 						senderLoopTimeoutId = setTimeout(runSenderLoop, delay);
 					} else {
 						// No pending items, check again in 5s
-						senderLoopTimeoutId = setTimeout(runSenderLoop, 5000);
+						senderLoopTimeoutId = setTimeout(runSenderLoop, SENDER_POLL_INTERVAL_MS);
 					}
 				}
+			} catch (error) {
+				console.warn('Outbox sender loop failed; retrying soon.', error);
+				if (isMounted) {
+					senderLoopTimeoutId = setTimeout(runSenderLoop, SENDER_POLL_INTERVAL_MS);
+				}
 			} finally {
-				await session.release();
+				if (session) {
+					try {
+						await session.release();
+					} catch (error) {
+						console.warn('Failed to release outbox leadership session.', error);
+					}
+				}
 			}
 		}
 
@@ -199,7 +269,7 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 				case 'outbox_changed':
 					// Refresh counts if it's for our user
 					if (msg.userScope === userScope) {
-						refreshCounts();
+						refreshCountsDebounced();
 					}
 					break;
 
@@ -210,13 +280,20 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 						queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
 
 						// Show toast with Open action
+						const batchId = msg.result.batchId;
+						const isSafeBatchId = BATCH_ID_PATTERN.test(batchId);
+						if (!isSafeBatchId) {
+							console.warn('[Outbox] Ignoring invalid batchId in outbox_result:', batchId);
+						}
 						toast.success('Batch ready', {
-							action: {
-								label: 'Open',
-								onClick: () => {
-									window.location.href = `/batch/${msg.result.batchId}`;
-								},
-							},
+							action: isSafeBatchId
+								? {
+										label: 'Open',
+										onClick: () => {
+											window.location.href = `/batch/${batchId}`;
+										},
+									}
+								: undefined,
 						});
 					}
 					break;
@@ -249,8 +326,13 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 		// Store cleanup function
 		cleanupRef.current = () => {
 			isMounted = false;
+			isMountedRef.current = false;
 			if (senderLoopTimeoutId) {
 				clearTimeout(senderLoopTimeoutId);
+			}
+			if (refreshTimeoutRef.current) {
+				clearTimeout(refreshTimeoutRef.current);
+				refreshTimeoutRef.current = null;
 			}
 			unsubscribe();
 		};
@@ -262,7 +344,38 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 				cleanupRef.current = null;
 			}
 		};
-	}, [userId, refreshCounts]);
+	}, [userId, refreshCounts, refreshCountsDebounced]);
+
+	// Resume auth-blocked items when auth state changes for the same user
+	useEffect(() => {
+		if (!userId || !outboxRef.current || !initUserScopeRef.current) {
+			lastUserIdRef.current = userId ?? null;
+			lastAuthSessionKeyRef.current = authSessionKey;
+			return;
+		}
+
+		if (lastUserIdRef.current !== userId) {
+			lastUserIdRef.current = userId;
+			lastAuthSessionKeyRef.current = authSessionKey;
+			return;
+		}
+
+		if (authSessionKey && lastAuthSessionKeyRef.current && authSessionKey !== lastAuthSessionKeyRef.current) {
+			outboxRef.current.store
+				.resumeBlockedAuth(userId, Date.now())
+				.then((count) => {
+					if (count > 0) {
+						refreshCounts();
+						outboxRef.current?.broadcast.publish({ type: 'kick' });
+					}
+				})
+				.catch(() => {
+					// Ignore errors while attempting to resume blocked items
+				});
+		}
+
+		lastAuthSessionKeyRef.current = authSessionKey;
+	}, [authSessionKey, refreshCounts, userId]);
 
 	// Context value
 	const contextValue = useMemo<OutboxContextValue | null>(() => {
