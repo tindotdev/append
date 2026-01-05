@@ -116,7 +116,7 @@ Paste this into the issue tracker / PR description and delete when complete.
 
 ## 8) Security verification (pre-merge)
 
-- [ ] Production has no `E2E_AUTH_SECRET` configured.
+- [x] Production has no `E2E_AUTH_SECRET` configured.
 - [ ] `/auth/e2e/login` unreachable in production (404).
 - [ ] Preview cookies are `SameSite=None; Secure`.
 - [ ] Preview `POST|PUT|DELETE /api/*` rejects missing/invalid Origin.
