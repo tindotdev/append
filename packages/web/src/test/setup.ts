@@ -9,7 +9,7 @@
 import '@testing-library/jest-dom/vitest';
 import 'fake-indexeddb/auto';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // Mock BroadcastChannel for cross-tab messaging tests
 // The real implementation uses a BroadcastChannel to coordinate across tabs,

@@ -33,6 +33,9 @@ describe('OutboxProvider', () => {
 
 		mockCreateOutbox.mockReturnValue({
 			store: {
+				put: vi.fn(),
+				get: vi.fn(),
+				listDue: vi.fn().mockResolvedValue([]),
 				resumeBlockedAuth,
 				countByStatus,
 				listByStatus: vi.fn(),
