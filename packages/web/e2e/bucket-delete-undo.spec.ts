@@ -42,7 +42,7 @@ test.describe('Bucket Delete + Undo', () => {
 
 		// Navigate to default bucket (first one the user has)
 		// The bucket slug should be available from the user's buckets
-		await page.goto('/bucket/default');
+		await page.goto('/bucket/foundations');
 
 		// Wait for table to load
 		await page.waitForSelector('table');
@@ -79,7 +79,7 @@ test.describe('Bucket Delete + Undo', () => {
 		const testTermName = (page as unknown as { testTermName: string }).testTermName;
 
 		// Navigate to bucket
-		await page.goto('/bucket/default');
+		await page.goto('/bucket/foundations');
 
 		// Wait for table to load
 		await page.waitForSelector('table');
