@@ -136,6 +136,12 @@ app.post('/:id/restore', vValidator('json', RestoreTermSenseSchema, validationHo
 				message: 'Term sense was modified by another request',
 				details: (error) => ({ currentVersion: error.currentVersion }),
 			},
+			term_version_conflict: {
+				status: 409,
+				code: 'VERSION_CONFLICT',
+				message: 'Term was modified by another request during restore',
+				details: (error) => ({ currentVersion: error.currentVersion }),
+			},
 		});
 	}
 

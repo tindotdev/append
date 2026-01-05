@@ -430,4 +430,45 @@ describe('POST /api/term-sense/:id/restore', () => {
 		expect(body.error.code).toBe('VERSION_CONFLICT');
 		expect(body.details.currentVersion).toBe(senseVersion + 1);
 	});
+
+	it('double restore returns noop on second attempt (term already active)', async () => {
+		// This test verifies that attempting to restore an already-restored sense/term
+		// returns noop since both are already active
+		const { senseId, senseVersion } = await createTermWithSense(authCookie);
+
+		// Archive the only sense (which also archives the term)
+		const archiveRes = await SELF.fetch(`https://example.com/api/term-sense/${senseId}/archive`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', cookie: authCookie },
+			body: JSON.stringify({ expectedVersion: senseVersion }),
+		});
+		const archiveBody = (await archiveRes.json()) as {
+			sense: { version: number };
+			term: { version: number };
+		};
+
+		// First restore succeeds
+		const firstRestoreRes = await SELF.fetch(`https://example.com/api/term-sense/${senseId}/restore`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', cookie: authCookie },
+			body: JSON.stringify({ expectedVersion: archiveBody.sense.version }),
+		});
+		expect(firstRestoreRes.status).toBe(200);
+		const firstRestoreBody = (await firstRestoreRes.json()) as {
+			sense: { version: number };
+			term: { version: number };
+		};
+
+		// Second restore attempt with correct NEW version - should return noop
+		// since sense is already restored (archivedAt is null)
+		const res = await SELF.fetch(`https://example.com/api/term-sense/${senseId}/restore`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', cookie: authCookie },
+			body: JSON.stringify({ expectedVersion: firstRestoreBody.sense.version }),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as { noop: boolean };
+		expect(body.noop).toBe(true);
+	});
 });

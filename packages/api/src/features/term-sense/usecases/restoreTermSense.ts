@@ -31,7 +31,11 @@ export interface RestoreTermSenseResult {
 /**
  * Possible errors from restoreTermSense.
  */
-export type RestoreTermSenseError = { type: 'not_found' } | { type: 'forbidden' } | { type: 'version_conflict'; currentVersion: number };
+export type RestoreTermSenseError =
+	| { type: 'not_found' }
+	| { type: 'forbidden' }
+	| { type: 'version_conflict'; currentVersion: number }
+	| { type: 'term_version_conflict'; currentVersion: number };
 
 /**
  * Restore a term sense with optimistic locking.
@@ -112,7 +116,7 @@ export async function restoreTermSense(
 	const updatedSense = updateResult[0];
 	let termResult: RestoreTermSenseResult['term'] | undefined;
 
-	// 6. If parent term is archived, restore it too
+	// 6. If parent term is archived, restore it too (with version guard)
 	if (termRow.archivedAt !== null) {
 		const termRestoreResult = await db
 			.update(term)
@@ -120,7 +124,7 @@ export async function restoreTermSense(
 				archivedAt: null,
 				version: sql`${term.version} + 1`,
 			})
-			.where(eq(term.id, termRow.id))
+			.where(sql`${term.id} = ${termRow.id} AND ${term.version} = ${termRow.version}`)
 			.returning({
 				id: term.id,
 				primarySenseId: term.primarySenseId,
@@ -128,15 +132,19 @@ export async function restoreTermSense(
 				archivedAt: term.archivedAt,
 			});
 
-		if (termRestoreResult.length > 0) {
-			const restoredTerm = termRestoreResult[0];
-			termResult = {
-				id: restoredTerm.id,
-				primarySenseId: restoredTerm.primarySenseId,
-				version: restoredTerm.version,
-				archivedAt: null,
-			};
+		if (termRestoreResult.length === 0) {
+			// Term was concurrently modified - return conflict
+			const currentTerm = await db.query.term.findFirst({ where: eq(term.id, termRow.id) });
+			return { success: false, error: { type: 'term_version_conflict', currentVersion: currentTerm?.version ?? termRow.version } };
 		}
+
+		const restoredTerm = termRestoreResult[0];
+		termResult = {
+			id: restoredTerm.id,
+			primarySenseId: restoredTerm.primarySenseId,
+			version: restoredTerm.version,
+			archivedAt: null,
+		};
 	}
 
 	// Success - return updated sense (and optionally term)

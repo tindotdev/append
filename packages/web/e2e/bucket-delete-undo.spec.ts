@@ -3,7 +3,8 @@
  *
  * Tests the delete flow in bucket feed:
  * - Create a term via capture flow
- * - Navigate to bucket feed
+ * - Accept the batch to materialize the term
+ * - Navigate to the bucket containing the term
  * - Delete the term
  * - Verify "Term deleted" toast with Undo appears
  * - Verify item removed from table
@@ -28,21 +29,45 @@ test.describe('Bucket Delete + Undo', () => {
 		// Submit the batch
 		await page.getByRole('button', { name: 'Submit Batch' }).click();
 
-		// Wait for sync to complete
+		// Wait for sync to complete and click Open to go to batch detail
 		await expect(page.locator('[data-sonner-toast]').filter({ hasText: /batch ready/i })).toBeVisible({
 			timeout: 15000,
 		});
+		await page
+			.locator('[data-sonner-toast]')
+			.filter({ hasText: /batch ready/i })
+			.getByRole('button', { name: 'Open' })
+			.click();
 
-		// Store term name for later assertions
-		(page as unknown as { testTermName: string }).testTermName = testTermName;
+		// Should be on batch detail page
+		await expect(page).toHaveURL(/\/batch\/[a-f0-9-]+/);
+
+		// Wait for suggestions to complete (Accept All button appears when ready)
+		await expect(page.getByRole('button', { name: 'Accept All' })).toBeVisible({ timeout: 30000 });
+
+		// Click Accept All to materialize the term
+		await page.getByRole('button', { name: 'Accept All' }).click();
+
+		// Wait for accept to complete (button becomes disabled/changes or we see success)
+		await expect(page.getByText(/accepted/i)).toBeVisible({ timeout: 10000 });
+
+		// Get the bucket the term was assigned to from the batch detail page
+		// The bucket is shown in the select dropdown or in the accepted candidates section
+		// After acceptance, candidates show "→ bucket-name" in the collapsed section
+		const bucketMatch = await page.locator('text=/→ (foundations|backend|frontend|dx-tooling|deep-concepts)/').first().textContent();
+		const bucketSlug = bucketMatch?.match(/→ (\S+)/)?.[1] ?? 'foundations';
+
+		// Store term name and bucket for later assertions
+		(page as unknown as { testTermName: string; bucketSlug: string }).testTermName = testTermName;
+		(page as unknown as { testTermName: string; bucketSlug: string }).bucketSlug = bucketSlug;
 	});
 
 	test('delete term and undo restores it', async ({ page }) => {
 		const testTermName = (page as unknown as { testTermName: string }).testTermName;
+		const bucketSlug = (page as unknown as { bucketSlug: string }).bucketSlug;
 
-		// Navigate to default bucket (first one the user has)
-		// The bucket slug should be available from the user's buckets
-		await page.goto('/bucket/foundations');
+		// Navigate to the bucket containing our term
+		await page.goto(`/bucket/${bucketSlug}`);
 
 		// Wait for table to load
 		await page.waitForSelector('table');
@@ -77,9 +102,10 @@ test.describe('Bucket Delete + Undo', () => {
 
 	test('delete term without undo removes it permanently from view', async ({ page }) => {
 		const testTermName = (page as unknown as { testTermName: string }).testTermName;
+		const bucketSlug = (page as unknown as { bucketSlug: string }).bucketSlug;
 
 		// Navigate to bucket
-		await page.goto('/bucket/foundations');
+		await page.goto(`/bucket/${bucketSlug}`);
 
 		// Wait for table to load
 		await page.waitForSelector('table');
