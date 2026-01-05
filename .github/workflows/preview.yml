@@ -171,6 +171,18 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Validate E2E secrets
+        run: |
+          if [ -z "${{ secrets.E2E_AUTH_SECRET }}" ]; then
+            echo "::error::E2E_AUTH_SECRET is not configured in GitHub Actions secrets."
+            echo "To set it up:"
+            echo "  1. Generate a 32+ character random secret: openssl rand -base64 32"
+            echo "  2. Add it to GitHub Actions secrets as E2E_AUTH_SECRET"
+            echo "  3. Add the same secret to the preview Worker via: wrangler secret put E2E_AUTH_SECRET -e preview"
+            exit 1
+          fi
+          echo "✓ E2E_AUTH_SECRET is configured"
+
       - name: Run Playwright E2E tests
         working-directory: packages/web
         env:
