@@ -53,18 +53,13 @@ async function secureCompare(a: string, b: string): Promise<boolean> {
 	const arrA = new Uint8Array(sigA);
 	const arrB = new Uint8Array(sigB);
 
-	// Length check (signatures are always same length from HMAC-SHA256)
-	// but include length mismatch tracking for robustness
-	const lengthMatch = a.length === b.length;
-
 	// Constant-time byte comparison of signatures
-	let sigMatch = true;
+	let diff = 0;
 	for (let i = 0; i < arrA.length; i++) {
-		sigMatch = sigMatch && arrA[i] === arrB[i];
+		diff |= arrA[i] ^ arrB[i];
 	}
 
-	// Both conditions must be true: original lengths match AND signatures match
-	return lengthMatch && sigMatch;
+	return diff === 0;
 }
 
 /** Valid APP_ENV values */
@@ -79,52 +74,57 @@ const MIN_SECRET_LENGTH = 32;
 /** Basic email format regex (RFC 5321 simplified; intentionally permissive for E2E) */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-e2eLoginRoute.post('/login', async (c) => {
-	const env = c.env;
+function notFound(c: any, message: string): Response {
+	console.warn(message);
+	return c.notFound();
+}
 
-	// Guard 1: APP_ENV validation + production check → 404 (pretend endpoint doesn't exist)
+function forbidden(c: any, message: string): Response {
+	console.warn(message);
+	return c.text('Forbidden', 403);
+}
+
+function guardAppEnv(c: any): Response | null {
+	const env = c.env;
 	if (!VALID_APP_ENVS.includes(env.APP_ENV as (typeof VALID_APP_ENVS)[number])) {
-		console.warn('[E2E Auth] Invalid APP_ENV:', env.APP_ENV);
-		return c.notFound();
+		return notFound(c, `[E2E Auth] Invalid APP_ENV: ${env.APP_ENV}`);
 	}
 	if (env.APP_ENV === 'production') {
 		return c.notFound();
 	}
+	return null;
+}
 
-	// Guard 2: Required configuration → 404 (pretend endpoint doesn't exist)
+function guardCoreConfig(c: any): Response | null {
+	const env = c.env;
 	if (!env.E2E_AUTH_SECRET) {
-		console.warn('[E2E Auth] Missing E2E_AUTH_SECRET configuration');
-		return c.notFound();
+		return notFound(c, '[E2E Auth] Missing E2E_AUTH_SECRET configuration');
 	}
-
-	// Guard 2b: Secret length validation → 404 (misconfigured)
 	if (env.E2E_AUTH_SECRET.length < MIN_SECRET_LENGTH) {
-		console.warn(`[E2E Auth] E2E_AUTH_SECRET must be at least ${MIN_SECRET_LENGTH} characters`);
-		return c.notFound();
+		return notFound(c, `[E2E Auth] E2E_AUTH_SECRET must be at least ${MIN_SECRET_LENGTH} characters`);
 	}
-
 	if (!env.E2E_AUTH_EMAIL || !env.BETTER_AUTH_SECRET) {
-		console.warn('[E2E Auth] Missing E2E_AUTH_EMAIL or BETTER_AUTH_SECRET configuration');
-		return c.notFound();
+		return notFound(c, '[E2E Auth] Missing E2E_AUTH_EMAIL or BETTER_AUTH_SECRET configuration');
 	}
+	return null;
+}
 
-	// Guard 2c: Email format validation → 404 (misconfigured)
+function getValidatedEmailOrResponse(c: any): { trimmedEmail: string } | Response {
+	const env = c.env;
+	if (!env.E2E_AUTH_EMAIL) {
+		return notFound(c, '[E2E Auth] Missing E2E_AUTH_EMAIL configuration');
+	}
 	const trimmedEmail = env.E2E_AUTH_EMAIL.trim();
 	if (!EMAIL_REGEX.test(trimmedEmail)) {
-		console.warn('[E2E Auth] E2E_AUTH_EMAIL is not a valid email format');
-		return c.notFound();
+		return notFound(c, '[E2E Auth] E2E_AUTH_EMAIL is not a valid email format');
 	}
+	return { trimmedEmail };
+}
 
-	// Guard 3: Secret header validation (constant-time) → 403
-	// Supports E2E_AUTH_SECRET_OLD for zero-downtime secret rotation
-	const providedSecret = c.req.header('x-e2e-secret');
-	if (!providedSecret) {
-		console.warn('[E2E Auth] Missing x-e2e-secret header');
-		return c.text('Forbidden', 403);
-	}
+function buildValidSecrets(c: any): string[] {
+	const env = c.env;
+	const validSecrets = [env.E2E_AUTH_SECRET].filter((secret): secret is string => typeof secret === 'string' && secret.length > 0);
 
-	// Build list of valid secrets (current + old for rotation grace period)
-	const validSecrets = [env.E2E_AUTH_SECRET];
 	if (env.E2E_AUTH_SECRET_OLD) {
 		if (env.E2E_AUTH_SECRET_OLD.length < MIN_SECRET_LENGTH) {
 			console.warn(`[E2E Auth] E2E_AUTH_SECRET_OLD must be at least ${MIN_SECRET_LENGTH} characters - ignoring`);
@@ -133,38 +133,38 @@ e2eLoginRoute.post('/login', async (c) => {
 		}
 	}
 
-	// Check against all valid secrets (constant-time for each)
-	let isValidSecret = false;
-	let usedOldSecret = false;
+	return validSecrets;
+}
+
+async function validateSecretHeader(
+	providedSecret: string,
+	validSecrets: string[],
+	oldSecret: string | undefined
+): Promise<{ isValid: boolean; usedOldSecret: boolean }> {
 	for (const secret of validSecrets) {
 		if (await secureCompare(providedSecret, secret)) {
-			isValidSecret = true;
-			usedOldSecret = secret === env.E2E_AUTH_SECRET_OLD;
-			break;
+			return { isValid: true, usedOldSecret: secret === oldSecret };
 		}
 	}
+	return { isValid: false, usedOldSecret: false };
+}
 
-	if (!isValidSecret) {
-		console.warn('[E2E Auth] Invalid x-e2e-secret header');
-		return c.text('Forbidden', 403);
-	}
-
-	// Warn if using deprecated old secret (for monitoring rotation progress)
-	if (usedOldSecret) {
-		console.warn('[E2E Auth] Using deprecated E2E_AUTH_SECRET_OLD - rotation in progress');
-	}
-
-	// Guard 4: Allowlist validation → 403
-	// ADR 0019: endpoint must not mint sessions unless the E2E email is explicitly allowlisted.
-	// Supports wildcard pattern for plus-addressing (e.g., `e2e-bot+*@append.test`)
-	// This enables per-PR E2E email isolation while keeping a single allowlist pattern.
+function guardAllowlist(c: any, trimmedEmail: string): Response | null {
+	const env = c.env;
 	if (!env.ALLOWED_EMAIL) {
-		console.warn('[E2E Auth] ALLOWED_EMAIL is required for E2E login');
-		return c.text('Forbidden', 403);
+		return forbidden(c, '[E2E Auth] ALLOWED_EMAIL is required for E2E login');
 	}
 	if (!emailMatchesAllowlist(trimmedEmail, env.ALLOWED_EMAIL)) {
-		console.warn('[E2E Auth] E2E_AUTH_EMAIL does not match ALLOWED_EMAIL pattern');
-		return c.text('Forbidden', 403);
+		return forbidden(c, '[E2E Auth] E2E_AUTH_EMAIL does not match ALLOWED_EMAIL pattern');
+	}
+	return null;
+}
+
+async function issueE2ESession(c: any, trimmedEmail: string): Promise<Response> {
+	const env = c.env;
+	const betterAuthSecret = env.BETTER_AUTH_SECRET;
+	if (!betterAuthSecret) {
+		return notFound(c, '[E2E Auth] Missing BETTER_AUTH_SECRET configuration');
 	}
 
 	// Get auth instance
@@ -212,7 +212,7 @@ e2eLoginRoute.post('/login', async (c) => {
 
 		// Sign the session token using Better Auth's HMAC signing
 		// Format: <token>.<signature> (matches Better Auth's cookie verification)
-		const signature = await makeSignature(session.token, env.BETTER_AUTH_SECRET);
+		const signature = await makeSignature(session.token, betterAuthSecret);
 		const signedToken = `${session.token}.${signature}`;
 
 		// Use Better Auth's createAuthCookie to get the properly configured cookie settings
@@ -238,6 +238,48 @@ e2eLoginRoute.post('/login', async (c) => {
 		console.error(`[E2E Auth] [${requestId}] Failed:`, error);
 		return c.text('Forbidden', 403);
 	}
+}
+
+e2eLoginRoute.post('/login', async (c) => {
+	const env = c.env;
+
+	// Guard 1: APP_ENV validation + production check → 404 (pretend endpoint doesn't exist)
+	const appEnvGuard = guardAppEnv(c);
+	if (appEnvGuard) return appEnvGuard;
+
+	// Guard 2: Required configuration → 404 (pretend endpoint doesn't exist)
+	const coreConfigGuard = guardCoreConfig(c);
+	if (coreConfigGuard) return coreConfigGuard;
+
+	// Guard 2c: Email format validation → 404 (misconfigured)
+	const emailResult = getValidatedEmailOrResponse(c);
+	if (emailResult instanceof Response) return emailResult;
+	const { trimmedEmail } = emailResult;
+
+	// Guard 3: Secret header validation (constant-time) → 403
+	// Supports E2E_AUTH_SECRET_OLD for zero-downtime secret rotation
+	const providedSecret = c.req.header('x-e2e-secret');
+	if (!providedSecret) {
+		return forbidden(c, '[E2E Auth] Missing x-e2e-secret header');
+	}
+
+	// Build list of valid secrets (current + old for rotation grace period)
+	const validSecrets = buildValidSecrets(c);
+	const { isValid: isValidSecret, usedOldSecret } = await validateSecretHeader(providedSecret, validSecrets, env.E2E_AUTH_SECRET_OLD);
+	if (!isValidSecret) return forbidden(c, '[E2E Auth] Invalid x-e2e-secret header');
+
+	// Warn if using deprecated old secret (for monitoring rotation progress)
+	if (usedOldSecret) {
+		console.warn('[E2E Auth] Using deprecated E2E_AUTH_SECRET_OLD - rotation in progress');
+	}
+
+	// Guard 4: Allowlist validation → 403
+	// ADR 0019: endpoint must not mint sessions unless the E2E email is explicitly allowlisted.
+	// Supports wildcard pattern for plus-addressing (e.g., `e2e-bot+*@append.test`)
+	// This enables per-PR E2E email isolation while keeping a single allowlist pattern.
+	const allowlistGuard = guardAllowlist(c, trimmedEmail);
+	if (allowlistGuard) return allowlistGuard;
+	return issueE2ESession(c, trimmedEmail);
 });
 
 export { e2eLoginRoute, emailMatchesAllowlist };

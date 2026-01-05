@@ -63,7 +63,6 @@ async function sendCaptureTerms(command: CaptureTermsCommand): Promise<SendResul
 				return { outcome: 'blocked_auth', error: outboxError };
 			case 'failed':
 				return { outcome: 'failed', error: outboxError };
-			case 'retry':
 			default:
 				return { outcome: 'retry', error: outboxError };
 		}
@@ -140,6 +139,7 @@ export function createSenderLoop(deps: SenderLoopDeps): SenderLoop {
 	// from rapid processOnce() calls within the same tab
 	const inFlight = new Set<string>();
 
+	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: intentionally imperative state machine
 	async function processOnce(): Promise<boolean> {
 		const now = clock.now();
 		const dueItems = await store.listDue(now, userScope);

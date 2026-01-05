@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createMockOutboxStore, createOutboxStore, getDatabaseName } from '../store';
-import type { OutboxItem, OutboxStore } from '../types';
+import type { OutboxItem } from '../types';
 
 // Helper to create a test item
 function createTestItem(overrides: Partial<OutboxItem> = {}): OutboxItem {
