@@ -59,7 +59,11 @@ export function createLeaseStore(options: LeaseStoreOptions): LeaseStore {
 				const tx = db.transaction(LEASE_STORE_NAME, 'readwrite');
 				const store = tx.objectStore(LEASE_STORE_NAME);
 				const getRequest = store.get('lease');
+				let acquired = false;
 
+				tx.oncomplete = () => resolve(acquired);
+				tx.onerror = () => reject(tx.error);
+				tx.onabort = () => reject(tx.error);
 				getRequest.onerror = () => reject(getRequest.error);
 				getRequest.onsuccess = () => {
 					const existing = getRequest.result as LeaseRecord | undefined;
@@ -72,9 +76,9 @@ export function createLeaseStore(options: LeaseStoreOptions): LeaseStore {
 						const newLease: LeaseRecord = { key: 'lease', holderId, expiresAt };
 						const putRequest = store.put(newLease);
 						putRequest.onerror = () => reject(putRequest.error);
-						putRequest.onsuccess = () => resolve(true);
-					} else {
-						resolve(false);
+						putRequest.onsuccess = () => {
+							acquired = true;
+						};
 					}
 				};
 			});
@@ -87,6 +91,9 @@ export function createLeaseStore(options: LeaseStoreOptions): LeaseStore {
 				const store = tx.objectStore(LEASE_STORE_NAME);
 				const getRequest = store.get('lease');
 
+				tx.oncomplete = () => resolve();
+				tx.onerror = () => reject(tx.error);
+				tx.onabort = () => reject(tx.error);
 				getRequest.onerror = () => reject(getRequest.error);
 				getRequest.onsuccess = () => {
 					const existing = getRequest.result as LeaseRecord | undefined;
@@ -94,9 +101,6 @@ export function createLeaseStore(options: LeaseStoreOptions): LeaseStore {
 					if (existing?.holderId === holderId) {
 						const deleteRequest = store.delete('lease');
 						deleteRequest.onerror = () => reject(deleteRequest.error);
-						deleteRequest.onsuccess = () => resolve();
-					} else {
-						resolve();
 					}
 				};
 			});

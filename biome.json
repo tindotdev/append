@@ -9,6 +9,7 @@
 	"files": {
 		"includes": [
 			"**",
+			"!.claude",
 			"!node_modules",
 			"!dist",
 			"!.turbo",

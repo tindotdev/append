@@ -46,6 +46,7 @@ function getCookieDomain(): string {
 	return new URL(BASE_URL).hostname;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: test-only bootstrapping with explicit error hints
 async function globalSetup(): Promise<void> {
 	const secret = process.env.E2E_AUTH_SECRET;
 	if (!secret) {

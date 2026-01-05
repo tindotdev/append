@@ -7,8 +7,10 @@
  * - Refreshes on open and after actions
  */
 
+import { useNavigate } from '@tanstack/react-router';
 import { AlertCircle, LogIn, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useOutboxSafe } from '../hooks/use-outbox';
@@ -21,6 +23,7 @@ interface OutboxManagementProps {
 
 export function OutboxManagement({ open, onOpenChange }: OutboxManagementProps) {
 	const outbox = useOutboxSafe();
+	const navigate = useNavigate();
 	const [failedItems, setFailedItems] = useState<OutboxItem[]>([]);
 	const [blockedItems, setBlockedItems] = useState<OutboxItem[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
@@ -33,8 +36,9 @@ export function OutboxManagement({ open, onOpenChange }: OutboxManagementProps) 
 			const [failed, blocked] = await Promise.all([outbox.listByStatus('failed'), outbox.listByStatus('blocked_auth')]);
 			setFailedItems(failed);
 			setBlockedItems(blocked);
-		} catch {
-			// Ignore errors
+		} catch (error) {
+			console.error('Failed to load outbox items:', error);
+			toast.error('Failed to load sync issues. Please try again.');
 		} finally {
 			setIsLoading(false);
 		}
@@ -51,6 +55,7 @@ export function OutboxManagement({ open, onOpenChange }: OutboxManagementProps) 
 	// Handle discard
 	const handleDiscard = async (itemId: string) => {
 		if (!outbox) return;
+		if (!window.confirm('Permanently discard this item? This cannot be undone.')) return;
 		await outbox.discardItem(itemId);
 		// Item will be removed from list via counts change triggering refresh
 	};
@@ -72,7 +77,7 @@ export function OutboxManagement({ open, onOpenChange }: OutboxManagementProps) 
 	// Handle sign in redirect
 	const handleSignIn = () => {
 		onOpenChange(false);
-		window.location.href = '/sign-in';
+		navigate({ to: '/sign-in' });
 	};
 
 	// Truncate terms for display
@@ -138,6 +143,7 @@ export function OutboxManagement({ open, onOpenChange }: OutboxManagementProps) 
 												className="h-8 w-8 shrink-0 text-destructive hover:bg-destructive/20 hover:text-destructive"
 												onClick={() => handleDiscard(item.id)}
 												title="Discard"
+												aria-label="Discard item"
 											>
 												<Trash2 className="h-4 w-4" />
 											</Button>

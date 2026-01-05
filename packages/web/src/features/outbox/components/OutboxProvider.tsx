@@ -120,14 +120,17 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 	const lastUserIdRef = useRef<string | null>(null);
 	const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const isMountedRef = useRef(true);
+	const refreshCountsSequenceRef = useRef(0);
+	const resumeBlockedAuthSequenceRef = useRef(0);
 	const authSessionKey = useMemo(() => getAuthSessionKey(session), [session]);
 
 	// Refresh counts from store
 	const refreshCounts = useCallback(async () => {
 		if (!isMountedRef.current || !outboxRef.current || !initUserScopeRef.current) return;
+		const sequence = ++refreshCountsSequenceRef.current;
 		try {
 			const newCounts = await outboxRef.current.store.countByStatus(initUserScopeRef.current);
-			if (isMountedRef.current) {
+			if (isMountedRef.current && sequence === refreshCountsSequenceRef.current) {
 				setCounts(newCounts);
 			}
 		} catch (err) {
@@ -215,6 +218,7 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 		let senderLoopTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 		// Sender loop runner - only runs when leader
+		// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: orchestrates leadership, retries, scheduling, and cleanup
 		async function runSenderLoop() {
 			if (!isMounted || !outboxRef.current || !leadershipRef.current) return;
 
@@ -265,6 +269,7 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 		}
 
 		// Handle broadcast messages
+		// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: broadcast handler is a small switch-based router
 		function handleBroadcast(msg: OutboxBroadcastMessage) {
 			if (!isMounted) return;
 
@@ -297,12 +302,13 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 						if (!isSafeBatchId) {
 							console.warn('[Outbox] Ignoring invalid batchId in outbox_result:', batchId);
 						}
+
 						toast.success('Batch ready', {
 							action: isSafeBatchId
 								? {
 										label: 'Open',
 										onClick: () => {
-											window.location.href = `/batch/${batchId}`;
+											void import('@/router').then(({ router }) => router.navigate({ to: '/batch/$batchId', params: { batchId } }));
 										},
 									}
 								: undefined,
@@ -373,9 +379,13 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 		}
 
 		if (authSessionKey && lastAuthSessionKeyRef.current && authSessionKey !== lastAuthSessionKeyRef.current) {
+			const sequence = ++resumeBlockedAuthSequenceRef.current;
 			outboxRef.current.store
 				.resumeBlockedAuth(userId, Date.now())
 				.then((count) => {
+					if (sequence !== resumeBlockedAuthSequenceRef.current || !isMountedRef.current) {
+						return;
+					}
 					if (count > 0) {
 						refreshCounts();
 						outboxRef.current?.broadcast.publish({ type: 'kick' });
@@ -389,27 +399,48 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 		lastAuthSessionKeyRef.current = authSessionKey;
 	}, [authSessionKey, refreshCounts, userId]);
 
+	const enqueue = useCallback((options: { terms: string }) => {
+		const outbox = outboxRef.current;
+		if (!outbox) return Promise.reject(new Error('Outbox not initialized'));
+		return outbox.enqueue(options);
+	}, []);
+
+	const undo = useCallback((itemId: string) => {
+		const outbox = outboxRef.current;
+		if (!outbox) return Promise.reject(new Error('Outbox not initialized'));
+		return outbox.undo(itemId);
+	}, []);
+
+	const listByStatus = useCallback((status: OutboxStatus) => {
+		const outbox = outboxRef.current;
+		const userScope = initUserScopeRef.current;
+		if (!outbox || !userScope) return Promise.reject(new Error('Outbox not initialized'));
+		return outbox.store.listByStatus(userScope, status);
+	}, []);
+
+	const discardItem = useCallback(async (itemId: string) => {
+		const outbox = outboxRef.current;
+		const userScope = initUserScopeRef.current;
+		if (!outbox || !userScope) throw new Error('Outbox not initialized');
+		await outbox.store.delete(itemId);
+		outbox.broadcast.publish({ type: 'outbox_changed', userScope });
+	}, []);
+
 	// Context value
 	const contextValue = useMemo<OutboxContextValue | null>(() => {
 		if (!outboxRef.current || !initUserScopeRef.current) {
 			return null;
 		}
 
-		const outbox = outboxRef.current;
-		const userScope = initUserScopeRef.current;
-
 		return {
-			enqueue: outbox.enqueue,
-			undo: outbox.undo,
+			enqueue,
+			undo,
 			counts,
 			isReady,
-			listByStatus: (status: OutboxStatus) => outbox.store.listByStatus(userScope, status),
-			discardItem: async (itemId: string) => {
-				await outbox.store.delete(itemId);
-				outbox.broadcast.publish({ type: 'outbox_changed', userScope });
-			},
+			listByStatus,
+			discardItem,
 		};
-	}, [counts, isReady]);
+	}, [counts, discardItem, enqueue, isReady, listByStatus, undo]);
 
 	return <OutboxContext.Provider value={contextValue}>{children}</OutboxContext.Provider>;
 }

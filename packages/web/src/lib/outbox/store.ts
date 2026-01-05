@@ -104,8 +104,11 @@ export function createOutboxStore(userScope: string): OutboxStore {
 				const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
 				const store = tx.objectStore(IDB_STORE_NAME);
 				const request = store.put(item);
+
+				tx.oncomplete = () => resolve();
+				tx.onerror = () => reject(tx.error);
+				tx.onabort = () => reject(tx.error);
 				request.onerror = () => reject(request.error);
-				request.onsuccess = () => resolve();
 			});
 		},
 
@@ -126,8 +129,11 @@ export function createOutboxStore(userScope: string): OutboxStore {
 				const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
 				const store = tx.objectStore(IDB_STORE_NAME);
 				const request = store.delete(id);
+
+				tx.oncomplete = () => resolve();
+				tx.onerror = () => reject(tx.error);
+				tx.onabort = () => reject(tx.error);
 				request.onerror = () => reject(request.error);
-				request.onsuccess = () => resolve();
 			});
 		},
 
@@ -233,24 +239,36 @@ export function createOutboxStore(userScope: string): OutboxStore {
 			});
 		},
 
+		/**
+		 * Delete an item if the predicate returns true.
+		 *
+		 * Note: This is atomic within a single IndexedDB transaction, but not
+		 * cross-tab serializable. Another tab may modify the item between the
+		 * predicate check and the delete. Callers must tolerate this (e.g., undo
+		 * racing with send is OK because the sender re-validates status).
+		 */
 		async deleteIf(id: string, predicate: (item: OutboxItem) => boolean): Promise<boolean> {
 			const db = await getDb();
 			return new Promise((resolve, reject) => {
 				const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
 				const store = tx.objectStore(IDB_STORE_NAME);
 				const getReq = store.get(id);
+				let didDelete = false;
 
+				tx.oncomplete = () => resolve(didDelete);
 				tx.onerror = () => reject(tx.error);
+				tx.onabort = () => reject(tx.error);
 				getReq.onerror = () => reject(getReq.error);
 				getReq.onsuccess = () => {
 					const item = getReq.result as OutboxItem | undefined;
 					if (!item || !predicate(item)) {
-						resolve(false);
 						return;
 					}
 					const delReq = store.delete(id);
 					delReq.onerror = () => reject(delReq.error);
-					delReq.onsuccess = () => resolve(true);
+					delReq.onsuccess = () => {
+						didDelete = true;
+					};
 				};
 			});
 		},

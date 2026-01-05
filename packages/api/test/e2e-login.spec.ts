@@ -1,10 +1,18 @@
 import { env, SELF } from 'cloudflare:test';
-import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { account, schema, session, user } from '../src/db';
 import { emailMatchesAllowlist } from '../src/lib/auth/e2e-login';
 import { applyMigrations } from './setup';
+
+function requireEnvVar(name: string, value: string | undefined): string {
+	if (!value) {
+		throw new Error(`Missing ${name} for test`);
+	}
+	return value;
+}
+
+const E2E_SECRET = requireEnvVar('E2E_AUTH_SECRET', env.E2E_AUTH_SECRET);
 
 // =============================================================================
 // Setup
@@ -40,7 +48,7 @@ describe('POST /auth/e2e/login', () => {
 		const res = await SELF.fetch('https://example.com/auth/e2e/login', {
 			method: 'POST',
 			headers: {
-				'x-e2e-secret': env.E2E_AUTH_SECRET!,
+				'x-e2e-secret': E2E_SECRET,
 			},
 		});
 
@@ -57,13 +65,16 @@ describe('POST /auth/e2e/login', () => {
 		const loginRes = await SELF.fetch('https://example.com/auth/e2e/login', {
 			method: 'POST',
 			headers: {
-				'x-e2e-secret': env.E2E_AUTH_SECRET!,
+				'x-e2e-secret': E2E_SECRET,
 			},
 		});
 
 		expect(loginRes.status).toBe(204);
-		const setCookie = loginRes.headers.get('set-cookie')!;
+		const setCookie = loginRes.headers.get('set-cookie');
 		expect(setCookie).toBeTruthy();
+		if (!setCookie) {
+			throw new Error('Missing set-cookie header');
+		}
 		expect(setCookie).toContain('better-auth.session_token=');
 
 		// Verify user was created in database
@@ -81,7 +92,10 @@ describe('POST /auth/e2e/login', () => {
 		// Cookie format is "<token>.<signature>" (signed by Better Auth)
 		const tokenMatch = setCookie.match(/better-auth\.session_token=([^;]+)/);
 		expect(tokenMatch).toBeTruthy();
-		const [cookieToken] = tokenMatch![1].split('.');
+		if (!tokenMatch) {
+			throw new Error('Missing session_token cookie value');
+		}
+		const [cookieToken] = tokenMatch[1].split('.');
 		expect(cookieToken).toBe(sessions[0].token);
 	});
 
@@ -110,7 +124,7 @@ describe('POST /auth/e2e/login', () => {
 		// First login - creates user
 		const res1 = await SELF.fetch('https://example.com/auth/e2e/login', {
 			method: 'POST',
-			headers: { 'x-e2e-secret': env.E2E_AUTH_SECRET! },
+			headers: { 'x-e2e-secret': E2E_SECRET },
 		});
 		expect(res1.status).toBe(204);
 
@@ -122,7 +136,7 @@ describe('POST /auth/e2e/login', () => {
 		// Second login - should reuse same user
 		const res2 = await SELF.fetch('https://example.com/auth/e2e/login', {
 			method: 'POST',
-			headers: { 'x-e2e-secret': env.E2E_AUTH_SECRET! },
+			headers: { 'x-e2e-secret': E2E_SECRET },
 		});
 		expect(res2.status).toBe(204);
 
@@ -140,7 +154,7 @@ describe('POST /auth/e2e/login', () => {
 	it('links e2e account on first login', async () => {
 		const res = await SELF.fetch('https://example.com/auth/e2e/login', {
 			method: 'POST',
-			headers: { 'x-e2e-secret': env.E2E_AUTH_SECRET! },
+			headers: { 'x-e2e-secret': E2E_SECRET },
 		});
 		expect(res.status).toBe(204);
 
@@ -177,7 +191,7 @@ describe('E2E Login Production Guards', () => {
 
 		const res = await SELF.fetch('https://example.com/auth/e2e/login', {
 			method: 'POST',
-			headers: { 'x-e2e-secret': env.E2E_AUTH_SECRET! },
+			headers: { 'x-e2e-secret': E2E_SECRET },
 		});
 
 		// In test env with correct config, should succeed
@@ -197,7 +211,7 @@ describe('E2E Login Allowlist Guards', () => {
 
 		const res = await SELF.fetch('https://example.com/auth/e2e/login', {
 			method: 'POST',
-			headers: { 'x-e2e-secret': env.E2E_AUTH_SECRET! },
+			headers: { 'x-e2e-secret': E2E_SECRET },
 		});
 
 		expect(res.status).toBe(204);
