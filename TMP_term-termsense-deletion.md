@@ -233,7 +233,7 @@ Web tests:
 - [x] Update web types to include `termVersion` and `primarySense.version` — `packages/web/src/features/bucket/types/index.ts`
 - [x] Add TanStack Table row selection to `BucketTable` — `packages/web/src/features/bucket/components/BucketTable.tsx:17-19,36-44`
 - [x] Add selection + actions columns to `packages/web/src/features/bucket/components/columns.tsx` — `packages/web/src/features/bucket/components/columns.tsx:44-124`
-- [ ] Add bulk action bar component (local to bucket feature; fixed bottom)
+- [x] Add bulk action bar component (local to bucket feature; fixed bottom) — `packages/web/src/features/bucket/components/BulkActionBar.tsx`
 - [x] Add term archive + restore client API helpers + mutations — `packages/web/src/features/bucket/api/archive-term.ts`
 - [x] Add term-sense archive + restore client API helpers + mutations — `packages/web/src/features/bucket/api/archive-term-sense.ts`
 - [ ] Wire per-row Delete + Move, and bulk Delete + Move

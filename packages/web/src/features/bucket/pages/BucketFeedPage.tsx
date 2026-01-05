@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useUserBuckets } from '@/lib/user-buckets';
 import { useBucketFeed } from '../api/get-bucket-feed';
 import { BucketTable } from '../components/BucketTable';
+import { BulkActionBar } from '../components/BulkActionBar';
 import { type ColumnMeta, getColumns } from '../components/columns';
 import { TermDetailSheet } from '../components/TermDetailSheet';
 import type { BucketFeedItem } from '../types';
@@ -85,6 +86,9 @@ function FeedContent({
 	onRowSelectionChange,
 	onDelete,
 	onMove,
+	onClearSelection,
+	onBulkDelete,
+	onBulkMove,
 }: {
 	title: string;
 	items: BucketFeedItem[];
@@ -98,6 +102,9 @@ function FeedContent({
 	onRowSelectionChange: (selection: RowSelectionState) => void;
 	onDelete: (item: BucketFeedItem) => void;
 	onMove: (item: BucketFeedItem) => void;
+	onClearSelection: () => void;
+	onBulkDelete: () => void;
+	onBulkMove: () => void;
 }) {
 	const [searchQuery, setSearchQuery] = useState('');
 	const deferredQuery = useDeferredValue(searchQuery);
@@ -112,60 +119,66 @@ function FeedContent({
 
 	const columnMeta: ColumnMeta = useMemo(() => ({ onDelete, onMove }), [onDelete, onMove]);
 	const columns = useMemo(() => getColumns(columnMeta), [columnMeta]);
+	const selectedCount = Object.keys(rowSelection).length;
 
 	return (
-		<div className="max-w-4xl">
-			<h2 className="text-xl font-semibold">{title}</h2>
-			<p className="text-sm text-zinc-500 mt-1">
-				{items.length} item{items.length !== 1 ? 's' : ''}
-				{hasNextPage ? ' (more available)' : ''}
-			</p>
+		<>
+			<div className="max-w-4xl">
+				<h2 className="text-xl font-semibold">{title}</h2>
+				<p className="text-sm text-zinc-500 mt-1">
+					{items.length} item{items.length !== 1 ? 's' : ''}
+					{hasNextPage ? ' (more available)' : ''}
+				</p>
 
-			{/* Search input */}
-			<div className="mt-4 relative">
-				<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
-				<Input
-					type="search"
-					placeholder="Filter items..."
-					value={searchQuery}
-					onChange={(e) => setSearchQuery(e.target.value)}
-					className="pl-9"
-				/>
-			</div>
-
-			{/* Filtered count */}
-			{searchQuery && (
-				<p className="text-sm text-zinc-500 mt-2">{isFiltering ? 'Filtering...' : `${filteredItems.length} of ${items.length} items`}</p>
-			)}
-
-			{/* Table */}
-			<div className="mt-4">
-				<BucketTable
-					columns={columns}
-					data={filteredItems}
-					onRowClick={onRowClick}
-					rowSelection={rowSelection}
-					onRowSelectionChange={onRowSelectionChange}
-				/>
-			</div>
-
-			{hasNextPage && (
-				<div className="mt-6 flex justify-center">
-					<button
-						type="button"
-						onClick={onFetchNextPage}
-						disabled={isFetchingNextPage}
-						className="px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-					>
-						{isFetchingNextPage && <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />}
-						Load more
-					</button>
+				{/* Search input */}
+				<div className="mt-4 relative">
+					<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+					<Input
+						type="search"
+						placeholder="Filter items..."
+						value={searchQuery}
+						onChange={(e) => setSearchQuery(e.target.value)}
+						className="pl-9"
+					/>
 				</div>
-			)}
 
-			{/* Term detail sheet */}
-			<TermDetailSheet termId={selectedTermId} onClose={onClosePanel} />
-		</div>
+				{/* Filtered count */}
+				{searchQuery && (
+					<p className="text-sm text-zinc-500 mt-2">{isFiltering ? 'Filtering...' : `${filteredItems.length} of ${items.length} items`}</p>
+				)}
+
+				{/* Table */}
+				<div className="mt-4">
+					<BucketTable
+						columns={columns}
+						data={filteredItems}
+						onRowClick={onRowClick}
+						rowSelection={rowSelection}
+						onRowSelectionChange={onRowSelectionChange}
+					/>
+				</div>
+
+				{hasNextPage && (
+					<div className="mt-6 flex justify-center">
+						<button
+							type="button"
+							onClick={onFetchNextPage}
+							disabled={isFetchingNextPage}
+							className="px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+						>
+							{isFetchingNextPage && <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />}
+							Load more
+						</button>
+					</div>
+				)}
+
+				{/* Term detail sheet */}
+				<TermDetailSheet termId={selectedTermId} onClose={onClosePanel} />
+			</div>
+
+			{/* Bulk action bar */}
+			<BulkActionBar selectedCount={selectedCount} onClear={onClearSelection} onBulkDelete={onBulkDelete} onBulkMove={onBulkMove} />
+		</>
 	);
 }
 
@@ -192,6 +205,18 @@ export function BucketFeedPage() {
 
 	const handleMove = (_item: BucketFeedItem) => {
 		// TODO: Open MoveToBucketDialog
+	};
+
+	const handleClearSelection = () => {
+		setRowSelection({});
+	};
+
+	const handleBulkDelete = () => {
+		// TODO: Wire to bulk archive with Undo toast
+	};
+
+	const handleBulkMove = () => {
+		// TODO: Open MoveToBucketDialog for bulk move
 	};
 
 	const { data: bucketsData, isLoading: bucketsLoading } = useUserBuckets();
@@ -228,6 +253,9 @@ export function BucketFeedPage() {
 			onRowSelectionChange={setRowSelection}
 			onDelete={handleDelete}
 			onMove={handleMove}
+			onClearSelection={handleClearSelection}
+			onBulkDelete={handleBulkDelete}
+			onBulkMove={handleBulkMove}
 		/>
 	);
 }
