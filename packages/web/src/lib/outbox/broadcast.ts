@@ -30,10 +30,20 @@ export function createOutboxBroadcast(): OutboxBroadcast {
 
 	return {
 		publish(message: OutboxBroadcastMessage): void {
+			// Broadcast to other tabs
 			try {
 				getChannel().postMessage(message);
 			} catch {
 				// Ignore errors (e.g., channel closed, serialization errors)
+			}
+
+			// Also notify local subscribers (BroadcastChannel doesn't echo to sender)
+			for (const sub of subscribers) {
+				try {
+					sub(message);
+				} catch {
+					// Ignore handler errors
+				}
 			}
 		},
 
