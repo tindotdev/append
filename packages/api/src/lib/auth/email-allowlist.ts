@@ -16,8 +16,22 @@ export function emailMatchesAllowlist(email: string, allowlistPattern: string): 
 	// Check for wildcard pattern: prefix+*@domain
 	if (patternLower.includes('+*@')) {
 		const [prefix, domain] = patternLower.split('+*@');
+		const prefixWithPlus = prefix + '+';
+		const atDomain = '@' + domain;
+
 		// Email must start with "prefix+" and end with "@domain"
-		return emailLower.startsWith(prefix + '+') && emailLower.endsWith('@' + domain);
+		if (!emailLower.startsWith(prefixWithPlus) || !emailLower.endsWith(atDomain)) {
+			return false;
+		}
+
+		// Security: Ensure non-empty suffix between + and @ to prevent
+		// matching unintended emails like "e2e-bot+@append.test"
+		const suffix = emailLower.slice(prefixWithPlus.length, emailLower.length - atDomain.length);
+		if (suffix.length === 0) {
+			return false;
+		}
+
+		return true;
 	}
 
 	// Exact match fallback

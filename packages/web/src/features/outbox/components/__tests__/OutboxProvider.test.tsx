@@ -40,6 +40,8 @@ describe('OutboxProvider', () => {
 				countByStatus,
 				listByStatus: vi.fn(),
 				delete: vi.fn(),
+				deleteIf: vi.fn().mockResolvedValue(false),
+				close: vi.fn(),
 			},
 			broadcast: {
 				subscribe: vi.fn(() => () => {}),

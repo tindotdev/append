@@ -229,6 +229,11 @@ describe('emailMatchesAllowlist', () => {
 			expect(emailMatchesAllowlist('e2e-bot@append.test', 'e2e-bot+*@append.test')).toBe(false);
 		});
 
+		it('does not match email with empty suffix (security fix)', () => {
+			// Prevents unintended match of "e2e-bot+@append.test" which has no suffix
+			expect(emailMatchesAllowlist('e2e-bot+@append.test', 'e2e-bot+*@append.test')).toBe(false);
+		});
+
 		it('does not match email with wrong prefix', () => {
 			expect(emailMatchesAllowlist('other+pr-123@append.test', 'e2e-bot+*@append.test')).toBe(false);
 		});

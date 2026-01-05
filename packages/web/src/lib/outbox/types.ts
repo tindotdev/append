@@ -191,6 +191,17 @@ export interface OutboxStore {
 	 * @returns The number of items that were resumed
 	 */
 	resumeBlockedAuth(userScope: string, now: number): Promise<number>;
+	/**
+	 * Atomically delete an item if the predicate returns true.
+	 * Used for TOCTOU-safe undo operations.
+	 * @returns true if item was deleted, false if not found or predicate failed
+	 */
+	deleteIf(id: string, predicate: (item: OutboxItem) => boolean): Promise<boolean>;
+	/**
+	 * Close the database connection and release resources.
+	 * Called on user sign-out to prevent memory leaks.
+	 */
+	close(): void;
 }
 
 /**
