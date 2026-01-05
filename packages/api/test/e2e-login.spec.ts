@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { account, schema, session, user } from '../src/db';
+import { emailMatchesAllowlist } from '../src/lib/auth/e2e-login';
 import { applyMigrations } from './setup';
 
 // =============================================================================
@@ -68,7 +69,7 @@ describe('POST /auth/e2e/login', () => {
 		// Verify user was created in database
 		const users = await db.select().from(user);
 		expect(users.length).toBe(1);
-		expect(users[0].email).toBe(env.E2E_AUTH_EMAIL!.toLowerCase());
+		expect(users[0].email).toBe('test-a@example.com');
 		expect(users[0].name).toBe('E2E Test User');
 
 		// Verify session was created in database
@@ -187,10 +188,10 @@ describe('E2E Login Production Guards', () => {
 // =============================================================================
 
 describe('E2E Login Allowlist Guards', () => {
-	it('E2E_AUTH_EMAIL must match configured ALLOWED_EMAIL', async () => {
-		expect(env.ALLOWED_EMAIL).toBeTruthy();
-		expect(env.E2E_AUTH_EMAIL).toBeTruthy();
-		expect(env.ALLOWED_EMAIL!.toLowerCase()).toBe(env.E2E_AUTH_EMAIL!.toLowerCase());
+	it('E2E_AUTH_EMAIL matches ALLOWED_EMAIL (exact match in test env)', async () => {
+		// Test environment uses exact match (wildcard patterns for preview)
+		expect(env.ALLOWED_EMAIL).toBe('test-a@example.com');
+		expect(env.E2E_AUTH_EMAIL).toBe('test-a@example.com');
 
 		const res = await SELF.fetch('https://example.com/auth/e2e/login', {
 			method: 'POST',
@@ -198,5 +199,55 @@ describe('E2E Login Allowlist Guards', () => {
 		});
 
 		expect(res.status).toBe(204);
+	});
+});
+
+// =============================================================================
+// emailMatchesAllowlist Unit Tests
+// =============================================================================
+
+describe('emailMatchesAllowlist', () => {
+	describe('wildcard pattern (plus-addressing)', () => {
+		it('matches email with PR suffix', () => {
+			expect(emailMatchesAllowlist('e2e-bot+pr-123@append.test', 'e2e-bot+*@append.test')).toBe(true);
+		});
+
+		it('matches email with any plus-address suffix', () => {
+			expect(emailMatchesAllowlist('e2e-bot+pr-456@append.test', 'e2e-bot+*@append.test')).toBe(true);
+			expect(emailMatchesAllowlist('e2e-bot+staging@append.test', 'e2e-bot+*@append.test')).toBe(true);
+			expect(emailMatchesAllowlist('e2e-bot+local-dev@append.test', 'e2e-bot+*@append.test')).toBe(true);
+		});
+
+		it('is case-insensitive', () => {
+			expect(emailMatchesAllowlist('E2E-BOT+pr-123@APPEND.TEST', 'e2e-bot+*@append.test')).toBe(true);
+			expect(emailMatchesAllowlist('e2e-bot+pr-123@append.test', 'E2E-BOT+*@APPEND.TEST')).toBe(true);
+		});
+
+		it('does not match email without plus-address', () => {
+			expect(emailMatchesAllowlist('e2e-bot@append.test', 'e2e-bot+*@append.test')).toBe(false);
+		});
+
+		it('does not match email with wrong prefix', () => {
+			expect(emailMatchesAllowlist('other+pr-123@append.test', 'e2e-bot+*@append.test')).toBe(false);
+		});
+
+		it('does not match email with wrong domain', () => {
+			expect(emailMatchesAllowlist('e2e-bot+pr-123@other.test', 'e2e-bot+*@append.test')).toBe(false);
+		});
+	});
+
+	describe('exact match (fallback)', () => {
+		it('matches exact email', () => {
+			expect(emailMatchesAllowlist('test@example.com', 'test@example.com')).toBe(true);
+		});
+
+		it('is case-insensitive', () => {
+			expect(emailMatchesAllowlist('TEST@EXAMPLE.COM', 'test@example.com')).toBe(true);
+			expect(emailMatchesAllowlist('test@example.com', 'TEST@EXAMPLE.COM')).toBe(true);
+		});
+
+		it('does not match different email', () => {
+			expect(emailMatchesAllowlist('other@example.com', 'test@example.com')).toBe(false);
+		});
 	});
 });

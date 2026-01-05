@@ -46,17 +46,39 @@ function isPreviewEnv(env?: Env): boolean {
 }
 
 /**
- * Check if email matches the allowlist (case-insensitive).
+ * Check if an email matches an allowlist pattern.
+ * Supports wildcard pattern for plus-addressing: `prefix+*@domain`
+ * Examples:
+ *   - `e2e-bot+*@append.test` matches `e2e-bot+pr-123@append.test`
+ *   - `test@example.com` matches `test@example.com` (exact match)
+ */
+function emailMatchesPattern(email: string, allowlistPattern: string): boolean {
+	const emailLower = email.toLowerCase();
+	const patternLower = allowlistPattern.toLowerCase();
+
+	// Check for wildcard pattern: prefix+*@domain
+	if (patternLower.includes('+*@')) {
+		const [prefix, domain] = patternLower.split('+*@');
+		// Email must start with "prefix+" and end with "@domain"
+		return emailLower.startsWith(prefix + '+') && emailLower.endsWith('@' + domain);
+	}
+
+	// Exact match fallback
+	return emailLower === patternLower;
+}
+
+/**
+ * Check if email matches the allowlist (supports wildcards).
  */
 function isEmailAllowed(env: Env, email: string): boolean {
 	if (!env.ALLOWED_EMAIL) return false;
-	return email.toLowerCase() === env.ALLOWED_EMAIL.toLowerCase();
+	return emailMatchesPattern(email, env.ALLOWED_EMAIL);
 }
 
 /**
  * Check if a user is allowed based on ADR 0001:
  * - Primary: Google sub (stable per account)
- * - Fallback: email (case-insensitive), only if sub not configured
+ * - Fallback: email (supports wildcards), only if sub not configured
  * - Fail closed: deny if no allowlist match
  */
 function isUserAllowed(env: Env, userEmail: string, accountId?: string): boolean {
@@ -65,9 +87,9 @@ function isUserAllowed(env: Env, userEmail: string, accountId?: string): boolean
 		return accountId === env.ALLOWED_SUB;
 	}
 
-	// Fallback check: email (if configured)
+	// Fallback check: email (if configured, supports wildcard patterns)
 	if (env.ALLOWED_EMAIL) {
-		return userEmail.toLowerCase() === env.ALLOWED_EMAIL.toLowerCase();
+		return emailMatchesPattern(userEmail, env.ALLOWED_EMAIL);
 	}
 
 	// Fail closed: no allowlist configured
