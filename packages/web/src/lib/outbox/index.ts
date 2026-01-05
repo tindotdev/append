@@ -72,7 +72,7 @@ export {
 	IDB_STORE_NAME,
 	// IndexedDB
 	IDB_VERSION,
-	JITTER_MAX_MS,
+	JITTER_RANGE_MS,
 	// Leadership (for cross-tab coordination)
 	LEASE_MS,
 	LEASE_STORE_NAME,

@@ -20,6 +20,7 @@
 import { makeSignature } from 'better-auth/crypto';
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../../platform/bindings';
+import { emailMatchesAllowlist } from './email-allowlist';
 import type { Auth } from './index';
 
 type E2EVariables = Variables & {
@@ -69,39 +70,14 @@ async function secureCompare(a: string, b: string): Promise<boolean> {
 /** Valid APP_ENV values */
 const VALID_APP_ENVS = ['production', 'preview', 'local', 'test'] as const;
 
-/** Session max age in seconds (7 days) */
+/** Session max age in seconds (7 days). Keep aligned with Better Auth defaults. */
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 /** Minimum secret length (32+ random bytes recommended in docs) */
 const MIN_SECRET_LENGTH = 32;
 
-/** Basic email format regex (RFC 5321 simplified) */
+/** Basic email format regex (RFC 5321 simplified; intentionally permissive for E2E) */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/**
- * Check if an email matches an allowlist pattern.
- * Supports wildcard pattern for plus-addressing: `prefix+*@domain`
- * Examples:
- *   - `e2e-bot+*@append.test` matches `e2e-bot+pr-123@append.test`
- *   - `test@example.com` matches `test@example.com` (exact match)
- *
- * This enables per-environment E2E email isolation (e.g., `e2e-bot+pr-{PR_NUMBER}@append.test`)
- * while maintaining a single allowlist pattern in the configuration.
- */
-function emailMatchesAllowlist(email: string, allowlistPattern: string): boolean {
-	const emailLower = email.toLowerCase();
-	const patternLower = allowlistPattern.toLowerCase();
-
-	// Check for wildcard pattern: prefix+*@domain
-	if (patternLower.includes('+*@')) {
-		const [prefix, domain] = patternLower.split('+*@');
-		// Email must start with "prefix+" and end with "@domain"
-		return emailLower.startsWith(prefix + '+') && emailLower.endsWith('@' + domain);
-	}
-
-	// Exact match fallback
-	return emailLower === patternLower;
-}
 
 e2eLoginRoute.post('/login', async (c) => {
 	const env = c.env;
@@ -116,14 +92,19 @@ e2eLoginRoute.post('/login', async (c) => {
 	}
 
 	// Guard 2: Required configuration → 404 (pretend endpoint doesn't exist)
-	if (!env.E2E_AUTH_SECRET || !env.E2E_AUTH_EMAIL || !env.BETTER_AUTH_SECRET) {
-		console.warn('[E2E Auth] Missing E2E_AUTH_SECRET, E2E_AUTH_EMAIL, or BETTER_AUTH_SECRET configuration');
+	if (!env.E2E_AUTH_SECRET) {
+		console.warn('[E2E Auth] Missing E2E_AUTH_SECRET configuration');
 		return c.notFound();
 	}
 
 	// Guard 2b: Secret length validation → 404 (misconfigured)
 	if (env.E2E_AUTH_SECRET.length < MIN_SECRET_LENGTH) {
 		console.warn(`[E2E Auth] E2E_AUTH_SECRET must be at least ${MIN_SECRET_LENGTH} characters`);
+		return c.notFound();
+	}
+
+	if (!env.E2E_AUTH_EMAIL || !env.BETTER_AUTH_SECRET) {
+		console.warn('[E2E Auth] Missing E2E_AUTH_EMAIL or BETTER_AUTH_SECRET configuration');
 		return c.notFound();
 	}
 
@@ -144,6 +125,7 @@ e2eLoginRoute.post('/login', async (c) => {
 	// Guard 4: Allowlist validation → 403
 	// ADR 0019: endpoint must not mint sessions unless the E2E email is explicitly allowlisted.
 	// Supports wildcard pattern for plus-addressing (e.g., `e2e-bot+*@append.test`)
+	// This enables per-PR E2E email isolation while keeping a single allowlist pattern.
 	if (!env.ALLOWED_EMAIL) {
 		console.warn('[E2E Auth] ALLOWED_EMAIL is required for E2E login');
 		return c.text('Forbidden', 403);

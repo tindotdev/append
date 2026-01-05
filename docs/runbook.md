@@ -215,6 +215,25 @@ Also add `E2E_AUTH_SECRET` to GitHub Actions secrets for the workflow to use.
 
 Note: `E2E_AUTH_EMAIL` is set automatically by the preview workflow — no manual configuration needed.
 
+**Manual preview auth verification (cross-site):**
+
+1. Open the preview Pages URL in a browser and open DevTools console.
+2. Run:
+
+   ```js
+   await fetch('https://append-api-preview.tindotdev.workers.dev/auth/e2e/login', {
+     method: 'POST',
+     headers: { 'x-e2e-secret': '<preview E2E_AUTH_SECRET>' },
+     credentials: 'include',
+   });
+
+   await fetch('https://append-api-preview.tindotdev.workers.dev/api/batch?limit=1', {
+     credentials: 'include',
+   });
+   ```
+
+3. Confirm the second request returns 200 and includes batches (or an empty list).
+
 ### Running E2E tests locally
 
 To run Playwright E2E tests against local development servers:
@@ -266,6 +285,16 @@ pnpm --filter @append/api exec wrangler secret put E2E_AUTH_SECRET --env preview
 # Update in GitHub Actions secrets
 # (manual step in GitHub repository settings)
 ```
+
+Verify the old secret is rejected:
+
+```bash
+curl -i -X POST "https://append-api-preview.tindotdev.workers.dev/auth/e2e/login" \\
+  -H "x-e2e-secret: <old-secret>"
+# Expect HTTP 403
+```
+
+Then verify the new secret succeeds (204 + Set-Cookie).
 
 ### Preview environment notes
 

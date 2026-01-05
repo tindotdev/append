@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { bucket, schema, type user } from '../../db';
 import { DEFAULT_BUCKETS } from '../../db/default-buckets';
+import { emailMatchesAllowlist } from './email-allowlist';
 
 type Env = {
 	DB: D1Database;
@@ -46,33 +47,11 @@ function isPreviewEnv(env?: Env): boolean {
 }
 
 /**
- * Check if an email matches an allowlist pattern.
- * Supports wildcard pattern for plus-addressing: `prefix+*@domain`
- * Examples:
- *   - `e2e-bot+*@append.test` matches `e2e-bot+pr-123@append.test`
- *   - `test@example.com` matches `test@example.com` (exact match)
- */
-function emailMatchesPattern(email: string, allowlistPattern: string): boolean {
-	const emailLower = email.toLowerCase();
-	const patternLower = allowlistPattern.toLowerCase();
-
-	// Check for wildcard pattern: prefix+*@domain
-	if (patternLower.includes('+*@')) {
-		const [prefix, domain] = patternLower.split('+*@');
-		// Email must start with "prefix+" and end with "@domain"
-		return emailLower.startsWith(prefix + '+') && emailLower.endsWith('@' + domain);
-	}
-
-	// Exact match fallback
-	return emailLower === patternLower;
-}
-
-/**
  * Check if email matches the allowlist (supports wildcards).
  */
 function isEmailAllowed(env: Env, email: string): boolean {
 	if (!env.ALLOWED_EMAIL) return false;
-	return emailMatchesPattern(email, env.ALLOWED_EMAIL);
+	return emailMatchesAllowlist(email, env.ALLOWED_EMAIL);
 }
 
 /**
@@ -89,7 +68,7 @@ function isUserAllowed(env: Env, userEmail: string, accountId?: string): boolean
 
 	// Fallback check: email (if configured, supports wildcard patterns)
 	if (env.ALLOWED_EMAIL) {
-		return emailMatchesPattern(userEmail, env.ALLOWED_EMAIL);
+		return emailMatchesAllowlist(userEmail, env.ALLOWED_EMAIL);
 	}
 
 	// Fail closed: no allowlist configured
