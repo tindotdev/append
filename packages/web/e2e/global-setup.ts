@@ -90,7 +90,10 @@ async function globalSetup(): Promise<void> {
 	const cookieDomain = getCookieDomain();
 	const cookies = parseCookies(setCookieHeader, cookieDomain);
 
-	console.log(`[E2E Setup] Got ${cookies.length} cookie(s), saving to storageState`);
+	console.log(`[E2E Setup] Got ${cookies.length} cookie(s) for domain: ${cookieDomain}`);
+	console.log(
+		`[E2E Setup] Cookie details: ${JSON.stringify(cookies.map((c) => ({ name: c.name, domain: c.domain, secure: c.secure, sameSite: c.sameSite })))}`
+	);
 
 	// Create a browser context to save the storage state with cookies
 	const browser = await chromium.launch();
@@ -98,6 +101,12 @@ async function globalSetup(): Promise<void> {
 
 	// Add the cookies to the context
 	await context.addCookies(cookies);
+
+	// Navigate to API domain to ensure cookies are properly associated
+	// This helps with cross-origin cookie handling in some browsers
+	const page = await context.newPage();
+	await page.goto(API_URL, { waitUntil: 'domcontentloaded' });
+	await page.close();
 
 	// Ensure .auth directory exists
 	const authDir = path.join(__dirname, '.auth');
