@@ -11,6 +11,7 @@ export type ApiErrorCode =
 	| 'PAYLOAD_TOO_LARGE'
 	| 'UNAUTHORIZED'
 	| 'FORBIDDEN'
+	| 'ORIGIN_FORBIDDEN' // Origin validation failed (preview env only)
 	| 'NOT_FOUND'
 	| 'VERSION_CONFLICT'
 	| 'BATCH_NOT_READY'

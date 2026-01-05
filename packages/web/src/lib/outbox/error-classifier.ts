@@ -70,7 +70,12 @@ export function classifyResponse(status: number, code?: string, batchId?: string
 		return { type: 'success', batchId: batchId ?? '' };
 	}
 
-	// Blocked auth
+	// Origin validation failures are permanent (re-auth won't fix)
+	if (status === 403 && code === 'ORIGIN_FORBIDDEN') {
+		return { type: 'failed' };
+	}
+
+	// Blocked auth (may recover after sign-in)
 	if (isAuthBlocked(status)) {
 		return { type: 'blocked_auth' };
 	}
