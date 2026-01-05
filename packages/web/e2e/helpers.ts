@@ -14,7 +14,8 @@ export function interceptBatchPosts(page: Page): {
 	waitForRequest: (timeoutMs?: number) => Promise<{ url: string; body: unknown }>;
 } {
 	const requests: Array<{ url: string; body: unknown }> = [];
-	let resolveNext: ((req: { url: string; body: unknown }) => void) | null = null;
+	// Queue of pending resolvers to avoid race condition when called concurrently
+	const pendingResolvers: Array<(req: { url: string; body: unknown }) => void> = [];
 
 	page.route('**/api/batch', async (route: Route, request) => {
 		if (request.method() === 'POST') {
@@ -22,9 +23,10 @@ export function interceptBatchPosts(page: Page): {
 			const captured = { url: request.url(), body };
 			requests.push(captured);
 
-			if (resolveNext) {
-				resolveNext(captured);
-				resolveNext = null;
+			// Resolve the oldest pending waiter (FIFO)
+			if (pendingResolvers.length > 0) {
+				const resolver = pendingResolvers.shift()!;
+				resolver(captured);
 			}
 		}
 
@@ -43,10 +45,11 @@ export function interceptBatchPosts(page: Page): {
 					return;
 				}
 
-				resolveNext = resolve;
+				pendingResolvers.push(resolve);
 				setTimeout(() => {
-					if (resolveNext) {
-						resolveNext = null;
+					const index = pendingResolvers.indexOf(resolve);
+					if (index >= 0) {
+						pendingResolvers.splice(index, 1);
 						reject(new Error(`No batch POST request within ${timeoutMs}ms`));
 					}
 				}, timeoutMs);

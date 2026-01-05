@@ -71,6 +71,12 @@ const VALID_APP_ENVS = ['production', 'preview', 'local', 'test'] as const;
 /** Session max age in seconds (7 days) */
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
+/** Minimum secret length (32+ random bytes recommended in docs) */
+const MIN_SECRET_LENGTH = 32;
+
+/** Basic email format regex (RFC 5321 simplified) */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
  * Check if an email matches an allowlist pattern.
  * Supports wildcard pattern for plus-addressing: `prefix+*@domain`
@@ -114,6 +120,19 @@ e2eLoginRoute.post('/login', async (c) => {
 		return c.notFound();
 	}
 
+	// Guard 2b: Secret length validation → 404 (misconfigured)
+	if (env.E2E_AUTH_SECRET.length < MIN_SECRET_LENGTH) {
+		console.warn(`[E2E Auth] E2E_AUTH_SECRET must be at least ${MIN_SECRET_LENGTH} characters`);
+		return c.notFound();
+	}
+
+	// Guard 2c: Email format validation → 404 (misconfigured)
+	const trimmedEmail = env.E2E_AUTH_EMAIL.trim();
+	if (!EMAIL_REGEX.test(trimmedEmail)) {
+		console.warn('[E2E Auth] E2E_AUTH_EMAIL is not a valid email format');
+		return c.notFound();
+	}
+
 	// Guard 3: Secret header validation (constant-time) → 403
 	const providedSecret = c.req.header('x-e2e-secret');
 	if (!providedSecret || !(await secureCompare(providedSecret, env.E2E_AUTH_SECRET))) {
@@ -128,7 +147,7 @@ e2eLoginRoute.post('/login', async (c) => {
 		console.warn('[E2E Auth] ALLOWED_EMAIL is required for E2E login');
 		return c.text('Forbidden', 403);
 	}
-	if (!emailMatchesAllowlist(env.E2E_AUTH_EMAIL, env.ALLOWED_EMAIL)) {
+	if (!emailMatchesAllowlist(trimmedEmail, env.ALLOWED_EMAIL)) {
 		console.warn('[E2E Auth] E2E_AUTH_EMAIL does not match ALLOWED_EMAIL pattern');
 		return c.text('Forbidden', 403);
 	}
@@ -146,8 +165,8 @@ e2eLoginRoute.post('/login', async (c) => {
 	console.log(`[E2E Auth] [${requestId}] Login attempt: env=${env.APP_ENV}, ip=${ip}, ua=${ua.slice(0, 50)}`);
 
 	try {
-		// Find or create E2E user
-		const email = env.E2E_AUTH_EMAIL.toLowerCase();
+		// Find or create E2E user (trimmedEmail already validated above)
+		const email = trimmedEmail.toLowerCase();
 		const existingUser = await ctx.internalAdapter.findUserByEmail(email);
 		let user = existingUser?.user;
 
