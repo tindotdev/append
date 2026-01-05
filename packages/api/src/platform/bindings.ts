@@ -33,6 +33,7 @@ export type Bindings = {
 	// E2E Auth Bootstrap (ADR 0019)
 	APP_ENV?: string; // 'production' | 'preview' | 'local' | 'test'
 	E2E_AUTH_SECRET?: string;
+	E2E_AUTH_SECRET_OLD?: string; // For zero-downtime secret rotation
 	E2E_AUTH_EMAIL?: string;
 };
 

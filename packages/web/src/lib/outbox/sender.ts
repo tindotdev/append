@@ -136,6 +136,10 @@ export interface SenderLoop {
 export function createSenderLoop(deps: SenderLoopDeps): SenderLoop {
 	const { store, sender, broadcast, clock, userScope, onAuthBlocked } = deps;
 
+	// Track items currently being processed to prevent duplicate sends
+	// from rapid processOnce() calls within the same tab
+	const inFlight = new Set<string>();
+
 	async function processOnce(): Promise<boolean> {
 		const now = clock.now();
 		const dueItems = await store.listDue(now, userScope);
@@ -148,6 +152,11 @@ export function createSenderLoop(deps: SenderLoopDeps): SenderLoop {
 
 		// Process one at a time (FIFO)
 		for (const item of dueItems) {
+			// Skip if already being processed by this tab (deduplication)
+			if (inFlight.has(item.id)) {
+				continue;
+			}
+
 			// Double-check item is still due (could have been deleted by undo)
 			const current = await store.get(item.id);
 			if (!current || current.status !== 'pending') {
@@ -159,67 +168,75 @@ export function createSenderLoop(deps: SenderLoopDeps): SenderLoop {
 				continue;
 			}
 
-			processedAny = true;
-			const result = await sender.send(current.command);
+			// Mark as in-flight before sending
+			inFlight.add(current.id);
 
-			switch (result.outcome) {
-				case 'success':
-					// Delete item and broadcast result
-					await store.delete(current.id);
-					broadcast.publish({ type: 'outbox_changed', userScope });
-					broadcast.publish({
-						type: 'outbox_result',
-						userScope,
-						result: {
-							commandType: 'capture_terms',
-							itemId: current.id,
-							batchId: result.batchId,
-						},
-					});
-					break;
+			try {
+				processedAny = true;
+				const result = await sender.send(current.command);
 
-				case 'retry': {
-					// Update attempt count and schedule next attempt
-					const nextAttemptAt = calculateNextAttemptAt(clock.now(), current.attemptCount);
-					const updated: OutboxItem = {
-						...current,
-						attemptCount: current.attemptCount + 1,
-						nextAttemptAt,
-						lastError: result.error,
-						updatedAt: clock.now(),
-					};
-					await store.put(updated);
-					broadcast.publish({ type: 'outbox_changed', userScope });
-					break;
+				switch (result.outcome) {
+					case 'success':
+						// Delete item and broadcast result
+						await store.delete(current.id);
+						broadcast.publish({ type: 'outbox_changed', userScope });
+						broadcast.publish({
+							type: 'outbox_result',
+							userScope,
+							result: {
+								commandType: 'capture_terms',
+								itemId: current.id,
+								batchId: result.batchId,
+							},
+						});
+						break;
+
+					case 'retry': {
+						// Update attempt count and schedule next attempt
+						const nextAttemptAt = calculateNextAttemptAt(clock.now(), current.attemptCount);
+						const updated: OutboxItem = {
+							...current,
+							attemptCount: current.attemptCount + 1,
+							nextAttemptAt,
+							lastError: result.error,
+							updatedAt: clock.now(),
+						};
+						await store.put(updated);
+						broadcast.publish({ type: 'outbox_changed', userScope });
+						break;
+					}
+
+					case 'blocked_auth': {
+						// Mark as blocked, notify auth blocked handler
+						const blocked: OutboxItem = {
+							...current,
+							status: 'blocked_auth',
+							lastError: result.error,
+							updatedAt: clock.now(),
+						};
+						await store.put(blocked);
+						broadcast.publish({ type: 'outbox_changed', userScope });
+						onAuthBlocked?.();
+						// Stop processing - auth is broken
+						return true;
+					}
+
+					case 'failed': {
+						// Mark as failed permanently
+						const failed: OutboxItem = {
+							...current,
+							status: 'failed',
+							lastError: result.error,
+							updatedAt: clock.now(),
+						};
+						await store.put(failed);
+						broadcast.publish({ type: 'outbox_changed', userScope });
+						break;
+					}
 				}
-
-				case 'blocked_auth': {
-					// Mark as blocked, notify auth blocked handler
-					const blocked: OutboxItem = {
-						...current,
-						status: 'blocked_auth',
-						lastError: result.error,
-						updatedAt: clock.now(),
-					};
-					await store.put(blocked);
-					broadcast.publish({ type: 'outbox_changed', userScope });
-					onAuthBlocked?.();
-					// Stop processing - auth is broken
-					return true;
-				}
-
-				case 'failed': {
-					// Mark as failed permanently
-					const failed: OutboxItem = {
-						...current,
-						status: 'failed',
-						lastError: result.error,
-						updatedAt: clock.now(),
-					};
-					await store.put(failed);
-					broadcast.publish({ type: 'outbox_changed', userScope });
-					break;
-				}
+			} finally {
+				// Always remove from in-flight set when done processing
+				inFlight.delete(current.id);
 			}
 		}
 
@@ -344,8 +361,8 @@ export function createUndoHelper(deps: UndoDeps): (itemId: string) => Promise<Un
 	const { store, broadcast, clock, userScope } = deps;
 
 	return async function undo(itemId: string): Promise<UndoResult> {
+		// First, get the item to extract terms for restoration (before deletion)
 		const item = await store.get(itemId);
-
 		if (!item) {
 			return { success: false }; // Already deleted
 		}
@@ -354,18 +371,22 @@ export function createUndoHelper(deps: UndoDeps): (itemId: string) => Promise<Un
 			return { success: false }; // Wrong user
 		}
 
-		const now = clock.now();
-		if (now >= item.undoUntil) {
-			return { success: false }; // Undo window expired
-		}
-
-		// Extract terms for restoration
+		// Extract terms for restoration before attempting deletion
 		const terms = item.command.type === 'capture_terms' ? item.command.request.terms : undefined;
 
-		// Delete the item
-		await store.delete(itemId);
-		broadcast.publish({ type: 'outbox_changed', userScope });
+		// Use atomic deleteIf to prevent TOCTOU race condition:
+		// The item could be sent between our check and delete, so we verify
+		// both status=pending AND time window in a single transaction
+		const now = clock.now();
+		const deleted = await store.deleteIf(itemId, (current) => {
+			return current.status === 'pending' && now < current.undoUntil;
+		});
 
+		if (!deleted) {
+			return { success: false }; // Undo window expired or item already sent
+		}
+
+		broadcast.publish({ type: 'outbox_changed', userScope });
 		return { success: true, terms };
 	};
 }
