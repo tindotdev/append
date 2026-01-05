@@ -239,7 +239,7 @@ Web tests:
 - [x] Wire per-row Delete + Move, and bulk Delete + Move — `packages/web/src/features/bucket/pages/BucketFeedPage.tsx:217-375`
 - [x] Add Sonner Undo for move/delete (single toast per bulk operation) — `packages/web/src/features/bucket/pages/BucketFeedPage.tsx:225-240,285-306,349-373`
 - [x] Add sense delete + term delete actions in `TermDetailSheet` — `packages/web/src/features/bucket/components/TermDetailSheet.tsx:125-159,294-329,356-364,381-386`
-- [ ] Add E2E test: delete + undo happy path
+- [x] Add E2E test: delete + undo happy path — `packages/web/e2e/bucket-delete-undo.spec.ts`
 
 ### Product / UX sanity checks
 
