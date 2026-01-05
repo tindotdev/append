@@ -135,17 +135,5 @@ describe('CORS headers', () => {
 	// verify the wildcard matching logic works correctly.
 });
 
-// =============================================================================
-// Note: Preview origin validation middleware tests
-// =============================================================================
-//
-// The preview origin validation middleware (returns 403 ORIGIN_FORBIDDEN)
-// only runs when APP_ENV=preview. The test environment uses APP_ENV=test,
-// so those code paths are not exercised here.
-//
-// To fully test preview origin validation:
-// 1. Create a separate vitest config with APP_ENV=preview
-// 2. Or use E2E tests against an actual preview deployment
-//
-// The unit tests for isOriginAllowed above cover the critical origin
-// matching logic that the middleware depends on.
+// Note: Preview-only origin validation middleware is covered by
+// `packages/api/test/cors.preview.spec.ts` and runs via `pnpm --filter @append/api test:preview`.
