@@ -188,9 +188,9 @@ describe('E2E Login Production Guards', () => {
 
 describe('E2E Login Allowlist Guards', () => {
 	it('E2E_AUTH_EMAIL must match configured ALLOWED_EMAIL', async () => {
-		// The test environment has:
-		// - ALLOWED_EMAIL: 'test-e2e@example.com' (same as E2E_AUTH_EMAIL)
-		// This test verifies the allowlist check passes when they match
+		expect(env.ALLOWED_EMAIL).toBeTruthy();
+		expect(env.E2E_AUTH_EMAIL).toBeTruthy();
+		expect(env.ALLOWED_EMAIL!.toLowerCase()).toBe(env.E2E_AUTH_EMAIL!.toLowerCase());
 
 		const res = await SELF.fetch('https://example.com/auth/e2e/login', {
 			method: 'POST',

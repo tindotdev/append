@@ -97,15 +97,12 @@ e2eLoginRoute.post('/login', async (c) => {
 	}
 
 	// Guard 4: Allowlist validation → 403
-	// E2E_AUTH_EMAIL must be in allowlist. Bypass if ALLOWED_SUB is set (owner has sub-based access).
-	if (!env.ALLOWED_EMAIL && !env.ALLOWED_SUB) {
-		console.warn('[E2E Auth] No allowlist configured');
+	// ADR 0019: endpoint must not mint sessions unless the E2E email is explicitly allowlisted.
+	if (!env.ALLOWED_EMAIL) {
+		console.warn('[E2E Auth] ALLOWED_EMAIL is required for E2E login');
 		return c.text('Forbidden', 403);
 	}
-
-	// If ALLOWED_SUB is set, bypass email check (owner has sub-based access, E2E can use any email)
-	// Otherwise, ALLOWED_EMAIL must match E2E_AUTH_EMAIL
-	if (!env.ALLOWED_SUB && env.ALLOWED_EMAIL && env.ALLOWED_EMAIL.toLowerCase() !== env.E2E_AUTH_EMAIL.toLowerCase()) {
+	if (env.ALLOWED_EMAIL.toLowerCase() !== env.E2E_AUTH_EMAIL.toLowerCase()) {
 		console.warn('[E2E Auth] E2E_AUTH_EMAIL does not match ALLOWED_EMAIL');
 		return c.text('Forbidden', 403);
 	}
