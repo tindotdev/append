@@ -238,7 +238,7 @@ Web tests:
 - [x] Add term-sense archive + restore client API helpers + mutations — `packages/web/src/features/bucket/api/archive-term-sense.ts`
 - [x] Wire per-row Delete + Move, and bulk Delete + Move — `packages/web/src/features/bucket/pages/BucketFeedPage.tsx:217-375`
 - [x] Add Sonner Undo for move/delete (single toast per bulk operation) — `packages/web/src/features/bucket/pages/BucketFeedPage.tsx:225-240,285-306,349-373`
-- [ ] Add sense delete + term delete actions in `TermDetailSheet`
+- [x] Add sense delete + term delete actions in `TermDetailSheet` — `packages/web/src/features/bucket/components/TermDetailSheet.tsx:125-159,294-329,356-364,381-386`
 - [ ] Add E2E test: delete + undo happy path
 
 ### Product / UX sanity checks
