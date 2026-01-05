@@ -143,6 +143,8 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 					cleanupRef.current();
 					cleanupRef.current = null;
 				}
+				// Close the store to release IndexedDB connection (prevents memory leak)
+				outboxRef.current?.store.close();
 				outboxRef.current = null;
 				leadershipRef.current = null;
 				initUserScopeRef.current = null;

@@ -116,10 +116,38 @@ e2eLoginRoute.post('/login', async (c) => {
 	}
 
 	// Guard 3: Secret header validation (constant-time) → 403
+	// Supports E2E_AUTH_SECRET_OLD for zero-downtime secret rotation
 	const providedSecret = c.req.header('x-e2e-secret');
-	if (!providedSecret || !(await secureCompare(providedSecret, env.E2E_AUTH_SECRET))) {
-		console.warn('[E2E Auth] Invalid or missing x-e2e-secret header');
+	if (!providedSecret) {
+		console.warn('[E2E Auth] Missing x-e2e-secret header');
 		return c.text('Forbidden', 403);
+	}
+
+	// Build list of valid secrets (current + old for rotation grace period)
+	const validSecrets = [env.E2E_AUTH_SECRET];
+	if (env.E2E_AUTH_SECRET_OLD) {
+		validSecrets.push(env.E2E_AUTH_SECRET_OLD);
+	}
+
+	// Check against all valid secrets (constant-time for each)
+	let isValidSecret = false;
+	let usedOldSecret = false;
+	for (const secret of validSecrets) {
+		if (await secureCompare(providedSecret, secret)) {
+			isValidSecret = true;
+			usedOldSecret = secret === env.E2E_AUTH_SECRET_OLD;
+			break;
+		}
+	}
+
+	if (!isValidSecret) {
+		console.warn('[E2E Auth] Invalid x-e2e-secret header');
+		return c.text('Forbidden', 403);
+	}
+
+	// Warn if using deprecated old secret (for monitoring rotation progress)
+	if (usedOldSecret) {
+		console.warn('[E2E Auth] Using deprecated E2E_AUTH_SECRET_OLD - rotation in progress');
 	}
 
 	// Guard 4: Allowlist validation → 403

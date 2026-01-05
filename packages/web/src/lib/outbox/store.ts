@@ -144,12 +144,17 @@ export function createOutboxStore(userScope: string): OutboxStore {
 				const request = index.openCursor(range);
 				const items: OutboxItem[] = [];
 
+				tx.onerror = () => reject(tx.error);
 				request.onerror = () => reject(request.error);
 				request.onsuccess = () => {
 					const cursor = request.result;
 					if (cursor) {
 						items.push(cursor.value as OutboxItem);
-						cursor.continue();
+						try {
+							cursor.continue();
+						} catch (e) {
+							reject(new Error(`Cursor iteration failed: ${e}`));
+						}
 					} else {
 						resolve(items);
 					}
@@ -227,6 +232,35 @@ export function createOutboxStore(userScope: string): OutboxStore {
 				};
 			});
 		},
+
+		async deleteIf(id: string, predicate: (item: OutboxItem) => boolean): Promise<boolean> {
+			const db = await getDb();
+			return new Promise((resolve, reject) => {
+				const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
+				const store = tx.objectStore(IDB_STORE_NAME);
+				const getReq = store.get(id);
+
+				tx.onerror = () => reject(tx.error);
+				getReq.onerror = () => reject(getReq.error);
+				getReq.onsuccess = () => {
+					const item = getReq.result as OutboxItem | undefined;
+					if (!item || !predicate(item)) {
+						resolve(false);
+						return;
+					}
+					const delReq = store.delete(id);
+					delReq.onerror = () => reject(delReq.error);
+					delReq.onsuccess = () => resolve(true);
+				};
+			});
+		},
+
+		close(): void {
+			if (dbPromise) {
+				dbPromise.then((db) => db.close()).catch(() => {});
+				dbPromise = null;
+			}
+		},
 	};
 }
 
@@ -303,6 +337,19 @@ export function createMockOutboxStore(): OutboxStore & {
 				}
 			}
 			return count;
+		},
+
+		async deleteIf(id: string, predicate: (item: OutboxItem) => boolean): Promise<boolean> {
+			const item = items.get(id);
+			if (!item || !predicate(item)) {
+				return false;
+			}
+			items.delete(id);
+			return true;
+		},
+
+		close(): void {
+			// No-op for mock store
 		},
 	};
 }
