@@ -126,7 +126,11 @@ e2eLoginRoute.post('/login', async (c) => {
 	// Build list of valid secrets (current + old for rotation grace period)
 	const validSecrets = [env.E2E_AUTH_SECRET];
 	if (env.E2E_AUTH_SECRET_OLD) {
-		validSecrets.push(env.E2E_AUTH_SECRET_OLD);
+		if (env.E2E_AUTH_SECRET_OLD.length < MIN_SECRET_LENGTH) {
+			console.warn(`[E2E Auth] E2E_AUTH_SECRET_OLD must be at least ${MIN_SECRET_LENGTH} characters - ignoring`);
+		} else {
+			validSecrets.push(env.E2E_AUTH_SECRET_OLD);
+		}
 	}
 
 	// Check against all valid secrets (constant-time for each)
