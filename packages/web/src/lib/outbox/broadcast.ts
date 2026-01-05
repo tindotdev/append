@@ -19,6 +19,12 @@ export function createOutboxBroadcast(): OutboxBroadcast {
 	// Create channel lazily to avoid errors in SSR/test environments
 	let channel: BroadcastChannel | null = null;
 
+	// Stable per-instance sender ID (used to ignore BroadcastChannel self-echo)
+	const senderId =
+		typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+			? crypto.randomUUID()
+			: `outbox-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
 	function getChannel(): BroadcastChannel {
 		if (!channel) {
 			channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
@@ -28,23 +34,42 @@ export function createOutboxBroadcast(): OutboxBroadcast {
 
 	const subscribers = new Set<(message: OutboxBroadcastMessage) => void>();
 
+	type WireMessage = OutboxBroadcastMessage & { __outbox_sender?: string };
+
+	function notifySubscribers(message: OutboxBroadcastMessage): void {
+		for (const sub of subscribers) {
+			try {
+				sub(message);
+			} catch {
+				// Ignore handler errors
+			}
+		}
+	}
+
+	function dispatchWireMessage(wire: unknown): void {
+		if (!wire || typeof wire !== 'object') return;
+
+		const data = wire as WireMessage;
+		if (data.__outbox_sender === senderId) return;
+
+		// Strip internal metadata before delivering to app code.
+		const message = { ...(data as any) } as WireMessage;
+		delete (message as any).__outbox_sender;
+		notifySubscribers(message as OutboxBroadcastMessage);
+	}
+
 	return {
 		publish(message: OutboxBroadcastMessage): void {
 			// Broadcast to other tabs
 			try {
-				getChannel().postMessage(message);
+				const wire: WireMessage = { ...message, __outbox_sender: senderId };
+				getChannel().postMessage(wire);
 			} catch {
 				// Ignore errors (e.g., channel closed, serialization errors)
 			}
 
-			// Also notify local subscribers (BroadcastChannel doesn't echo to sender)
-			for (const sub of subscribers) {
-				try {
-					sub(message);
-				} catch {
-					// Ignore handler errors
-				}
-			}
+			// Notify local subscribers immediately; ignore BroadcastChannel self-echo via senderId.
+			notifySubscribers(message);
 		},
 
 		subscribe(handler: (message: OutboxBroadcastMessage) => void): () => void {
@@ -52,14 +77,8 @@ export function createOutboxBroadcast(): OutboxBroadcast {
 
 			// If first subscriber, set up the listener
 			if (subscribers.size === 0) {
-				ch.onmessage = (event: MessageEvent<OutboxBroadcastMessage>) => {
-					for (const sub of subscribers) {
-						try {
-							sub(event.data);
-						} catch {
-							// Ignore handler errors to prevent one bad handler from breaking others
-						}
-					}
+				ch.onmessage = (event: MessageEvent<unknown>) => {
+					dispatchWireMessage(event.data);
 				};
 			}
 

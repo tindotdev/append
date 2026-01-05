@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createMockBroadcast, createOutboxBroadcast } from '../broadcast';
 import type { OutboxBroadcastMessage } from '../types';
 
@@ -139,5 +139,77 @@ describe('createOutboxBroadcast', () => {
 
 		expect(typeof unsubscribe).toBe('function');
 		expect(() => unsubscribe()).not.toThrow();
+	});
+});
+
+describe('createOutboxBroadcast (BroadcastChannel echo)', () => {
+	class MockBroadcastChannel {
+		static channelsByName = new Map<string, Set<MockBroadcastChannel>>();
+
+		name: string;
+		onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+
+		constructor(name: string) {
+			this.name = name;
+			const set = MockBroadcastChannel.channelsByName.get(name) ?? new Set<MockBroadcastChannel>();
+			set.add(this);
+			MockBroadcastChannel.channelsByName.set(name, set);
+		}
+
+		postMessage(data: unknown) {
+			const set = MockBroadcastChannel.channelsByName.get(this.name);
+			if (!set) return;
+
+			for (const ch of set) {
+				ch.onmessage?.({ data } as MessageEvent<unknown>);
+			}
+		}
+
+		close() {
+			const set = MockBroadcastChannel.channelsByName.get(this.name);
+			set?.delete(this);
+			if (set && set.size === 0) {
+				MockBroadcastChannel.channelsByName.delete(this.name);
+			}
+		}
+
+		static reset() {
+			MockBroadcastChannel.channelsByName.clear();
+		}
+	}
+
+	afterEach(() => {
+		MockBroadcastChannel.reset();
+		vi.unstubAllGlobals();
+	});
+
+	it('does not double-dispatch to local subscribers', () => {
+		vi.stubGlobal('BroadcastChannel', MockBroadcastChannel as unknown as typeof BroadcastChannel);
+
+		const broadcast = createOutboxBroadcast();
+		const handler = vi.fn();
+
+		broadcast.subscribe(handler);
+		broadcast.publish({ type: 'kick' });
+
+		expect(handler).toHaveBeenCalledTimes(1);
+	});
+
+	it('delivers to other instances in the same tab', () => {
+		vi.stubGlobal('BroadcastChannel', MockBroadcastChannel as unknown as typeof BroadcastChannel);
+
+		const a = createOutboxBroadcast();
+		const b = createOutboxBroadcast();
+
+		const handlerA = vi.fn();
+		const handlerB = vi.fn();
+
+		a.subscribe(handlerA);
+		b.subscribe(handlerB);
+
+		a.publish({ type: 'kick' });
+
+		expect(handlerA).toHaveBeenCalledTimes(1);
+		expect(handlerB).toHaveBeenCalledTimes(1);
 	});
 });
