@@ -219,7 +219,9 @@ Note: `E2E_AUTH_EMAIL` is set automatically by the preview workflow — no manua
 
 To run Playwright E2E tests against local development servers:
 
-1. Configure E2E secrets in `packages/api/.dev.vars`:
+1. Configure secrets in both packages:
+
+   **API** (`packages/api/.dev.vars`):
 
    ```bash
    E2E_AUTH_SECRET=your-local-e2e-secret-at-least-32-chars
@@ -227,29 +229,27 @@ To run Playwright E2E tests against local development servers:
    ALLOWED_EMAIL=your-test-email@example.com
    ```
 
-2. Ensure `ALLOWED_EMAIL` matches `E2E_AUTH_EMAIL` (exact match or wildcard pattern).
-
-3. Start the API and web dev servers:
+   **Web** (`packages/web/.env` — auto-loaded by Playwright):
 
    ```bash
-   # Terminal 1: API
-   pnpm --filter @append/api dev
-
-   # Terminal 2: Web
-   pnpm --filter @append/web dev
+   E2E_AUTH_SECRET=your-local-e2e-secret-at-least-32-chars
    ```
 
-4. Run Playwright tests:
+   The `E2E_AUTH_SECRET` must match in both files.
+
+2. Ensure `ALLOWED_EMAIL` matches `E2E_AUTH_EMAIL` (exact match or wildcard pattern).
+
+3. Run Playwright tests (starts dev servers automatically):
 
    ```bash
    cd packages/web
-   E2E_AUTH_SECRET=your-local-e2e-secret-at-least-32-chars pnpm test:e2e
+   pnpm test:e2e
    ```
 
-5. For interactive debugging:
+4. For interactive debugging:
 
    ```bash
-   E2E_AUTH_SECRET=your-local-e2e-secret-at-least-32-chars pnpm test:e2e:ui
+   pnpm test:e2e:ui
    ```
 
 ### E2E secret rotation
@@ -281,6 +281,7 @@ Cloudflare Pages has **automatic Git integration** that deploys separately from 
 - **GitHub Actions workflow**: Defined in `.github/workflows/preview.yml`. Uses environment variables from the workflow file.
 
 For preview builds to call the correct API, `VITE_API_URL` must be set in **both** places:
+
 1. Cloudflare Pages dashboard → Settings → Environment variables → Preview
 2. GitHub Actions workflow (already configured in `preview.yml`)
 
