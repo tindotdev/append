@@ -1,14 +1,30 @@
-import { type ColumnDef, flexRender, getCoreRowModel, getSortedRowModel, type SortingState, useReactTable } from '@tanstack/react-table';
+import {
+	type ColumnDef,
+	flexRender,
+	getCoreRowModel,
+	getSortedRowModel,
+	type RowSelectionState,
+	type SortingState,
+	useReactTable,
+} from '@tanstack/react-table';
 import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-interface BucketTableProps<TData> {
+interface BucketTableProps<TData extends { termId: string }> {
 	columns: ColumnDef<TData>[];
 	data: TData[];
 	onRowClick?: (row: TData) => void;
+	rowSelection?: RowSelectionState;
+	onRowSelectionChange?: (selection: RowSelectionState) => void;
 }
 
-export function BucketTable<TData>({ columns, data, onRowClick }: BucketTableProps<TData>) {
+export function BucketTable<TData extends { termId: string }>({
+	columns,
+	data,
+	onRowClick,
+	rowSelection = {},
+	onRowSelectionChange,
+}: BucketTableProps<TData>) {
 	const [sorting, setSorting] = useState<SortingState>([]);
 
 	const table = useReactTable({
@@ -17,8 +33,14 @@ export function BucketTable<TData>({ columns, data, onRowClick }: BucketTablePro
 		getCoreRowModel: getCoreRowModel(),
 		getSortedRowModel: getSortedRowModel(),
 		onSortingChange: setSorting,
+		onRowSelectionChange: (updater) => {
+			const newSelection = typeof updater === 'function' ? updater(rowSelection) : updater;
+			onRowSelectionChange?.(newSelection);
+		},
+		getRowId: (row) => row.termId,
 		state: {
 			sorting,
+			rowSelection,
 		},
 	});
 

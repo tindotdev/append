@@ -1,11 +1,12 @@
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
+import type { RowSelectionState } from '@tanstack/react-table';
 import { Search } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { useUserBuckets } from '@/lib/user-buckets';
 import { useBucketFeed } from '../api/get-bucket-feed';
 import { BucketTable } from '../components/BucketTable';
-import { columns } from '../components/columns';
+import { type ColumnMeta, getColumns } from '../components/columns';
 import { TermDetailSheet } from '../components/TermDetailSheet';
 import type { BucketFeedItem } from '../types';
 
@@ -80,6 +81,10 @@ function FeedContent({
 	selectedTermId,
 	onRowClick,
 	onClosePanel,
+	rowSelection,
+	onRowSelectionChange,
+	onDelete,
+	onMove,
 }: {
 	title: string;
 	items: BucketFeedItem[];
@@ -89,6 +94,10 @@ function FeedContent({
 	selectedTermId: string | null;
 	onRowClick: (item: BucketFeedItem) => void;
 	onClosePanel: () => void;
+	rowSelection: RowSelectionState;
+	onRowSelectionChange: (selection: RowSelectionState) => void;
+	onDelete: (item: BucketFeedItem) => void;
+	onMove: (item: BucketFeedItem) => void;
 }) {
 	const [searchQuery, setSearchQuery] = useState('');
 	const deferredQuery = useDeferredValue(searchQuery);
@@ -100,6 +109,9 @@ function FeedContent({
 	}, [items, deferredQuery]);
 
 	const isFiltering = searchQuery !== deferredQuery;
+
+	const columnMeta: ColumnMeta = useMemo(() => ({ onDelete, onMove }), [onDelete, onMove]);
+	const columns = useMemo(() => getColumns(columnMeta), [columnMeta]);
 
 	return (
 		<div className="max-w-4xl">
@@ -128,7 +140,13 @@ function FeedContent({
 
 			{/* Table */}
 			<div className="mt-4">
-				<BucketTable columns={columns} data={filteredItems} onRowClick={onRowClick} />
+				<BucketTable
+					columns={columns}
+					data={filteredItems}
+					onRowClick={onRowClick}
+					rowSelection={rowSelection}
+					onRowSelectionChange={onRowSelectionChange}
+				/>
 			</div>
 
 			{hasNextPage && (
@@ -157,6 +175,7 @@ export function BucketFeedPage() {
 	const navigate = useNavigate();
 
 	const selectedTermId = search.term ?? null;
+	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
 	const handleRowClick = (item: BucketFeedItem) => {
 		navigate({ to: '/bucket/$slug', params: { slug }, search: { term: item.termId } });
@@ -164,6 +183,15 @@ export function BucketFeedPage() {
 
 	const handleClosePanel = () => {
 		navigate({ to: '/bucket/$slug', params: { slug }, search: { term: undefined } });
+	};
+
+	// Stub handlers - will be wired to mutations in a later task
+	const handleDelete = (_item: BucketFeedItem) => {
+		// TODO: Wire to useArchiveTerm mutation with Undo toast
+	};
+
+	const handleMove = (_item: BucketFeedItem) => {
+		// TODO: Open MoveToBucketDialog
 	};
 
 	const { data: bucketsData, isLoading: bucketsLoading } = useUserBuckets();
@@ -196,6 +224,10 @@ export function BucketFeedPage() {
 			selectedTermId={selectedTermId}
 			onRowClick={handleRowClick}
 			onClosePanel={handleClosePanel}
+			rowSelection={rowSelection}
+			onRowSelectionChange={setRowSelection}
+			onDelete={handleDelete}
+			onMove={handleMove}
 		/>
 	);
 }
