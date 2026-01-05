@@ -29,34 +29,40 @@ const e2eLoginRoute = new Hono<{ Bindings: Bindings; Variables: E2EVariables }>(
 
 /**
  * Constant-time string comparison to prevent timing attacks.
- * Uses Web Crypto API's timingSafeEqual via subtle comparison.
+ * Uses Web Crypto API's HMAC-based comparison with identical work in all paths.
+ *
+ * Security: Both length-mismatch and length-match paths perform identical
+ * cryptographic operations (1 key import + 2 HMAC signs + byte comparison)
+ * to prevent timing side-channels.
  */
 async function secureCompare(a: string, b: string): Promise<boolean> {
-	if (a.length !== b.length) {
-		// Still do comparison to avoid leaking length via timing
-		const dummy = new TextEncoder().encode(a);
-		const dummyKey = await crypto.subtle.importKey('raw', dummy, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-		await crypto.subtle.sign('HMAC', dummyKey, dummy);
-		return false;
-	}
-
 	const encoder = new TextEncoder();
 	const aBytes = encoder.encode(a);
 	const bBytes = encoder.encode(b);
 
-	// Use HMAC-based comparison for constant-time behavior
+	// Always use 'a' as the key material to ensure consistent key derivation time
 	const key = await crypto.subtle.importKey('raw', aBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-	const sig = await crypto.subtle.sign('HMAC', key, bBytes);
-	const expected = await crypto.subtle.sign('HMAC', key, aBytes);
 
-	// Compare signatures (same if inputs match)
-	const sigArr = new Uint8Array(sig);
-	const expArr = new Uint8Array(expected);
-	let match = sigArr.length === expArr.length;
-	for (let i = 0; i < sigArr.length; i++) {
-		match = match && sigArr[i] === expArr[i];
+	// Always compute both signatures to ensure identical timing
+	const sigA = await crypto.subtle.sign('HMAC', key, aBytes);
+	const sigB = await crypto.subtle.sign('HMAC', key, bBytes);
+
+	// Compare signatures in constant time
+	const arrA = new Uint8Array(sigA);
+	const arrB = new Uint8Array(sigB);
+
+	// Length check (signatures are always same length from HMAC-SHA256)
+	// but include length mismatch tracking for robustness
+	const lengthMatch = a.length === b.length;
+
+	// Constant-time byte comparison of signatures
+	let sigMatch = true;
+	for (let i = 0; i < arrA.length; i++) {
+		sigMatch = sigMatch && arrA[i] === arrB[i];
 	}
-	return match;
+
+	// Both conditions must be true: original lengths match AND signatures match
+	return lengthMatch && sigMatch;
 }
 
 /** Valid APP_ENV values */
@@ -108,10 +114,13 @@ e2eLoginRoute.post('/login', async (c) => {
 	const auth = c.get('auth');
 	const ctx = await auth.$context;
 
+	// Generate request ID for tracing (use cf-ray if available, otherwise random)
+	const requestId = c.req.header('cf-ray') || crypto.randomUUID().slice(0, 8);
+
 	// Log invocation (without secret)
 	const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
 	const ua = c.req.header('user-agent') || 'unknown';
-	console.log(`[E2E Auth] Login attempt: env=${env.APP_ENV}, ip=${ip}, ua=${ua.slice(0, 50)}`);
+	console.log(`[E2E Auth] [${requestId}] Login attempt: env=${env.APP_ENV}, ip=${ip}, ua=${ua.slice(0, 50)}`);
 
 	try {
 		// Find or create E2E user
@@ -134,13 +143,13 @@ e2eLoginRoute.post('/login', async (c) => {
 				userId: user.id,
 			});
 
-			console.log(`[E2E Auth] Created new user: ${user.id}`);
+			console.log(`[E2E Auth] [${requestId}] Created new user: ${user.id}`);
 		}
 
 		// Create session using internal adapter
 		const session = await ctx.internalAdapter.createSession(user.id, false);
 		if (!session) {
-			console.error('[E2E Auth] Failed to create session');
+			console.error(`[E2E Auth] [${requestId}] Failed to create session`);
 			return c.text('Internal Server Error', 500);
 		}
 
@@ -160,11 +169,11 @@ e2eLoginRoute.post('/login', async (c) => {
 
 		c.header('Set-Cookie', parts.join('; '));
 
-		console.log(`[E2E Auth] Session created for user: ${user.id}`);
+		console.log(`[E2E Auth] [${requestId}] Session created for user: ${user.id}`);
 		return c.body(null, 204);
 	} catch (error) {
 		// User creation may fail if not on allowlist (expected behavior)
-		console.error('[E2E Auth] Failed:', error);
+		console.error(`[E2E Auth] [${requestId}] Failed:`, error);
 		return c.text('Forbidden', 403);
 	}
 });
