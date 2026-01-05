@@ -32,8 +32,8 @@ export const BACKOFF_BASE_MS = 1_000;
 /** Maximum delay cap in ms for backoff (60 seconds) */
 export const BACKOFF_CAP_MS = 60_000;
 
-/** Maximum jitter in ms added to backoff (250ms) */
-export const JITTER_MAX_MS = 250;
+/** Jitter range in ms added to backoff (0..250ms) */
+export const JITTER_RANGE_MS = 250;
 
 // =============================================================================
 // BroadcastChannel

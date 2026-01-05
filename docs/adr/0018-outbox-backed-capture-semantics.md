@@ -79,7 +79,7 @@ Retry/backoff defaults (v1):
 
 - `BACKOFF_BASE_MS = 1_000`
 - `BACKOFF_CAP_MS = 60_000`
-- `JITTER_MS = random(0..250)`
+- `JITTER_RANGE_MS = random(0..250)`
 
 ### 5) Cross-tab coordination
 
@@ -129,8 +129,13 @@ Outbox persistence is scoped per signed-in user:
 ### Negative / risks
 
 - Adds meaningful client complexity (IDB, leadership, retries, cross-tab messaging).
-- Requires careful StrictMode-safe bootstrapping and crash recovery posture (avoid durable `sending` or unstick on startup).
+- Requires careful StrictMode-safe bootstrapping and crash recovery posture (avoid durable `sending`; on startup all pending items are eligible to retry).
 - Requires a management surface for failed/blocked items.
+
+### Failure modes & recovery
+
+- **IndexedDB unavailable/corrupt/quota exceeded**: outbox initialization can fail; the app should continue to render, show a toast, and keep capture disabled until storage is available again.
+- **Crash recovery**: no durable `sending` state is used; items remain `pending` and are retried when the sender loop resumes.
 
 ## Alternatives considered
 
