@@ -30,7 +30,8 @@ Append uses Google SSO with a strict allowlist (ADR 0001). At least one of the
 following must be configured, or auth will **fail closed** at runtime:
 
 - `ALLOWED_SUB` (preferred) — Google account `sub`
-- `ALLOWED_EMAIL` (fallback) — case-insensitive email
+- `ALLOWED_EMAIL` (fallback) — case-insensitive email, supports wildcard patterns
+  for plus-addressing (e.g., `e2e-bot+*@append.test` matches `e2e-bot+pr-123@append.test`)
 
 Required auth secrets:
 
@@ -189,29 +190,30 @@ must allow the preview Pages origin and use preview-only cookie settings per ADR
 
 Required preview configuration for E2E tests (ADR 0019):
 
-- Secrets (preview Worker) — **not yet set**:
-  - `E2E_AUTH_SECRET` — secret required by `x-e2e-secret` header
-  - `E2E_AUTH_EMAIL` — dedicated email for E2E test user
-- Vars (preview Worker) — already configured:
-  - `APP_ENV=preview` (set in `wrangler.jsonc`)
+- Secrets (preview Worker):
+  - `E2E_AUTH_SECRET` — secret required by `x-e2e-secret` header (set in Cloudflare)
+  - `E2E_AUTH_EMAIL` — set dynamically by preview workflow per PR (e.g., `e2e-bot+pr-123@append.test`)
+- Vars (preview Worker) — already configured in `wrangler.jsonc`:
+  - `APP_ENV=preview`
+  - `ALLOWED_EMAIL=e2e-bot+*@append.test` (wildcard pattern for plus-addressing)
 - Allowlist (required for `/auth/e2e/login`):
-  - `ALLOWED_EMAIL` **must** be set and must equal `E2E_AUTH_EMAIL` (case-insensitive).
-  - If you also want owner Google access in preview, set `ALLOWED_SUB` to the owner’s Google `sub`.
+  - `ALLOWED_EMAIL` supports wildcard patterns for plus-addressing (e.g., `e2e-bot+*@append.test`)
+  - `E2E_AUTH_EMAIL` must match the `ALLOWED_EMAIL` pattern (exact match or wildcard)
+  - If you also want owner Google access in preview, set `ALLOWED_SUB` to the owner's Google `sub`.
 
-Set E2E secrets (required for Playwright tests):
+**Per-PR email isolation**: The preview workflow automatically sets `E2E_AUTH_EMAIL` to
+`e2e-bot+pr-{PR_NUMBER}@append.test` for each PR. This provides environment isolation
+while using a single wildcard allowlist pattern.
+
+Set E2E secret (required for Playwright tests):
 
 ```bash
 pnpm --filter @append/api exec wrangler secret put E2E_AUTH_SECRET --env preview
-pnpm --filter @append/api exec wrangler secret put E2E_AUTH_EMAIL --env preview
 ```
 
 Also add `E2E_AUTH_SECRET` to GitHub Actions secrets for the workflow to use.
 
-Set/update preview allowlist for E2E (required for `/auth/e2e/login`):
-
-```bash
-pnpm --filter @append/api exec wrangler secret put ALLOWED_EMAIL --env preview
-```
+Note: `E2E_AUTH_EMAIL` is set automatically by the preview workflow — no manual configuration needed.
 
 ### Running E2E tests locally
 
@@ -222,9 +224,10 @@ To run Playwright E2E tests against local development servers:
    ```bash
    E2E_AUTH_SECRET=your-local-e2e-secret-at-least-32-chars
    E2E_AUTH_EMAIL=your-test-email@example.com
+   ALLOWED_EMAIL=your-test-email@example.com
    ```
 
-2. Ensure `ALLOWED_EMAIL` is set and equals `E2E_AUTH_EMAIL` (case-insensitive).
+2. Ensure `ALLOWED_EMAIL` matches `E2E_AUTH_EMAIL` (exact match or wildcard pattern).
 
 3. Start the API and web dev servers:
 

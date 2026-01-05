@@ -71,6 +71,31 @@ const VALID_APP_ENVS = ['production', 'preview', 'local', 'test'] as const;
 /** Session max age in seconds (7 days) */
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
+/**
+ * Check if an email matches an allowlist pattern.
+ * Supports wildcard pattern for plus-addressing: `prefix+*@domain`
+ * Examples:
+ *   - `e2e-bot+*@append.test` matches `e2e-bot+pr-123@append.test`
+ *   - `test@example.com` matches `test@example.com` (exact match)
+ *
+ * This enables per-environment E2E email isolation (e.g., `e2e-bot+pr-{PR_NUMBER}@append.test`)
+ * while maintaining a single allowlist pattern in the configuration.
+ */
+function emailMatchesAllowlist(email: string, allowlistPattern: string): boolean {
+	const emailLower = email.toLowerCase();
+	const patternLower = allowlistPattern.toLowerCase();
+
+	// Check for wildcard pattern: prefix+*@domain
+	if (patternLower.includes('+*@')) {
+		const [prefix, domain] = patternLower.split('+*@');
+		// Email must start with "prefix+" and end with "@domain"
+		return emailLower.startsWith(prefix + '+') && emailLower.endsWith('@' + domain);
+	}
+
+	// Exact match fallback
+	return emailLower === patternLower;
+}
+
 e2eLoginRoute.post('/login', async (c) => {
 	const env = c.env;
 
@@ -98,12 +123,13 @@ e2eLoginRoute.post('/login', async (c) => {
 
 	// Guard 4: Allowlist validation → 403
 	// ADR 0019: endpoint must not mint sessions unless the E2E email is explicitly allowlisted.
+	// Supports wildcard pattern for plus-addressing (e.g., `e2e-bot+*@append.test`)
 	if (!env.ALLOWED_EMAIL) {
 		console.warn('[E2E Auth] ALLOWED_EMAIL is required for E2E login');
 		return c.text('Forbidden', 403);
 	}
-	if (env.ALLOWED_EMAIL.toLowerCase() !== env.E2E_AUTH_EMAIL.toLowerCase()) {
-		console.warn('[E2E Auth] E2E_AUTH_EMAIL does not match ALLOWED_EMAIL');
+	if (!emailMatchesAllowlist(env.E2E_AUTH_EMAIL, env.ALLOWED_EMAIL)) {
+		console.warn('[E2E Auth] E2E_AUTH_EMAIL does not match ALLOWED_EMAIL pattern');
 		return c.text('Forbidden', 403);
 	}
 
@@ -175,4 +201,4 @@ e2eLoginRoute.post('/login', async (c) => {
 	}
 });
 
-export { e2eLoginRoute };
+export { e2eLoginRoute, emailMatchesAllowlist };
