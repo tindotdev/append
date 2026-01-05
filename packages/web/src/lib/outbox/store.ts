@@ -21,6 +21,24 @@ export function getDatabaseName(userScope: string): string {
 }
 
 /**
+ * Delete the outbox database for a user scope.
+ * Used for cleanup on sign-out to prevent data leakage on shared devices.
+ *
+ * @param userScope - User scope (typically session.user.id)
+ * @returns Promise that resolves when deletion is complete
+ */
+export async function deleteOutboxDatabase(userScope: string): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const request = indexedDB.deleteDatabase(getDatabaseName(userScope));
+		request.onsuccess = () => resolve();
+		request.onerror = () => reject(request.error);
+		// Also resolve on blocked (database open in another tab)
+		// Cleanup will happen when the other tab closes
+		request.onblocked = () => resolve();
+	});
+}
+
+/**
  * Open the IndexedDB database, creating object stores if needed.
  */
 function openDatabase(userScope: string): Promise<IDBDatabase> {
@@ -169,6 +187,37 @@ export function createOutboxStore(userScope: string): OutboxStore {
 				};
 			});
 		},
+
+		async resumeBlockedAuth(_userScope: string, now: number): Promise<number> {
+			const db = await getDb();
+			return new Promise((resolve, reject) => {
+				const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
+				const store = tx.objectStore(IDB_STORE_NAME);
+				const index = store.index('by_status');
+				const request = index.getAll('blocked_auth');
+
+				request.onerror = () => reject(request.error);
+				request.onsuccess = () => {
+					const items = request.result as OutboxItem[];
+					let count = 0;
+
+					for (const item of items) {
+						// Convert to pending and set nextAttemptAt to now for immediate retry
+						const updated: OutboxItem = {
+							...item,
+							status: 'pending',
+							nextAttemptAt: now,
+							updatedAt: now,
+						};
+						store.put(updated);
+						count++;
+					}
+
+					tx.oncomplete = () => resolve(count);
+					tx.onerror = () => reject(tx.error);
+				};
+			});
+		},
 	};
 }
 
@@ -229,6 +278,22 @@ export function createMockOutboxStore(): OutboxStore & {
 			return Array.from(items.values())
 				.filter((item) => item.userScope === userScope && item.status === status)
 				.sort((a, b) => a.createdAt - b.createdAt);
+		},
+
+		async resumeBlockedAuth(userScope: string, now: number): Promise<number> {
+			let count = 0;
+			for (const [id, item] of items) {
+				if (item.userScope === userScope && item.status === 'blocked_auth') {
+					items.set(id, {
+						...item,
+						status: 'pending',
+						nextAttemptAt: now,
+						updatedAt: now,
+					});
+					count++;
+				}
+			}
+			return count;
 		},
 	};
 }

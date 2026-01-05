@@ -12,7 +12,7 @@ import { AlertCircle, Loader2, WifiOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useOutbox } from '../hooks/use-outbox';
+import { useOutboxCounts } from '../hooks/use-outbox';
 
 interface SyncIndicatorProps {
 	/** Callback when clicked (opens management UI) */
@@ -20,7 +20,8 @@ interface SyncIndicatorProps {
 }
 
 export function SyncIndicator({ onManageClick }: SyncIndicatorProps) {
-	const { counts, isReady } = useOutbox();
+	// Use the safe hook that won't throw during initialization
+	const { counts, isReady } = useOutboxCounts();
 	const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
 	// Listen for online/offline events

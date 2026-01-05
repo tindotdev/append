@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useOutbox } from '@/features/outbox';
+import { useOutboxSafe } from '@/features/outbox';
 import { UNDO_GRACE_MS } from '@/lib/outbox';
 
 // --- Constants ---
@@ -110,7 +110,8 @@ function clearDraft(): void {
 
 // --- Component ---
 export function BatchNewPage() {
-	const { enqueue, undo } = useOutbox();
+	// Use safe hook that won't throw during initialization
+	const outbox = useOutboxSafe();
 
 	const [rows, setRows] = useState<TermRow[]>(() => loadDraft());
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -148,7 +149,8 @@ export function BatchNewPage() {
 		const validation = validateTerm(r.value, termValues, i);
 		return validation.status === 'too-long' || validation.status === 'forbidden-delimiter';
 	});
-	const canSubmit = validTermCount >= TERM_MIN && validTermCount <= TERM_MAX && !hasValidationErrors && !isSubmitting;
+	// Also require outbox to be initialized
+	const canSubmit = outbox && validTermCount >= TERM_MIN && validTermCount <= TERM_MAX && !hasValidationErrors && !isSubmitting;
 
 	const handleRowChange = useCallback((id: string, value: string) => {
 		setRows((prev) => prev.map((r) => (r.id === id ? { ...r, value } : r)));
@@ -213,7 +215,7 @@ export function BatchNewPage() {
 	}, []);
 
 	const handleSubmit = useCallback(async () => {
-		if (!canSubmit) return;
+		if (!canSubmit || !outbox) return;
 
 		setIsSubmitting(true);
 
@@ -223,7 +225,7 @@ export function BatchNewPage() {
 			const termsInput = terms.join('\n');
 
 			// Enqueue to outbox (instant, durable)
-			const { item } = await enqueue({ terms: termsInput });
+			const { item } = await outbox.enqueue({ terms: termsInput });
 
 			// Clear composer immediately, stay on page
 			clearDraft();
@@ -235,7 +237,7 @@ export function BatchNewPage() {
 				action: {
 					label: 'Undo',
 					onClick: async () => {
-						const result = await undo(item.id);
+						const result = await outbox.undo(item.id);
 						if (result.success && result.terms) {
 							restoreDraft(result.terms);
 							toast.success('Restored to composer');
@@ -250,7 +252,7 @@ export function BatchNewPage() {
 		} finally {
 			setIsSubmitting(false);
 		}
-	}, [canSubmit, rows, enqueue, undo, restoreDraft]);
+	}, [canSubmit, outbox, rows, restoreDraft]);
 
 	const handleRowKeyDown = useCallback(
 		(id: string, e: React.KeyboardEvent<HTMLInputElement>) => {

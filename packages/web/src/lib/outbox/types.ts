@@ -185,6 +185,12 @@ export interface OutboxStore {
 	countByStatus(userScope: string): Promise<Record<OutboxStatus, number>>;
 	/** List items by status */
 	listByStatus(userScope: string, status: OutboxStatus): Promise<OutboxItem[]>;
+	/**
+	 * Resume auth-blocked items by converting them to pending.
+	 * Called when authentication is restored.
+	 * @returns The number of items that were resumed
+	 */
+	resumeBlockedAuth(userScope: string, now: number): Promise<number>;
 }
 
 /**
