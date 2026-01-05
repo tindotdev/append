@@ -59,12 +59,14 @@ export async function updateTermSense(
 		return { success: false, error: { type: termOwnership.error } };
 	}
 
-	// 3. Validate bucket exists for user (if provided)
+	// 3. Validate bucket exists for user (if provided) and get bucket ID
+	let bucketId: string | undefined;
 	if (bucketSlug) {
 		const bucketRow = await findUserBucketBySlug(db, userId, bucketSlug);
 		if (!bucketRow) {
 			return { success: false, error: { type: 'invalid_bucket', slug: bucketSlug } };
 		}
+		bucketId = bucketRow.id;
 	}
 
 	// 4. Build update set (partial update semantics)
@@ -77,6 +79,7 @@ export async function updateTermSense(
 	}
 	if (bucketSlug !== undefined) {
 		updateSet.bucket = bucketSlug;
+		updateSet.bucketId = bucketId;
 	}
 
 	// 5. Atomic conditional update with optimistic locking
