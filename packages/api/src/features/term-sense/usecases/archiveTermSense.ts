@@ -31,7 +31,11 @@ export interface ArchiveTermSenseResult {
 /**
  * Possible errors from archiveTermSense.
  */
-export type ArchiveTermSenseError = { type: 'not_found' } | { type: 'forbidden' } | { type: 'version_conflict'; currentVersion: number };
+export type ArchiveTermSenseError =
+	| { type: 'not_found' }
+	| { type: 'forbidden' }
+	| { type: 'version_conflict'; currentVersion: number }
+	| { type: 'term_version_conflict'; currentVersion: number };
 
 /**
  * Find a replacement primary sense when archiving the current primary.
@@ -164,14 +168,14 @@ export async function archiveTermSense(
 		const replacementId = await findReplacementPrimarySense(db, termRow.id, senseId, senseRow.bucket);
 
 		if (replacementId !== null) {
-			// Update term's primarySenseId (conditional on it still pointing to archived sense)
+			// Update term's primarySenseId (conditional on version and primarySenseId to prevent race)
 			const termUpdateResult = await db
 				.update(term)
 				.set({
 					primarySenseId: replacementId,
 					version: sql`${term.version} + 1`,
 				})
-				.where(sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId}`)
+				.where(sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId} AND ${term.version} = ${termRow.version}`)
 				.returning({
 					id: term.id,
 					primarySenseId: term.primarySenseId,
@@ -179,24 +183,28 @@ export async function archiveTermSense(
 					archivedAt: term.archivedAt,
 				});
 
-			if (termUpdateResult.length > 0) {
-				const updatedTerm = termUpdateResult[0];
-				termResult = {
-					id: updatedTerm.id,
-					primarySenseId: updatedTerm.primarySenseId,
-					version: updatedTerm.version,
-					archivedAt: updatedTerm.archivedAt?.getTime() ?? null,
-				};
+			if (termUpdateResult.length === 0) {
+				// Term was concurrently modified - return conflict
+				const currentTerm = await db.query.term.findFirst({ where: eq(term.id, termRow.id) });
+				return { success: false, error: { type: 'term_version_conflict', currentVersion: currentTerm?.version ?? termRow.version } };
 			}
+
+			const updatedTerm = termUpdateResult[0];
+			termResult = {
+				id: updatedTerm.id,
+				primarySenseId: updatedTerm.primarySenseId,
+				version: updatedTerm.version,
+				archivedAt: updatedTerm.archivedAt?.getTime() ?? null,
+			};
 		} else {
-			// No replacement exists - archive the term too
+			// No replacement exists - archive the term too (conditional on version to prevent race)
 			const termArchiveResult = await db
 				.update(term)
 				.set({
 					archivedAt: now,
 					version: sql`${term.version} + 1`,
 				})
-				.where(sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId}`)
+				.where(sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId} AND ${term.version} = ${termRow.version}`)
 				.returning({
 					id: term.id,
 					primarySenseId: term.primarySenseId,
@@ -204,15 +212,19 @@ export async function archiveTermSense(
 					archivedAt: term.archivedAt,
 				});
 
-			if (termArchiveResult.length > 0) {
-				const archivedTerm = termArchiveResult[0];
-				termResult = {
-					id: archivedTerm.id,
-					primarySenseId: archivedTerm.primarySenseId,
-					version: archivedTerm.version,
-					archivedAt: archivedTerm.archivedAt?.getTime() ?? null,
-				};
+			if (termArchiveResult.length === 0) {
+				// Term was concurrently modified - return conflict
+				const currentTerm = await db.query.term.findFirst({ where: eq(term.id, termRow.id) });
+				return { success: false, error: { type: 'term_version_conflict', currentVersion: currentTerm?.version ?? termRow.version } };
 			}
+
+			const archivedTerm = termArchiveResult[0];
+			termResult = {
+				id: archivedTerm.id,
+				primarySenseId: archivedTerm.primarySenseId,
+				version: archivedTerm.version,
+				archivedAt: archivedTerm.archivedAt?.getTime() ?? null,
+			};
 		}
 	}
 

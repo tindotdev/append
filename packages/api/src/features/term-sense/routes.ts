@@ -92,6 +92,12 @@ app.post('/:id/archive', vValidator('json', ArchiveTermSenseSchema, validationHo
 				message: 'Term sense was modified by another request',
 				details: (error) => ({ currentVersion: error.currentVersion }),
 			},
+			term_version_conflict: {
+				status: 409,
+				code: 'VERSION_CONFLICT',
+				message: 'Term was modified by another request during primary sense replacement',
+				details: (error) => ({ currentVersion: error.currentVersion }),
+			},
 		});
 	}
 

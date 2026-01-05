@@ -262,7 +262,7 @@ export function BucketFeedPage() {
 		if (selectedItems.length === 0) return;
 
 		const results: Array<{ termId: string; version: number }> = [];
-		let hasConflict = false;
+		let failedCount = 0;
 
 		for (const item of selectedItems) {
 			try {
@@ -271,18 +271,41 @@ export function BucketFeedPage() {
 					expectedVersion: item.termVersion,
 				});
 				results.push({ termId: item.termId, version: result.term.version });
-			} catch (error) {
-				if (error instanceof ApiRequestError && error.status === 409) {
-					hasConflict = true;
-				}
+			} catch {
+				failedCount++;
 			}
 		}
 
 		setRowSelection({});
 
-		if (hasConflict) {
-			toast.error('Some items had conflicts. Please refresh the page.');
-		} else if (results.length > 0) {
+		if (results.length === 0) {
+			// All failed
+			toast.error('Delete failed. Please refresh and try again.');
+		} else if (failedCount > 0) {
+			// Partial success - show Undo for successful items
+			toast.success(`${results.length} deleted, ${failedCount} failed`, {
+				action: {
+					label: 'Undo',
+					onClick: async () => {
+						let restored = 0;
+						for (const { termId, version } of results) {
+							try {
+								await restoreTerm.mutateAsync({ termId, expectedVersion: version });
+								restored++;
+							} catch {
+								// Continue with other restores
+							}
+						}
+						if (restored === results.length) {
+							toast.success('Restored');
+						} else {
+							toast.error(`Only restored ${restored} of ${results.length}`);
+						}
+					},
+				},
+			});
+		} else {
+			// Full success
 			toast.success(`${results.length} ${results.length === 1 ? 'term' : 'terms'} deleted`, {
 				action: {
 					label: 'Undo',
@@ -318,7 +341,7 @@ export function BucketFeedPage() {
 	const handleMoveConfirm = async (targetBucket: string) => {
 		const itemsToMove = moveDialog.items;
 		const results: Array<{ senseId: string; previousBucket: string; version: number }> = [];
-		let hasConflict = false;
+		let failedCount = 0;
 
 		for (const item of itemsToMove) {
 			try {
@@ -334,19 +357,45 @@ export function BucketFeedPage() {
 					previousBucket: item.primarySense.bucket,
 					version: result.sense.version,
 				});
-			} catch (error) {
-				if (error instanceof ApiRequestError && error.status === 409) {
-					hasConflict = true;
-				}
+			} catch {
+				failedCount++;
 			}
 		}
 
 		setMoveDialog({ open: false, items: [] });
 		setRowSelection({});
 
-		if (hasConflict) {
-			toast.error('Some items had conflicts. Please refresh the page.');
-		} else if (results.length > 0) {
+		if (results.length === 0) {
+			// All failed
+			toast.error('Move failed. Please refresh and try again.');
+		} else if (failedCount > 0) {
+			// Partial success - show Undo for successful items
+			toast.success(`${results.length} moved, ${failedCount} failed`, {
+				action: {
+					label: 'Undo',
+					onClick: async () => {
+						let restored = 0;
+						for (const { senseId, previousBucket, version } of results) {
+							try {
+								await updateTermSense.mutateAsync({
+									senseId,
+									request: { expectedVersion: version, bucket: previousBucket },
+								});
+								restored++;
+							} catch {
+								// Continue with other restores
+							}
+						}
+						if (restored === results.length) {
+							toast.success('Moved back');
+						} else {
+							toast.error(`Only moved back ${restored} of ${results.length}`);
+						}
+					},
+				},
+			});
+		} else {
+			// Full success
 			toast.success(`${results.length} ${results.length === 1 ? 'term' : 'terms'} moved`, {
 				action: {
 					label: 'Undo',

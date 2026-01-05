@@ -141,38 +141,38 @@ Update `GET /api/bucket/:slug` to include:
 
 ### API (Workers + D1)
 
-- [ ] Add `POST /api/term/:id/archive` (term optimistic lock; archive term + all active senses; idempotent noop)
-- [ ] Add `POST /api/term/:id/restore` (term optimistic lock; restore term + all senses; idempotent noop; ownership works for archived terms)
-- [ ] Add `POST /api/term-sense/:id/archive` (sense optimistic lock; archive sense; if primary then replace primary or archive term; idempotent noop)
-- [ ] Add `POST /api/term-sense/:id/restore` (sense optimistic lock; restore sense; optionally restore term; idempotent noop; ownership works for archived terms)
-- [ ] Extend `GET /api/bucket/:slug` response to include `termVersion` + `primarySense.version`
-- [ ] Update `PATCH /api/term-sense/:id` to persist `bucket_id` when bucket changes (slug + id stay consistent)
-- [ ] Add API tests covering:
-  - [ ] archive/restore term hides/shows in bucket feed + export
-  - [ ] archive/restore non-primary sense
-  - [ ] archive primary sense w/ replacement
-  - [ ] archive primary sense w/o replacement archives term
-  - [ ] version conflicts (409) for all endpoints
+- [x] Add `POST /api/term/:id/archive` (term optimistic lock; archive term + all active senses; idempotent noop)
+- [x] Add `POST /api/term/:id/restore` (term optimistic lock; restore term + all senses; idempotent noop; ownership works for archived terms)
+- [x] Add `POST /api/term-sense/:id/archive` (sense optimistic lock; archive sense; if primary then replace primary or archive term; idempotent noop)
+- [x] Add `POST /api/term-sense/:id/restore` (sense optimistic lock; restore sense; optionally restore term; idempotent noop; ownership works for archived terms)
+- [x] Extend `GET /api/bucket/:slug` response to include `termVersion` + `primarySense.version`
+- [x] Update `PATCH /api/term-sense/:id` to persist `bucket_id` when bucket changes (slug + id stay consistent)
+- [x] Add API tests covering:
+  - [x] archive/restore term hides/shows in bucket feed + export
+  - [x] archive/restore non-primary sense
+  - [x] archive primary sense w/ replacement
+  - [x] archive primary sense w/o replacement archives term
+  - [x] version conflicts (409) for all endpoints
 
 ### Web (SPA)
 
-- [ ] Add row selection state to bucket feed table (TanStack `rowSelection`)
-- [ ] Add selection + row actions columns (Move, Delete)
-- [ ] Add fixed bulk action bar (visible only when `selectedCount > 0`)
-- [ ] Add client helpers + React Query mutations for:
-  - [ ] term archive/restore
-  - [ ] term-sense archive/restore
-- [ ] Wire Undo toasts to call restore/inverse endpoints using returned versions
-- [ ] Add term detail actions:
-  - [ ] delete sense (archive sense)
-  - [ ] delete term (archive term)
-- [ ] Add E2E: bucket feed delete + undo happy path
+- [x] Add row selection state to bucket feed table (TanStack `rowSelection`)
+- [x] Add selection + row actions columns (Move, Delete)
+- [x] Add fixed bulk action bar (visible only when `selectedCount > 0`)
+- [x] Add client helpers + React Query mutations for:
+  - [x] term archive/restore
+  - [x] term-sense archive/restore
+- [x] Wire Undo toasts to call restore/inverse endpoints using returned versions
+- [x] Add term detail actions:
+  - [x] delete sense (archive sense)
+  - [x] delete term (archive term)
+- [x] Add E2E: bucket feed delete + undo happy path
 
 ### Verification
 
-- [ ] `pnpm -r --if-present typecheck`
-- [ ] `pnpm test:api`
-- [ ] `pnpm --filter @append/web test`
-- [ ] `pnpm --filter @append/web test:e2e`
-- [ ] `pnpm docs:policy`
+- [x] `pnpm -r --if-present typecheck`
+- [x] `pnpm test:api`
+- [x] `pnpm --filter @append/web test`
+- [x] `pnpm --filter @append/web test:e2e`
+- [x] `pnpm docs:policy`
 
