@@ -45,6 +45,9 @@ const DEFAULT_COUNTS: OutboxCounts = { pending: 0, failed: 0, blocked_auth: 0 };
 // Batch IDs are UUID v4s; avoid navigation if format is unexpected
 const BATCH_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+// In-memory fallback for tab ID when sessionStorage is unavailable
+let inMemoryTabId: string | null = null;
+
 interface OutboxProviderProps {
 	children: React.ReactNode;
 }
@@ -52,14 +55,24 @@ interface OutboxProviderProps {
 /**
  * Get or create a stable tab ID for this browser tab.
  * Stored in sessionStorage to survive page refreshes but not new tabs.
+ * Falls back to in-memory storage if sessionStorage is unavailable
+ * (Safari private mode, storage disabled contexts, etc.)
  */
 function getTabId(): string {
-	let tabId = sessionStorage.getItem(TAB_ID_KEY);
-	if (!tabId) {
-		tabId = generateTabId();
-		sessionStorage.setItem(TAB_ID_KEY, tabId);
+	try {
+		let tabId = sessionStorage.getItem(TAB_ID_KEY);
+		if (!tabId) {
+			tabId = generateTabId();
+			sessionStorage.setItem(TAB_ID_KEY, tabId);
+		}
+		return tabId;
+	} catch {
+		// Storage unavailable - use in-memory fallback (won't survive refresh)
+		if (!inMemoryTabId) {
+			inMemoryTabId = generateTabId();
+		}
+		return inMemoryTabId;
 	}
-	return tabId;
 }
 
 type AuthSession = AuthContextType['data'];
