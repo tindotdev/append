@@ -243,17 +243,17 @@ Web tests:
 
 ### Product / UX sanity checks
 
-- [ ] Deleting a primary sense never leaves the term “invisible” if other senses exist.
-- [ ] Bulk actions do not act across pagination (only current loaded rows).
-- [ ] Conflicts (409) produce a clear “refresh” message and do not silently drop selection.
+- [x] Deleting a primary sense never leaves the term "invisible" if other senses exist. — API handles primary replacement in `archiveTermSense.ts`; tested in `term-sense-archive.spec.ts`
+- [x] Bulk actions do not act across pagination (only current loaded rows). — Only `filteredItems` from current data are processed
+- [x] Conflicts (409) produce a clear "refresh" message and do not silently drop selection. — All handlers show `toast.error('Conflict: Please refresh the page')`
 
 ### Verification
 
-- [ ] `pnpm -r --if-present typecheck`
-- [ ] `pnpm test:api`
-- [ ] `pnpm --filter @append/web test`
+- [x] `pnpm -r --if-present typecheck` — all 4 packages pass
+- [x] `pnpm test:api` — 193 tests pass
+- [x] `pnpm --filter @append/web test` — 150 tests pass
 - [ ] `pnpm --filter @append/web test:e2e` (requires Playwright env + auth bootstrap)
-- [ ] `pnpm docs:policy`
+- [x] `pnpm docs:policy` — OK
 
 ## UI mock (optional)
 
