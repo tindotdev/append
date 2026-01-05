@@ -147,12 +147,12 @@ app.use('/api/*', async (c, next) => {
 	// Require valid Origin header for POST/PUT/DELETE in preview
 	const origin = c.req.header('origin');
 	if (!origin) {
-		return apiError(c, 403, 'FORBIDDEN', 'Origin header required');
+		return apiError(c, 403, 'ORIGIN_FORBIDDEN', 'Origin header required');
 	}
 
 	const allowedOrigins = getAllowedOrigins(c.env);
 	if (!isOriginAllowed(origin, allowedOrigins)) {
-		return apiError(c, 403, 'FORBIDDEN', 'Invalid origin');
+		return apiError(c, 403, 'ORIGIN_FORBIDDEN', 'Invalid origin');
 	}
 
 	return next();
