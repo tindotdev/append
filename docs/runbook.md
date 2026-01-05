@@ -174,7 +174,7 @@ Required secrets (already configured):
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `BETTER_AUTH_SECRET`
-- `ALLOWED_EMAIL` (or `ALLOWED_SUB`)
+- `ALLOWED_SUB` (preferred) or `ALLOWED_EMAIL` (fallback)
 
 ### E2E authentication for Playwright (ADR 0019)
 
@@ -194,8 +194,9 @@ Required preview configuration for E2E tests (ADR 0019):
   - `E2E_AUTH_EMAIL` — dedicated email for E2E test user
 - Vars (preview Worker) — already configured:
   - `APP_ENV=preview` (set in `wrangler.jsonc`)
-- Allowlist — already configured:
-  - `ALLOWED_EMAIL` is set for the owner's Google account
+- Allowlist (required for `/auth/e2e/login`):
+  - `ALLOWED_EMAIL` **must** be set and must equal `E2E_AUTH_EMAIL` (case-insensitive).
+  - If you also want owner Google access in preview, set `ALLOWED_SUB` to the owner’s Google `sub`.
 
 Set E2E secrets (required for Playwright tests):
 
@@ -205,6 +206,12 @@ pnpm --filter @append/api exec wrangler secret put E2E_AUTH_EMAIL --env preview
 ```
 
 Also add `E2E_AUTH_SECRET` to GitHub Actions secrets for the workflow to use.
+
+Set/update preview allowlist for E2E (required for `/auth/e2e/login`):
+
+```bash
+pnpm --filter @append/api exec wrangler secret put ALLOWED_EMAIL --env preview
+```
 
 ### Running E2E tests locally
 
@@ -217,7 +224,7 @@ To run Playwright E2E tests against local development servers:
    E2E_AUTH_EMAIL=your-test-email@example.com
    ```
 
-2. Ensure the email is on your allowlist (`ALLOWED_EMAIL` or `ALLOWED_SUB`).
+2. Ensure `ALLOWED_EMAIL` is set and equals `E2E_AUTH_EMAIL` (case-insensitive).
 
 3. Start the API and web dev servers:
 
