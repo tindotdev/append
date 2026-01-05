@@ -84,7 +84,7 @@ export {
 // Store
 // =============================================================================
 
-export { createMockOutboxStore, createOutboxStore, getDatabaseName } from './store';
+export { createMockOutboxStore, createOutboxStore, deleteOutboxDatabase, getDatabaseName } from './store';
 
 // =============================================================================
 // Error Classification

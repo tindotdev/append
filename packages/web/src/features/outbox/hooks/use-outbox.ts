@@ -14,7 +14,7 @@ export const OutboxContext = createContext<OutboxContextValue | null>(null);
 /**
  * Hook to access the outbox context.
  *
- * @throws {Error} If used outside of OutboxProvider
+ * @throws {Error} If used outside of OutboxProvider or before initialization
  *
  * @example
  * ```tsx
@@ -37,10 +37,38 @@ export function useOutbox(): OutboxContextValue {
 }
 
 /**
+ * Hook to safely access the outbox context without throwing.
+ * Returns null if outside OutboxProvider or before initialization completes.
+ *
+ * Use this when you need to conditionally access outbox functionality
+ * and can handle the null case gracefully.
+ *
+ * @example
+ * ```tsx
+ * function SyncIndicator() {
+ *   const outbox = useOutboxSafe();
+ *   if (!outbox) return null; // Not ready yet
+ *   return <Chip>{outbox.counts.pending} pending</Chip>;
+ * }
+ * ```
+ */
+export function useOutboxSafe(): OutboxContextValue | null {
+	return useContext(OutboxContext);
+}
+
+// Default counts for when context is not ready
+const DEFAULT_COUNTS = { pending: 0, failed: 0, blocked_auth: 0 };
+
+/**
  * Hook to access outbox counts specifically.
- * Convenience alias for components that only need counts.
+ * Returns default zero counts when context is not ready.
+ *
+ * Safe to use during initialization - won't throw.
  */
 export function useOutboxCounts() {
-	const { counts, isReady } = useOutbox();
-	return { counts, isReady };
+	const context = useContext(OutboxContext);
+	if (!context) {
+		return { counts: DEFAULT_COUNTS, isReady: false };
+	}
+	return { counts: context.counts, isReady: context.isReady };
 }

@@ -17,6 +17,7 @@ import { batchKeys } from '@/features/batch/api/get-batch';
 import {
 	createLeadershipProvider,
 	createOutbox,
+	deleteOutboxDatabase,
 	generateTabId,
 	type LeadershipProvider,
 	type OutboxBroadcastMessage,
@@ -78,16 +79,26 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 
 	// Initialize/reinitialize when user changes
 	useEffect(() => {
-		// Skip if no user
+		// Skip if no user (sign-out or not authenticated)
 		if (!userId) {
-			// Clean up if was initialized
-			if (cleanupRef.current) {
-				cleanupRef.current();
-				cleanupRef.current = null;
+			// Clean up if was initialized (user signed out)
+			const oldUserScope = initUserScopeRef.current;
+			if (oldUserScope) {
+				// Clean up refs and state first
+				if (cleanupRef.current) {
+					cleanupRef.current();
+					cleanupRef.current = null;
+				}
+				outboxRef.current = null;
+				leadershipRef.current = null;
+				initUserScopeRef.current = null;
+
+				// Delete the database to prevent data leakage on shared devices
+				// Fire and forget - don't block on this
+				deleteOutboxDatabase(oldUserScope).catch(() => {
+					// Ignore errors (e.g., database blocked by another tab)
+				});
 			}
-			outboxRef.current = null;
-			leadershipRef.current = null;
-			initUserScopeRef.current = null;
 			setCounts(DEFAULT_COUNTS);
 			setIsReady(false);
 			return;
@@ -215,8 +226,18 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 		// Subscribe to broadcasts
 		const unsubscribe = outbox.broadcast.subscribe(handleBroadcast);
 
-		// Initial counts load
-		refreshCounts().then(() => {
+		// Initial counts load and resume any auth-blocked items
+		// (covers both initial load with session and sign-in after sign-out)
+		Promise.all([
+			refreshCounts(),
+			outbox.store.resumeBlockedAuth(userScope, clock.now()).then((count) => {
+				if (count > 0 && isMounted) {
+					// Items were resumed - refresh counts and kick sender
+					refreshCounts();
+					outbox.broadcast.publish({ type: 'kick' });
+				}
+			}),
+		]).then(() => {
 			if (isMounted) {
 				setIsReady(true);
 			}

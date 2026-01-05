@@ -170,7 +170,7 @@ jobs:
 
       - name: Install Playwright browsers
         working-directory: packages/web
-        run: pnpm exec playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Validate E2E secrets
         run: |
