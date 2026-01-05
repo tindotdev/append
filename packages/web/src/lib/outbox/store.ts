@@ -40,8 +40,12 @@ export async function deleteOutboxDatabase(userScope: string): Promise<void> {
 
 /**
  * Open the IndexedDB database, creating object stores if needed.
+ *
+ * This is the single source of truth for database schema upgrades.
+ * Both the outbox store and lease provider should use this function
+ * to ensure all object stores are created regardless of access order.
  */
-function openDatabase(userScope: string): Promise<IDBDatabase> {
+export function openDatabase(userScope: string): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
 		const request = indexedDB.open(getDatabaseName(userScope), IDB_VERSION);
 
