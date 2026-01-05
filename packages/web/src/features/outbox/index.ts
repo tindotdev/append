@@ -8,6 +8,7 @@
  * - OutboxManagement: UI for managing failed/blocked items
  */
 
+export { OutboxErrorBoundary } from './components/OutboxErrorBoundary';
 // Components
 export { OutboxManagement } from './components/OutboxManagement';
 export { OutboxProvider } from './components/OutboxProvider';

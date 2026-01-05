@@ -13,6 +13,7 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/features/auth';
+import type { AuthContextType } from '@/features/auth/hooks/use-auth';
 import { batchKeys } from '@/features/batch/api/get-batch';
 import {
 	createLeadershipProvider,
@@ -61,11 +62,7 @@ function getTabId(): string {
 	return tabId;
 }
 
-type AuthSession = {
-	user?: { id?: string | null };
-	session?: { id?: string | null; expiresAt?: string | number | null; updatedAt?: string | number | null };
-	expiresAt?: string | number | null;
-};
+type AuthSession = AuthContextType['data'];
 
 function getAuthSessionKey(session: AuthSession | null | undefined): string | null {
 	if (!session) return null;
@@ -82,7 +79,7 @@ function getAuthSessionKey(session: AuthSession | null | undefined): string | nu
 
 	if (session.session?.expiresAt) {
 		parts.push(`exp:${session.session.expiresAt}`);
-	} else if (session.expiresAt) {
+	} else if ('expiresAt' in session && session.expiresAt) {
 		parts.push(`exp:${session.expiresAt}`);
 	}
 
@@ -110,7 +107,7 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 	const lastUserIdRef = useRef<string | null>(null);
 	const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const isMountedRef = useRef(true);
-	const authSessionKey = useMemo(() => getAuthSessionKey(session as AuthSession), [session]);
+	const authSessionKey = useMemo(() => getAuthSessionKey(session), [session]);
 
 	// Refresh counts from store
 	const refreshCounts = useCallback(async () => {

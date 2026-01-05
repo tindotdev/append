@@ -137,13 +137,18 @@ export function createOutboxStore(userScope: string): OutboxStore {
 				// Range: status='pending' and nextAttemptAt <= now
 				// IDB compound index range: lower bound ['pending', 0], upper bound ['pending', now]
 				const range = IDBKeyRange.bound(['pending', 0], ['pending', now]);
-				const request = index.getAll(range);
+				const request = index.openCursor(range);
+				const items: OutboxItem[] = [];
 
 				request.onerror = () => reject(request.error);
 				request.onsuccess = () => {
-					// Sort by nextAttemptAt (FIFO by eligibility time)
-					const items = (request.result as OutboxItem[]).sort((a, b) => a.nextAttemptAt - b.nextAttemptAt);
-					resolve(items);
+					const cursor = request.result;
+					if (cursor) {
+						items.push(cursor.value as OutboxItem);
+						cursor.continue();
+					} else {
+						resolve(items);
+					}
 				};
 			});
 		},

@@ -50,6 +50,7 @@ jobs:
         working-directory: packages/api
         run: |
           # Set E2E_AUTH_EMAIL with PR-specific suffix for environment isolation
+          # This is the canonical place where preview E2E_AUTH_EMAIL is set.
           # This matches the wildcard pattern in ALLOWED_EMAIL (e2e-bot+*@append.test)
           echo "e2e-bot+pr-${{ github.event.pull_request.number }}@append.test" | \
             pnpm exec wrangler secret put E2E_AUTH_EMAIL -e preview --config wrangler.jsonc

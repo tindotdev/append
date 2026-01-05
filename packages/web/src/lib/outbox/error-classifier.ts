@@ -8,7 +8,7 @@
  * - failed: 400 VALIDATION_ERROR, 409 IDEMPOTENCY_CONFLICT, 413 → permanent failure
  */
 
-import { BACKOFF_BASE_MS, BACKOFF_CAP_MS, JITTER_MAX_MS } from './constants';
+import { BACKOFF_BASE_MS, BACKOFF_CAP_MS, JITTER_RANGE_MS } from './constants';
 
 // =============================================================================
 // Error Classification
@@ -102,7 +102,7 @@ export interface BackoffOptions {
 	baseMs?: number;
 	/** Maximum delay cap in ms (default: BACKOFF_CAP_MS) */
 	capMs?: number;
-	/** Maximum jitter in ms (default: JITTER_MAX_MS) */
+	/** Jitter range in ms (default: JITTER_RANGE_MS) */
 	jitterMaxMs?: number;
 	/** Jitter function returning 0-1 (default: Math.random) */
 	jitterFn?: () => number;
@@ -119,7 +119,7 @@ export interface BackoffOptions {
  * @returns Timestamp for next attempt in ms
  */
 export function calculateNextAttemptAt(now: number, attemptCount: number, options: BackoffOptions = {}): number {
-	const { baseMs = BACKOFF_BASE_MS, capMs = BACKOFF_CAP_MS, jitterMaxMs = JITTER_MAX_MS, jitterFn = Math.random } = options;
+	const { baseMs = BACKOFF_BASE_MS, capMs = BACKOFF_CAP_MS, jitterMaxMs = JITTER_RANGE_MS, jitterFn = Math.random } = options;
 
 	// Exponential delay: base * 2^attempt, capped at capMs
 	const exponentialDelay = Math.min(baseMs * 2 ** attemptCount, capMs);
