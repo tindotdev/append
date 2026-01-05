@@ -12,7 +12,11 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
+
+// ESM equivalent of __dirname
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // API URL for E2E login endpoint (Worker) - used for login request and cookie domain
 const API_URL = process.env.PLAYWRIGHT_API_URL ?? 'http://localhost:8787';
