@@ -20,10 +20,13 @@ export default defineConfig({
 	testDir: './e2e',
 	fullyParallel: true,
 	forbidOnly: !!process.env.CI,
-	retries: process.env.CI ? 2 : 0,
+	// Reduce retries for faster feedback (1 retry = 2 attempts max)
+	retries: process.env.CI ? 1 : 0,
 	workers: process.env.CI ? 1 : undefined,
 	reporter: process.env.CI ? 'github' : 'html',
 	timeout: 30_000,
+	// Stop after 3 failures for faster feedback in CI
+	maxFailures: process.env.CI ? 3 : undefined,
 
 	// Global setup runs first to authenticate
 	globalSetup: './e2e/global-setup.ts',
@@ -35,6 +38,11 @@ export default defineConfig({
 
 		// Use storageState from globalSetup (authenticated session)
 		storageState: './e2e/.auth/storage-state.json',
+	},
+
+	// Reduce assertion timeout for faster failure detection
+	expect: {
+		timeout: 3_000,
 	},
 
 	projects: [

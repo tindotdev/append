@@ -106,6 +106,29 @@ async function globalSetup(): Promise<void> {
 	// This helps with cross-origin cookie handling in some browsers
 	const page = await context.newPage();
 	await page.goto(API_URL, { waitUntil: 'domcontentloaded' });
+
+	// Verify session is valid by calling get-session endpoint
+	// This catches auth issues immediately instead of failing all tests
+	console.log('[E2E Setup] Verifying session via /auth/get-session...');
+	const sessionResponse = await page.evaluate(async (apiUrl) => {
+		const res = await fetch(`${apiUrl}/auth/get-session`, {
+			credentials: 'include',
+		});
+		const data = await res.json();
+		return { ok: res.ok, status: res.status, data };
+	}, API_URL);
+
+	if (!sessionResponse.ok || !sessionResponse.data?.session) {
+		throw new Error(
+			`[E2E Setup] Session verification failed!\n` +
+				`Status: ${sessionResponse.status}\n` +
+				`Response: ${JSON.stringify(sessionResponse.data, null, 2)}\n\n` +
+				`This usually means the cookie signature is invalid or the session expired.\n` +
+				`Check that BETTER_AUTH_SECRET matches between the E2E login endpoint and the get-session endpoint.`
+		);
+	}
+	console.log(`[E2E Setup] Session verified for user: ${sessionResponse.data.user?.email ?? 'unknown'}`);
+
 	await page.close();
 
 	// Ensure .auth directory exists
