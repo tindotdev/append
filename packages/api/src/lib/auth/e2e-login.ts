@@ -17,6 +17,7 @@
  *   Cloudflare's built-in rate limiting or Durable Objects for state tracking.
  */
 
+import { makeSignature } from 'better-auth/crypto';
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../../platform/bindings';
 import type { Auth } from './index';
@@ -115,8 +116,8 @@ e2eLoginRoute.post('/login', async (c) => {
 	}
 
 	// Guard 2: Required configuration → 404 (pretend endpoint doesn't exist)
-	if (!env.E2E_AUTH_SECRET || !env.E2E_AUTH_EMAIL) {
-		console.warn('[E2E Auth] Missing E2E_AUTH_SECRET or E2E_AUTH_EMAIL configuration');
+	if (!env.E2E_AUTH_SECRET || !env.E2E_AUTH_EMAIL || !env.BETTER_AUTH_SECRET) {
+		console.warn('[E2E Auth] Missing E2E_AUTH_SECRET, E2E_AUTH_EMAIL, or BETTER_AUTH_SECRET configuration');
 		return c.notFound();
 	}
 
@@ -195,6 +196,11 @@ e2eLoginRoute.post('/login', async (c) => {
 			return c.text('Internal Server Error', 500);
 		}
 
+		// Sign the session token using Better Auth's HMAC signing
+		// Format: <token>.<signature> (matches Better Auth's cookie verification)
+		const signature = await makeSignature(session.token, env.BETTER_AUTH_SECRET);
+		const signedToken = `${session.token}.${signature}`;
+
 		// Use Better Auth's createAuthCookie to get the properly configured cookie settings
 		const cookieConfig = ctx.createAuthCookie('session_token', {
 			maxAge: SESSION_MAX_AGE_SECONDS,
@@ -202,7 +208,7 @@ e2eLoginRoute.post('/login', async (c) => {
 
 		// Build cookie string from the config
 		const attrs = cookieConfig.attributes;
-		const parts = [`${cookieConfig.name}=${session.token}`];
+		const parts = [`${cookieConfig.name}=${signedToken}`];
 		if (attrs.maxAge) parts.push(`Max-Age=${attrs.maxAge}`);
 		if (attrs.path) parts.push(`Path=${attrs.path}`);
 		if (attrs.httpOnly) parts.push('HttpOnly');
