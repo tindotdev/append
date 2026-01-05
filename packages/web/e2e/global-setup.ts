@@ -69,7 +69,9 @@ async function globalSetup(): Promise<void> {
 				? '\nHint: 404 means endpoint unavailable. Check APP_ENV is not "production" and E2E_AUTH_SECRET/E2E_AUTH_EMAIL are configured.'
 				: response.status === 403
 					? '\nHint: 403 means auth failed. Verify E2E_AUTH_SECRET matches between client and server, and E2E_AUTH_EMAIL is on the allowlist.'
-					: '';
+					: response.status === 500
+						? '\nHint: 500 means server error. Check the API Worker logs for errors. Common causes: missing database tables (run migrations), missing environment bindings, or code errors.'
+						: '';
 		throw new Error(`E2E login failed: ${response.status} ${response.statusText} - ${text}${hints}\nAPI URL: ${API_URL}`);
 	}
 
