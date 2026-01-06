@@ -13,6 +13,31 @@ html {
 	-moz-osx-font-smoothing: grayscale;
 }
 
+body {
+	line-height: 1.6;
+}
+
+/* Modern Inter font features for improved legibility */
+.font-sans {
+	font-feature-settings: "cv01", "cv02", "cv03", "cv04", "cv05", "cv06", "cv07", "cv08", "cv09", "cv10", "cv11";
+}
+
+/* Tabular numbers for metrics and data tables */
+.tabular-nums {
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum";
+}
+
+/* Tighter letter spacing for headings (Linear/Vercel style) */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	letter-spacing: -0.02em;
+}
+
 summary {
 	list-style: none;
 }
