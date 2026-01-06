@@ -1,5 +1,18 @@
 # Agent Guide
 
+## **THIS BRANCH: `dev/ux-ui-prototype`**
+
+**⚠️ CRITICAL: WEB PACKAGE DEVELOPMENT ONLY ⚠️**
+
+- **ONLY develop the web package (`packages/web`).**
+- **NO API CALLS. NO DATABASE INTERACTIONS.**
+- **Design UX/UI FREELY without server-side constraints.**
+- **Use MOCK DATA and CLIENT-SIDE LOGIC ONLY.**
+
+**The goal is to explore and iterate on the user experience WITHOUT being limited by backend implementation details. DO NOT implement or design any server-side code on this branch.**
+
+---
+
 ## Quick commands
 
 - `pnpm -r --if-present typecheck`
@@ -28,7 +41,7 @@
 
 ## Current stage
 
-- See `docs/design.md` (“Current stage”).
+- See `docs/design.md` ("Current stage").
 
 ## Engineering defaults (unless an ADR says otherwise)
 
