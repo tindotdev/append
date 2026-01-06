@@ -4,6 +4,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
+		"setup": "pnpm install && pnpm --filter @append/api db:migrate:local",
 		"dev": "pnpm -r --parallel dev",
 		"dev:api": "pnpm --filter @append/api run dev",
 		"dev:web": "pnpm --filter @append/web run dev",

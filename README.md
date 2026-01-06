@@ -2,6 +2,26 @@
 
 `append` is the concept that builds on top of eng-log.
 
+## Development Setup
+
+First-time setup (including git worktrees):
+
+```bash
+pnpm setup
+```
+
+This will:
+1. Install dependencies
+2. Initialize the local D1 database with migrations
+
+Then start the development servers:
+
+```bash
+pnpm dev
+```
+
+This runs both the API (http://localhost:8787) and Web (http://localhost:5173) servers in parallel.
+
 ## Deployment (Cloudflare)
 
 - API (Workers): `pnpm deploy:api`
