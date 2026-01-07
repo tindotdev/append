@@ -42,10 +42,10 @@ importers:
     dependencies:
       '@ai-sdk/openai':
         specifier: ^3.0.1
-        version: 3.0.4(zod@4.3.4)
+        version: 3.0.7(zod@4.3.4)
       '@ai-sdk/valibot':
         specifier: ^2.0.1
-        version: 2.0.3(@valibot/to-json-schema@1.5.0(valibot@1.2.0(typescript@5.9.3)))(valibot@1.2.0(typescript@5.9.3))(zod@4.3.4)
+        version: 2.0.4(@valibot/to-json-schema@1.5.0(valibot@1.2.0(typescript@5.9.3)))(valibot@1.2.0(typescript@5.9.3))(zod@4.3.4)
       '@append/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -54,10 +54,10 @@ importers:
         version: 1.5.0(valibot@1.2.0(typescript@5.9.3))
       ai:
         specifier: ^6.0.3
-        version: 6.0.11(zod@4.3.4)
+        version: 6.0.14(zod@4.3.4)
       ai-gateway-provider:
         specifier: ^3.0.1
-        version: 3.0.2(@ai-sdk/openai-compatible@2.0.1(zod@4.3.4))(@ai-sdk/provider-utils@4.0.3(zod@4.3.4))(@ai-sdk/provider@3.0.1)(ai@6.0.11(zod@4.3.4))(zod@4.3.4)
+        version: 3.0.2(@ai-sdk/openai-compatible@2.0.1(zod@4.3.4))(@ai-sdk/provider-utils@4.0.4(zod@4.3.4))(@ai-sdk/provider@3.0.2)(ai@6.0.14(zod@4.3.4))(zod@4.3.4)
       valibot:
         specifier: ^1.2.0
         version: 1.2.0(typescript@5.9.3)
@@ -76,7 +76,7 @@ importers:
     dependencies:
       '@ai-sdk/valibot':
         specifier: ^2.0.1
-        version: 2.0.3(@valibot/to-json-schema@1.5.0(valibot@1.2.0(typescript@5.9.3)))(valibot@1.2.0(typescript@5.9.3))(zod@4.3.4)
+        version: 2.0.4(@valibot/to-json-schema@1.5.0(valibot@1.2.0(typescript@5.9.3)))(valibot@1.2.0(typescript@5.9.3))(zod@4.3.4)
       '@append/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -85,10 +85,10 @@ importers:
         version: 0.6.1(hono@4.11.3)(valibot@1.2.0(typescript@5.9.3))
       ai:
         specifier: ^6.0.3
-        version: 6.0.11(zod@4.3.4)
+        version: 6.0.14(zod@4.3.4)
       ai-gateway-provider:
         specifier: ^3.0.1
-        version: 3.0.2(@ai-sdk/openai-compatible@2.0.1(zod@4.3.4))(@ai-sdk/provider-utils@4.0.3(zod@4.3.4))(@ai-sdk/provider@3.0.1)(ai@6.0.11(zod@4.3.4))(zod@4.3.4)
+        version: 3.0.2(@ai-sdk/openai-compatible@2.0.1(zod@4.3.4))(@ai-sdk/provider-utils@4.0.4(zod@4.3.4))(@ai-sdk/provider@3.0.2)(ai@6.0.14(zod@4.3.4))(zod@4.3.4)
       better-auth:
         specifier: ^1.4.7
         version: 1.4.10(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20260103.0)(@opentelemetry/api@1.9.0)(kysely@0.28.9))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)(vitest@3.2.4(@types/node@25.0.3)(jiti@2.6.1)(jsdom@27.4.0)(lightningcss@1.30.2)(tsx@4.21.0))
@@ -212,7 +212,7 @@ importers:
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       filepond:
         specifier: ^4.32.10
-        version: 4.32.10
+        version: 4.32.11
       hono:
         specifier: ^4.11.1
         version: 4.11.3
@@ -230,7 +230,7 @@ importers:
         version: 19.2.3(react@19.2.3)
       react-filepond:
         specifier: ^7.1.3
-        version: 7.1.3(filepond@4.32.10)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+        version: 7.1.3(filepond@4.32.11)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -252,10 +252,10 @@ importers:
         version: 4.1.18(vite@7.3.0(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
       '@tanstack/devtools-vite':
         specifier: ^0.4.0
-        version: 0.4.0(vite@7.3.0(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
+        version: 0.4.1(vite@7.3.0(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
       '@tanstack/react-devtools':
         specifier: ^0.9.0
-        version: 0.9.0(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(csstype@3.2.3)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)
+        version: 0.9.1(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(csstype@3.2.3)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)
       '@tanstack/react-router-devtools':
         specifier: ^1.132.0
         version: 1.145.7(@tanstack/react-router@1.145.7(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(@tanstack/router-core@1.145.7)(csstype@3.2.3)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)
@@ -279,10 +279,10 @@ importers:
         version: 6.2.5
       filepond-plugin-file-validate-size:
         specifier: ^2.2.8
-        version: 2.2.8(filepond@4.32.10)
+        version: 2.2.8(filepond@4.32.11)
       filepond-plugin-file-validate-type:
         specifier: ^1.2.9
-        version: 1.2.9(filepond@4.32.10)
+        version: 1.2.9(filepond@4.32.11)
       jsdom:
         specifier: ^27.4.0
         version: 27.4.0
@@ -367,8 +367,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/gateway@3.0.8':
-    resolution: {integrity: sha512-ZH3j9LSQxR05QTORH3C7WnPWFylraRhElOrNbZ64Zl/tZrPbWcc4bDar453haLNgY2rEwp3BqGzk5qxYifqPXQ==}
+  '@ai-sdk/gateway@3.0.9':
+    resolution: {integrity: sha512-EA5dZIukimwoJ9HIPuuREotAqaTItpdc/yImzVF0XGNg7B0YRJmYI8Uq3aCMr87vjr1YB1cWUfnrTt6OJ9eHiQ==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -409,8 +409,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/openai@3.0.4':
-    resolution: {integrity: sha512-tRDCn0FMswaL5xvhnIAn5nOEQcwLcamL+IxzeE94DwzY1RaRlsS5v4DuS5QrXqNORCRRyrZ0BOeqU9dzwZOwtQ==}
+  '@ai-sdk/openai@3.0.7':
+    resolution: {integrity: sha512-CBoYn1U59Lop8yBL9KuVjHCKc/B06q9Qo0SasRwHoyMEq+X4I8LQZu3a8Ck1jwwcZTTxfyiExB70LtIRSynBDA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -427,8 +427,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/provider-utils@4.0.3':
-    resolution: {integrity: sha512-Vo2p61dDld8Dy/O66zKQpE4nqHojiEEYEjZcSbICjE7h8Z6QmHzBfd+ss/paIDdyXyS0yHmC1GoRYYKo89cqZQ==}
+  '@ai-sdk/provider-utils@4.0.4':
+    resolution: {integrity: sha512-VxhX0B/dWGbpNHxrKCWUAJKXIXV015J4e7qYjdIU9lLWeptk0KMLGcqkB4wFxff5Njqur8dt8wRi1MN9lZtDqg==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -437,12 +437,12 @@ packages:
     resolution: {integrity: sha512-m9ka3ptkPQbaHHZHqDXDF9C9B5/Mav0KTdky1k2HZ3/nrW2t1AgObxIVPyGDWQNS9FXT/FS6PIoSjpcP/No8rQ==}
     engines: {node: '>=18'}
 
-  '@ai-sdk/provider@3.0.1':
-    resolution: {integrity: sha512-2lR4w7mr9XrydzxBSjir4N6YMGdXD+Np1Sh0RXABh7tWdNFFwIeRI1Q+SaYZMbfL8Pg8RRLcrxQm51yxTLhokg==}
+  '@ai-sdk/provider@3.0.2':
+    resolution: {integrity: sha512-HrEmNt/BH/hkQ7zpi2o6N3k1ZR1QTb7z85WYhYygiTxOQuaml4CMtHCWRbric5WPU+RNsYI7r1EpyVQMKO1pYw==}
     engines: {node: '>=18'}
 
-  '@ai-sdk/valibot@2.0.3':
-    resolution: {integrity: sha512-ePzlzSvYSoClwylDTu9CB01ETZx/ix4PE6ROrkYqfiYzaC7q/+TQU1/8UUg/ZZDtz1waHhg8vadxH9+AhJFYIA==}
+  '@ai-sdk/valibot@2.0.4':
+    resolution: {integrity: sha512-DMofwUSmccLXwX+rhslcWfve2zJrmCpK2CMvCqQexcojTyOedqlANdbHZafu/8SD/KTMM4dSvFmcbpfugEQO3Q==}
     engines: {node: '>=18'}
     peerDependencies:
       '@valibot/to-json-schema': ^1.3.0
@@ -2398,14 +2398,14 @@ packages:
     peerDependencies:
       solid-js: '>=1.9.7'
 
-  '@tanstack/devtools-vite@0.4.0':
-    resolution: {integrity: sha512-vZ5SsjcLSLC+lBb4N6QDJEdrsrORs8OtIcwQafexAR7aJOv6SxGNoqERujEbTzfWY+PAypa1oYxPqtEAOcitDw==}
+  '@tanstack/devtools-vite@0.4.1':
+    resolution: {integrity: sha512-PkMOomcWnl/pUkCqIjqL/csjPHtkMVBirDpJVOZR7XJZDxo5CuD7B+3KsujFCF4Dsn6QYlae97gCZvxi/CB76Q==}
     engines: {node: '>=18'}
     peerDependencies:
       vite: ^6.0.0 || ^7.0.0
 
-  '@tanstack/devtools@0.10.1':
-    resolution: {integrity: sha512-1gtPmCDXV4Pl1nVtoqwjV0tc4E9GMuFtlkBX1Lz1KfqI3W9JojT5YsVifOQ/g8BTQ5w5+tyIANwHU7WYgLq/MQ==}
+  '@tanstack/devtools@0.10.2':
+    resolution: {integrity: sha512-6TPNl3jTrCFpyV3m9lBeHxum6btmiihbv+A3xkDpt3JScRcWP1a8G5rZzKhlOtikzG1QSiceRrbckKnIAvZ7FQ==}
     engines: {node: '>=18'}
     peerDependencies:
       solid-js: '>=1.9.7'
@@ -2424,8 +2424,8 @@ packages:
   '@tanstack/query-core@5.90.16':
     resolution: {integrity: sha512-MvtWckSVufs/ja463/K4PyJeqT+HMlJWtw6PrCpywznd2NSgO3m4KwO9RqbFqGg6iDE8vVMFWMeQI4Io3eEYww==}
 
-  '@tanstack/react-devtools@0.9.0':
-    resolution: {integrity: sha512-Lq0svXOTG5N61SHgx8F0on6zz2GB0kmFjN/yyfNLrJyRgJ+U3jYFRd9ti3uBPABsXzHQMHYYujnTXrOYp/OaUg==}
+  '@tanstack/react-devtools@0.9.1':
+    resolution: {integrity: sha512-ONDMs117FrzWxFD1JQ9Z94QnTx+63RuQ+9Z3ieSS9bHAWmty4PWiLddAZPvyHCbV9iljlpUEkCoKCO1HMywR2Q==}
     engines: {node: '>=18'}
     peerDependencies:
       '@types/react': '>=16.8'
@@ -2775,8 +2775,8 @@ packages:
       '@ai-sdk/provider-utils': ^4.0.0
       ai: ^6.0.0
 
-  ai@6.0.11:
-    resolution: {integrity: sha512-uQAGp/5YAZZFcMNxLCg5vPZ4lNKn0NGvBeI+iY9yW2RvkonooMVfHPOum2lgqwugkoBbffzPtR7TXOFFyKJCOg==}
+  ai@6.0.14:
+    resolution: {integrity: sha512-OaEJFeQ3gb45eZtC/lSNKqAxmsrqWxC8wLmIVXFYAMvPXE3lb96zIdS3swYArR4uXOVt6N7H/XZSyQz/Dl+HTw==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -3474,8 +3474,8 @@ packages:
     peerDependencies:
       filepond: '>=1.x <5.x'
 
-  filepond@4.32.10:
-    resolution: {integrity: sha512-uflpIL+rfAgsYk7HgXugh7ELlHNHLTPtIHfvuq0gv3x2qNfVxdGA6T7RPxMh9Vji8ysXstXkDHVXQ4hY38MPTQ==}
+  filepond@4.32.11:
+    resolution: {integrity: sha512-+uHkc/XNksMMy2S+x5MGxTuA97NqzBBwmoixn3tqGELa4BgqJ+PBiWL3YeRamqAoYguT7t/au3s7ams2jjMshA==}
 
   fill-range@7.1.1:
     resolution: {integrity: sha512-YsGpe3WHLK8ZYi4tWDg2Jy3ebRz2rXowDxnld4bkQB00cc/1Zw9AWnC0i9ztDJitivtQvaI9KaLyKrc+hBW0yg==}
@@ -4545,6 +4545,18 @@ packages:
       utf-8-validate:
         optional: true
 
+  ws@8.19.0:
+    resolution: {integrity: sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   xml-name-validator@5.0.0:
     resolution: {integrity: sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg==}
     engines: {node: '>=18'}
@@ -4653,10 +4665,10 @@ snapshots:
       zod: 4.3.4
     optional: true
 
-  '@ai-sdk/gateway@3.0.8(zod@4.3.4)':
+  '@ai-sdk/gateway@3.0.9(zod@4.3.4)':
     dependencies:
-      '@ai-sdk/provider': 3.0.1
-      '@ai-sdk/provider-utils': 4.0.3(zod@4.3.4)
+      '@ai-sdk/provider': 3.0.2
+      '@ai-sdk/provider-utils': 4.0.4(zod@4.3.4)
       '@vercel/oidc': 3.1.0
       zod: 4.3.4
 
@@ -4706,10 +4718,10 @@ snapshots:
       zod: 4.3.4
     optional: true
 
-  '@ai-sdk/openai@3.0.4(zod@4.3.4)':
+  '@ai-sdk/openai@3.0.7(zod@4.3.4)':
     dependencies:
-      '@ai-sdk/provider': 3.0.1
-      '@ai-sdk/provider-utils': 4.0.3(zod@4.3.4)
+      '@ai-sdk/provider': 3.0.2
+      '@ai-sdk/provider-utils': 4.0.4(zod@4.3.4)
       zod: 4.3.4
 
   '@ai-sdk/perplexity@3.0.1(zod@4.3.4)':
@@ -4726,9 +4738,9 @@ snapshots:
       eventsource-parser: 3.0.6
       zod: 4.3.4
 
-  '@ai-sdk/provider-utils@4.0.3(zod@4.3.4)':
+  '@ai-sdk/provider-utils@4.0.4(zod@4.3.4)':
     dependencies:
-      '@ai-sdk/provider': 3.0.1
+      '@ai-sdk/provider': 3.0.2
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
       zod: 4.3.4
@@ -4737,13 +4749,13 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/provider@3.0.1':
+  '@ai-sdk/provider@3.0.2':
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/valibot@2.0.3(@valibot/to-json-schema@1.5.0(valibot@1.2.0(typescript@5.9.3)))(valibot@1.2.0(typescript@5.9.3))(zod@4.3.4)':
+  '@ai-sdk/valibot@2.0.4(@valibot/to-json-schema@1.5.0(valibot@1.2.0(typescript@5.9.3)))(valibot@1.2.0(typescript@5.9.3))(zod@4.3.4)':
     dependencies:
-      '@ai-sdk/provider-utils': 4.0.3(zod@4.3.4)
+      '@ai-sdk/provider-utils': 4.0.4(zod@4.3.4)
       '@valibot/to-json-schema': 1.5.0(valibot@1.2.0(typescript@5.9.3))
       valibot: 1.2.0(typescript@5.9.3)
     transitivePeerDependencies:
@@ -5634,10 +5646,10 @@ snapshots:
 
   '@noble/hashes@2.0.1': {}
 
-  '@openrouter/ai-sdk-provider@1.5.4(ai@6.0.11(zod@4.3.4))(zod@4.3.4)':
+  '@openrouter/ai-sdk-provider@1.5.4(ai@6.0.14(zod@4.3.4))(zod@4.3.4)':
     dependencies:
       '@openrouter/sdk': 0.1.27
-      ai: 6.0.11(zod@4.3.4)
+      ai: 6.0.14(zod@4.3.4)
       zod: 4.3.4
     optional: true
 
@@ -6315,7 +6327,7 @@ snapshots:
 
   '@tanstack/devtools-event-bus@0.4.0':
     dependencies:
-      ws: 8.18.3
+      ws: 8.19.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -6330,7 +6342,7 @@ snapshots:
     transitivePeerDependencies:
       - csstype
 
-  '@tanstack/devtools-vite@0.4.0(vite@7.3.0(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))':
+  '@tanstack/devtools-vite@0.4.1(vite@7.3.0(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))':
     dependencies:
       '@babel/core': 7.28.5
       '@babel/generator': 7.28.5
@@ -6348,7 +6360,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@tanstack/devtools@0.10.1(csstype@3.2.3)(solid-js@1.9.10)':
+  '@tanstack/devtools@0.10.2(csstype@3.2.3)(solid-js@1.9.10)':
     dependencies:
       '@solid-primitives/event-listener': 2.4.3(solid-js@1.9.10)
       '@solid-primitives/keyboard': 1.3.3(solid-js@1.9.10)
@@ -6376,9 +6388,9 @@ snapshots:
 
   '@tanstack/query-core@5.90.16': {}
 
-  '@tanstack/react-devtools@0.9.0(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(csstype@3.2.3)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)':
+  '@tanstack/react-devtools@0.9.1(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(csstype@3.2.3)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)':
     dependencies:
-      '@tanstack/devtools': 0.10.1(csstype@3.2.3)(solid-js@1.9.10)
+      '@tanstack/devtools': 0.10.2(csstype@3.2.3)(solid-js@1.9.10)
       '@types/react': 19.2.7
       '@types/react-dom': 19.2.3(@types/react@19.2.7)
       react: 19.2.3
@@ -6744,12 +6756,12 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai-gateway-provider@3.0.2(@ai-sdk/openai-compatible@2.0.1(zod@4.3.4))(@ai-sdk/provider-utils@4.0.3(zod@4.3.4))(@ai-sdk/provider@3.0.1)(ai@6.0.11(zod@4.3.4))(zod@4.3.4):
+  ai-gateway-provider@3.0.2(@ai-sdk/openai-compatible@2.0.1(zod@4.3.4))(@ai-sdk/provider-utils@4.0.4(zod@4.3.4))(@ai-sdk/provider@3.0.2)(ai@6.0.14(zod@4.3.4))(zod@4.3.4):
     dependencies:
       '@ai-sdk/openai-compatible': 2.0.1(zod@4.3.4)
-      '@ai-sdk/provider': 3.0.1
-      '@ai-sdk/provider-utils': 4.0.3(zod@4.3.4)
-      ai: 6.0.11(zod@4.3.4)
+      '@ai-sdk/provider': 3.0.2
+      '@ai-sdk/provider-utils': 4.0.4(zod@4.3.4)
+      ai: 6.0.14(zod@4.3.4)
     optionalDependencies:
       '@ai-sdk/amazon-bedrock': 4.0.3(zod@4.3.4)
       '@ai-sdk/anthropic': 3.0.1(zod@4.3.4)
@@ -6764,19 +6776,19 @@ snapshots:
       '@ai-sdk/google-vertex': 4.0.1(zod@4.3.4)
       '@ai-sdk/groq': 3.0.1(zod@4.3.4)
       '@ai-sdk/mistral': 3.0.1(zod@4.3.4)
-      '@ai-sdk/openai': 3.0.4(zod@4.3.4)
+      '@ai-sdk/openai': 3.0.7(zod@4.3.4)
       '@ai-sdk/perplexity': 3.0.1(zod@4.3.4)
       '@ai-sdk/xai': 3.0.2(zod@4.3.4)
-      '@openrouter/ai-sdk-provider': 1.5.4(ai@6.0.11(zod@4.3.4))(zod@4.3.4)
+      '@openrouter/ai-sdk-provider': 1.5.4(ai@6.0.14(zod@4.3.4))(zod@4.3.4)
     transitivePeerDependencies:
       - supports-color
       - zod
 
-  ai@6.0.11(zod@4.3.4):
+  ai@6.0.14(zod@4.3.4):
     dependencies:
-      '@ai-sdk/gateway': 3.0.8(zod@4.3.4)
-      '@ai-sdk/provider': 3.0.1
-      '@ai-sdk/provider-utils': 4.0.3(zod@4.3.4)
+      '@ai-sdk/gateway': 3.0.9(zod@4.3.4)
+      '@ai-sdk/provider': 3.0.2
+      '@ai-sdk/provider-utils': 4.0.4(zod@4.3.4)
       '@opentelemetry/api': 1.9.0
       zod: 4.3.4
 
@@ -7373,15 +7385,15 @@ snapshots:
     dependencies:
       flat-cache: 4.0.1
 
-  filepond-plugin-file-validate-size@2.2.8(filepond@4.32.10):
+  filepond-plugin-file-validate-size@2.2.8(filepond@4.32.11):
     dependencies:
-      filepond: 4.32.10
+      filepond: 4.32.11
 
-  filepond-plugin-file-validate-type@1.2.9(filepond@4.32.10):
+  filepond-plugin-file-validate-type@1.2.9(filepond@4.32.11):
     dependencies:
-      filepond: 4.32.10
+      filepond: 4.32.11
 
-  filepond@4.32.10: {}
+  filepond@4.32.11: {}
 
   fill-range@7.1.1:
     dependencies:
@@ -7909,9 +7921,9 @@ snapshots:
       react: 19.2.3
       scheduler: 0.27.0
 
-  react-filepond@7.1.3(filepond@4.32.10)(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
+  react-filepond@7.1.3(filepond@4.32.11)(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
     dependencies:
-      filepond: 4.32.10
+      filepond: 4.32.11
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
 
@@ -8448,6 +8460,8 @@ snapshots:
   ws@8.18.0: {}
 
   ws@8.18.3: {}
+
+  ws@8.19.0: {}
 
   xml-name-validator@5.0.0: {}
 
