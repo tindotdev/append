@@ -1,5 +1,17 @@
 import { Link, useLocation } from '@tanstack/react-router';
-import { Archive, ChevronDown, FileDown, FileUp, FolderOpen, LogOut, PenSquare, Plus, Search, Settings } from 'lucide-react';
+import {
+	Archive,
+	ChevronDown,
+	FileDown,
+	FileUp,
+	FolderOpen,
+	LayoutDashboard,
+	LogOut,
+	PenSquare,
+	Plus,
+	Search,
+	Settings,
+} from 'lucide-react';
 import * as React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -29,6 +41,7 @@ import { signOut, useAuth } from '@/features/auth';
 import { useUserBuckets } from '@/features/settings';
 
 const NAV_ITEMS = [
+	{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, shortcut: undefined },
 	{ to: '/search', label: 'Search', icon: Search, shortcut: '/' },
 	{ to: '/batch/new', label: 'Capture', icon: Plus, shortcut: 'C' },
 	{ to: '/batch', label: 'Batches', icon: Archive, shortcut: 'G B' },
