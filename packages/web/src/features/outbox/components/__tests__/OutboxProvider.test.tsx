@@ -46,6 +46,7 @@ describe('OutboxProvider', () => {
 			broadcast: {
 				subscribe: vi.fn(() => () => {}),
 				publish,
+				close: vi.fn(),
 			},
 			senderLoop: {
 				processOnce: vi.fn().mockResolvedValue(false),
@@ -53,6 +54,8 @@ describe('OutboxProvider', () => {
 			},
 			enqueue: vi.fn(),
 			undo: vi.fn(),
+			retry: vi.fn(),
+			close: vi.fn(),
 		});
 
 		mockCreateLeadershipProvider.mockReturnValue({

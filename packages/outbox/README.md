@@ -98,6 +98,9 @@ Options:
 - `createResultPayload`: Factory to create broadcast result payloads
 - `onAuthBlocked?`: Callback when auth is blocked
 - `undoGraceMs?`: Undo window duration (default: 5000ms)
+- `maxAttempts?`: Maximum retry attempts before failing (default: unlimited)
+- `onItemProcessed?`: Callback after each item is processed (observability)
+- `onRetryScheduled?`: Callback when a retry is scheduled (observability)
 
 Returns:
 - `store`: Persistence store
@@ -105,6 +108,8 @@ Returns:
 - `senderLoop`: Processing loop
 - `enqueue`: Enqueue function
 - `undo`: Undo function
+- `retry`: Retry a failed item
+- `close`: Close store and broadcast resources
 
 ### Transport Interface
 
@@ -171,6 +176,67 @@ Calculates next retry timestamp with exponential backoff and jitter.
 - `BACKOFF_CAP_MS`: 60000ms - Maximum backoff delay
 - `JITTER_RANGE_MS`: 250ms - Jitter range
 
+## Error Recovery
+
+### Failed Items
+
+Items that reach `failed` status (validation errors, permanent failures, or max attempts exceeded) remain in the store for inspection. To recover:
+
+```typescript
+// Retry a failed item (resets to pending with immediate retry)
+const result = await outbox.retry(itemId);
+if (result.success) {
+  console.log('Retrying:', result.item);
+}
+
+// Or delete the failed item
+await outbox.store.delete(itemId);
+```
+
+### Auth-Blocked Items
+
+Items blocked on authentication automatically resume when `store.resumeBlockedAuth()` is called:
+
+```typescript
+// Call when user re-authenticates
+await outbox.store.resumeBlockedAuth(userScope, Date.now());
+```
+
+### Observability
+
+Use callbacks to monitor retry behavior without modifying the library:
+
+```typescript
+const outbox = createOutbox({
+  // ... other options
+  onItemProcessed: (item, outcome) => {
+    console.log(`Item ${item.id}: ${outcome}`);
+  },
+  onRetryScheduled: (item, delayMs) => {
+    if (item.attemptCount > 5) {
+      console.warn(`Item ${item.id} has failed ${item.attemptCount} times`);
+    }
+  },
+});
+```
+
+## Cleanup
+
+Call `close()` when done (e.g., on user sign-out):
+
+```typescript
+outbox.close();
+```
+
+For complete cleanup including data deletion:
+
+```typescript
+import { deleteOutboxDatabase } from '@append/outbox';
+
+outbox.close();
+await deleteOutboxDatabase(userScope);
+```
+
 ## Browser Support
 
 - Chrome desktop
@@ -180,6 +246,21 @@ Requires:
 - IndexedDB
 - BroadcastChannel
 - Web Locks API (optional, falls back to IDB lease)
+
+## Publishing for External Use
+
+This package currently exports TypeScript directly for monorepo use. For external publishing, configure a build step:
+
+```json
+{
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
+}
+```
 
 ## License
 

@@ -7,11 +7,14 @@
  */
 
 import { createOutboxBroadcast } from './broadcast';
-import type { EnqueueResult, SenderLoop, UndoResult } from './sender';
+import type { EnqueueResult, ProcessOutcome, SenderLoop, UndoResult } from './sender';
 import { createEnqueueHelper, createSenderLoop, createUndoHelper } from './sender';
 import { createOutboxStore } from './store';
 import type { Transport } from './transport';
 import type { Clock, OutboxBroadcast, OutboxItem, OutboxStore } from './types';
+
+// Re-export ProcessOutcome for consumers
+export type { ProcessOutcome } from './sender';
 
 /**
  * Options for creating an outbox instance.
@@ -34,6 +37,33 @@ export interface CreateOutboxOptions<TCommand, TResult, TEnqueueOptions, TBroadc
 	clock?: Clock;
 	/** Called when an item is blocked on auth */
 	onAuthBlocked?: () => void;
+	/**
+	 * Maximum number of retry attempts before marking item as failed.
+	 * Default: undefined (unlimited retries with exponential backoff)
+	 */
+	maxAttempts?: number;
+	/**
+	 * Called after each item is processed (for observability).
+	 * Includes the item and the outcome of the processing attempt.
+	 */
+	onItemProcessed?: (item: OutboxItem<TCommand>, outcome: ProcessOutcome) => void;
+	/**
+	 * Called when a retry is scheduled (for observability).
+	 * Includes the item and the delay in ms until the next attempt.
+	 */
+	onRetryScheduled?: (item: OutboxItem<TCommand>, delayMs: number) => void;
+}
+
+/**
+ * Result of attempting to retry a failed item.
+ */
+export interface RetryResult<TCommand> {
+	/** Whether the retry was initiated */
+	success: boolean;
+	/** The updated item (if successful) */
+	item?: OutboxItem<TCommand>;
+	/** Error message (if unsuccessful) */
+	error?: string;
 }
 
 /**
@@ -54,6 +84,16 @@ export interface OutboxInstance<TCommand, TEnqueueOptions, TBroadcastResult = un
 	undo: (itemId: string) => Promise<UndoResult<TCommand>>;
 	/** The sender loop (for processing due items) */
 	senderLoop: SenderLoop;
+	/**
+	 * Retry a failed item by resetting it to pending status.
+	 * Only works for items with status 'failed'.
+	 */
+	retry: (itemId: string) => Promise<RetryResult<TCommand>>;
+	/**
+	 * Close the outbox and release resources.
+	 * Closes the store and broadcast channel.
+	 */
+	close: () => void;
 }
 
 /**
@@ -105,7 +145,8 @@ export interface OutboxInstance<TCommand, TEnqueueOptions, TBroadcastResult = un
 export function createOutbox<TCommand, TResult, TEnqueueOptions, TBroadcastResult = unknown>(
 	options: CreateOutboxOptions<TCommand, TResult, TEnqueueOptions, TBroadcastResult>
 ): OutboxInstance<TCommand, TEnqueueOptions, TBroadcastResult> {
-	const { userScope, transport, createCommand, createResultPayload, onAuthBlocked } = options;
+	const { userScope, transport, createCommand, createResultPayload, onAuthBlocked, maxAttempts, onItemProcessed, onRetryScheduled } =
+		options;
 	const clock = options.clock ?? { now: () => Date.now() };
 
 	const store = createOutboxStore<TCommand>(userScope);
@@ -119,6 +160,9 @@ export function createOutbox<TCommand, TResult, TEnqueueOptions, TBroadcastResul
 		userScope,
 		onAuthBlocked,
 		createResultPayload,
+		maxAttempts,
+		onItemProcessed,
+		onRetryScheduled,
 	});
 
 	const enqueue = createEnqueueHelper({ store, broadcast, clock, userScope }, createCommand);
@@ -130,11 +174,46 @@ export function createOutbox<TCommand, TResult, TEnqueueOptions, TBroadcastResul
 		userScope,
 	});
 
+	async function retry(itemId: string): Promise<RetryResult<TCommand>> {
+		const item = await store.get(itemId);
+		if (!item) {
+			return { success: false, error: 'Item not found' };
+		}
+		if (item.userScope !== userScope) {
+			return { success: false, error: 'Item belongs to different user' };
+		}
+		if (item.status !== 'failed') {
+			return { success: false, error: `Cannot retry item with status '${item.status}'` };
+		}
+
+		// Reset item to pending with immediate retry
+		const updated: OutboxItem<TCommand> = {
+			...item,
+			status: 'pending',
+			attemptCount: 0,
+			nextAttemptAt: clock.now(), // Immediate retry
+			lastError: undefined,
+			updatedAt: clock.now(),
+		};
+		await store.put(updated);
+		broadcast.publish({ type: 'outbox_changed', userScope });
+		broadcast.publish({ type: 'kick' });
+
+		return { success: true, item: updated };
+	}
+
+	function close(): void {
+		store.close();
+		broadcast.close();
+	}
+
 	return {
 		store,
 		broadcast,
 		enqueue,
 		undo,
 		senderLoop,
+		retry,
+		close,
 	};
 }

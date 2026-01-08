@@ -91,6 +91,17 @@ export function createOutboxBroadcast<TResult = unknown>(): OutboxBroadcast<TRes
 				}
 			};
 		},
+
+		close(): void {
+			// Clear all subscribers
+			subscribers.clear();
+			// Close the BroadcastChannel if it was created
+			if (channel) {
+				channel.onmessage = null;
+				channel.close();
+				channel = null;
+			}
+		},
 	};
 }
 
@@ -131,6 +142,11 @@ export function createMockBroadcast<TResult = unknown>(): OutboxBroadcast<TResul
 		subscribe(handler: (message: OutboxBroadcastMessage<TResult>) => void): () => void {
 			subscribers.add(handler);
 			return () => subscribers.delete(handler);
+		},
+
+		close(): void {
+			// Clear subscribers for mock
+			subscribers.clear();
 		},
 	};
 }
