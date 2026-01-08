@@ -3,6 +3,7 @@
  */
 
 import { BucketManager } from '../components/BucketManager';
+import { DeviceTokenManager } from '../components/DeviceTokenManager';
 
 export function SettingsPage() {
 	return (
@@ -12,8 +13,9 @@ export function SettingsPage() {
 				<p className="text-sm text-zinc-500 mt-1">Manage your buckets and preferences.</p>
 			</div>
 
-			<section>
+			<section className="space-y-8">
 				<BucketManager />
+				<DeviceTokenManager />
 			</section>
 		</div>
 	);
