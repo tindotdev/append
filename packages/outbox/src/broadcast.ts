@@ -4,7 +4,7 @@
  * Message types:
  * - `kick`: Wake the leader to check for due items
  * - `outbox_changed`: Notify all tabs to refresh counts/indicators
- * - `outbox_result`: Notify all tabs of a successful send (for "Batch ready" toast)
+ * - `outbox_result`: Notify all tabs of a successful send (for app-specific handling)
  */
 
 import { BROADCAST_CHANNEL_NAME } from './constants';
@@ -15,7 +15,7 @@ import type { OutboxBroadcast, OutboxBroadcastMessage } from './types';
  *
  * Uses the real BroadcastChannel API for cross-tab messaging.
  */
-export function createOutboxBroadcast(): OutboxBroadcast {
+export function createOutboxBroadcast<TResult = unknown>(): OutboxBroadcast<TResult> {
 	// Create channel lazily to avoid errors in SSR/test environments
 	let channel: BroadcastChannel | null = null;
 
@@ -32,11 +32,11 @@ export function createOutboxBroadcast(): OutboxBroadcast {
 		return channel;
 	}
 
-	const subscribers = new Set<(message: OutboxBroadcastMessage) => void>();
+	const subscribers = new Set<(message: OutboxBroadcastMessage<TResult>) => void>();
 
-	type WireMessage = OutboxBroadcastMessage & { __outbox_sender?: string };
+	type WireMessage = OutboxBroadcastMessage<TResult> & { __outbox_sender?: string };
 
-	function notifySubscribers(message: OutboxBroadcastMessage): void {
+	function notifySubscribers(message: OutboxBroadcastMessage<TResult>): void {
 		for (const sub of subscribers) {
 			try {
 				sub(message);
@@ -53,13 +53,13 @@ export function createOutboxBroadcast(): OutboxBroadcast {
 		if (data.__outbox_sender === senderId) return;
 
 		// Strip internal metadata before delivering to app code.
-		const message = { ...(data as any) } as WireMessage;
-		delete (message as any).__outbox_sender;
-		notifySubscribers(message as OutboxBroadcastMessage);
+		const message = { ...(data as WireMessage) };
+		delete (message as Record<string, unknown>).__outbox_sender;
+		notifySubscribers(message as OutboxBroadcastMessage<TResult>);
 	}
 
 	return {
-		publish(message: OutboxBroadcastMessage): void {
+		publish(message: OutboxBroadcastMessage<TResult>): void {
 			// Broadcast to other tabs
 			try {
 				const wire: WireMessage = { ...message, __outbox_sender: senderId };
@@ -72,7 +72,7 @@ export function createOutboxBroadcast(): OutboxBroadcast {
 			notifySubscribers(message);
 		},
 
-		subscribe(handler: (message: OutboxBroadcastMessage) => void): () => void {
+		subscribe(handler: (message: OutboxBroadcastMessage<TResult>) => void): () => void {
 			const ch = getChannel();
 
 			// If first subscriber, set up the listener
@@ -100,14 +100,14 @@ export function createOutboxBroadcast(): OutboxBroadcast {
  * The mock simulates cross-tab behavior by synchronously calling all subscribers
  * when a message is published.
  */
-export function createMockBroadcast(): OutboxBroadcast & {
+export function createMockBroadcast<TResult = unknown>(): OutboxBroadcast<TResult> & {
 	/** All published messages (for test assertions) */
-	messages: OutboxBroadcastMessage[];
+	messages: OutboxBroadcastMessage<TResult>[];
 	/** Clear all messages */
 	clear(): void;
 } {
-	const messages: OutboxBroadcastMessage[] = [];
-	const subscribers = new Set<(message: OutboxBroadcastMessage) => void>();
+	const messages: OutboxBroadcastMessage<TResult>[] = [];
+	const subscribers = new Set<(message: OutboxBroadcastMessage<TResult>) => void>();
 
 	return {
 		messages,
@@ -116,7 +116,7 @@ export function createMockBroadcast(): OutboxBroadcast & {
 			messages.length = 0;
 		},
 
-		publish(message: OutboxBroadcastMessage): void {
+		publish(message: OutboxBroadcastMessage<TResult>): void {
 			messages.push(message);
 			// Notify subscribers synchronously (simulates cross-tab)
 			for (const sub of subscribers) {
@@ -128,7 +128,7 @@ export function createMockBroadcast(): OutboxBroadcast & {
 			}
 		},
 
-		subscribe(handler: (message: OutboxBroadcastMessage) => void): () => void {
+		subscribe(handler: (message: OutboxBroadcastMessage<TResult>) => void): () => void {
 			subscribers.add(handler);
 			return () => subscribers.delete(handler);
 		},

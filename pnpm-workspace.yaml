@@ -2,4 +2,5 @@ packages:
   - "packages/ai-gateway-lab"
   - "packages/api"
   - "packages/contracts"
+  - "packages/outbox"
   - "packages/web"

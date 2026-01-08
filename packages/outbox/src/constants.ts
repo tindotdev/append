@@ -1,7 +1,7 @@
 /**
  * Outbox configuration constants.
  *
- * These are the default values from ADR 0018.
+ * These are the default values for timing and configuration.
  * All timing values are in milliseconds.
  */
 
@@ -13,7 +13,7 @@
 export const UNDO_GRACE_MS = 5_000;
 
 // =============================================================================
-// Leadership (for T7-T8: cross-tab coordination)
+// Leadership (for cross-tab coordination)
 // =============================================================================
 
 /** Lease duration in ms for IDB lease fallback (10 seconds) */

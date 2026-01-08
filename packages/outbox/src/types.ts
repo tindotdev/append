@@ -2,39 +2,13 @@
  * Outbox types and interfaces.
  *
  * Defines the data model for the client-side outbox system:
- * - Commands: What to send (v1: capture_terms only)
  * - Items: Queued commands with retry metadata
  * - Status: pending | failed | blocked_auth
  * - DI interfaces: Dependency injection boundaries for testing
+ *
+ * Note: Command types are application-specific and should be defined
+ * by the consuming application via generics.
  */
-
-// =============================================================================
-// Command Types (v1: capture_terms only)
-// =============================================================================
-
-/**
- * Request payload for capturing terms (matches POST /api/batch body).
- */
-export interface CaptureTermsRequest {
-	/** Newline-separated terms */
-	terms: string;
-	/** UUID for idempotency */
-	clientRequestId: string;
-}
-
-/**
- * Command to capture terms via POST /api/batch.
- */
-export interface CaptureTermsCommand {
-	type: 'capture_terms';
-	request: CaptureTermsRequest;
-}
-
-/**
- * Union of all outbox command types.
- * v1: Only capture_terms is supported.
- */
-export type OutboxCommand = CaptureTermsCommand;
 
 // =============================================================================
 // Status
@@ -72,15 +46,15 @@ export interface OutboxError {
 /**
  * An item in the outbox queue.
  *
- * @template T - The command type (defaults to OutboxCommand union)
+ * @template TCommand - The command type (application-specific)
  */
-export interface OutboxItem<T extends OutboxCommand = OutboxCommand> {
+export interface OutboxItem<TCommand = unknown> {
 	/** Unique identifier (UUID) */
 	id: string;
 	/** User scope for isolation (derived from session.user.id) */
 	userScope: string;
 	/** The command to execute (immutable after enqueue) */
-	command: T;
+	command: TCommand;
 	/** Timestamp when the item was created (ms since epoch) */
 	createdAt: number;
 	/** Timestamp when the item was last updated (ms since epoch) */
@@ -118,34 +92,19 @@ export interface OutboxChangedMessage {
 
 /**
  * Message to notify all tabs of a successful send result.
+ *
+ * @template TResult - The result type (application-specific)
  */
-export interface OutboxResultMessage {
+export interface OutboxResultMessage<TResult = unknown> {
 	type: 'outbox_result';
 	userScope: string;
-	result: {
-		commandType: 'capture_terms';
-		itemId: string;
-		batchId: string;
-	};
+	result: TResult;
 }
 
 /**
  * Union of all broadcast message types.
  */
-export type OutboxBroadcastMessage = KickMessage | OutboxChangedMessage | OutboxResultMessage;
-
-// =============================================================================
-// Send Result Types
-// =============================================================================
-
-/**
- * Result of sending a command.
- */
-export type SendResult =
-	| { outcome: 'success'; batchId: string }
-	| { outcome: 'retry'; error: OutboxError }
-	| { outcome: 'blocked_auth'; error: OutboxError }
-	| { outcome: 'failed'; error: OutboxError };
+export type OutboxBroadcastMessage<TResult = unknown> = KickMessage | OutboxChangedMessage | OutboxResultMessage<TResult>;
 
 // =============================================================================
 // DI Interfaces
@@ -162,29 +121,29 @@ export interface Clock {
 /**
  * BroadcastChannel wrapper interface.
  */
-export interface OutboxBroadcast {
+export interface OutboxBroadcast<TResult = unknown> {
 	/** Publish a message to all tabs */
-	publish(message: OutboxBroadcastMessage): void;
+	publish(message: OutboxBroadcastMessage<TResult>): void;
 	/** Subscribe to messages, returns unsubscribe function */
-	subscribe(handler: (message: OutboxBroadcastMessage) => void): () => void;
+	subscribe(handler: (message: OutboxBroadcastMessage<TResult>) => void): () => void;
 }
 
 /**
  * Outbox persistence store interface.
  */
-export interface OutboxStore {
+export interface OutboxStore<TCommand = unknown> {
 	/** Insert or update an item */
-	put(item: OutboxItem): Promise<void>;
+	put(item: OutboxItem<TCommand>): Promise<void>;
 	/** Get an item by ID */
-	get(id: string): Promise<OutboxItem | undefined>;
+	get(id: string): Promise<OutboxItem<TCommand> | undefined>;
 	/** Delete an item by ID */
 	delete(id: string): Promise<void>;
 	/** List items that are due to be sent (pending + nextAttemptAt <= now) */
-	listDue(now: number, userScope: string): Promise<OutboxItem[]>;
+	listDue(now: number, userScope: string): Promise<OutboxItem<TCommand>[]>;
 	/** Count items by status */
 	countByStatus(userScope: string): Promise<Record<OutboxStatus, number>>;
 	/** List items by status */
-	listByStatus(userScope: string, status: OutboxStatus): Promise<OutboxItem[]>;
+	listByStatus(userScope: string, status: OutboxStatus): Promise<OutboxItem<TCommand>[]>;
 	/**
 	 * Resume auth-blocked items by converting them to pending.
 	 * Called when authentication is restored.
@@ -196,20 +155,12 @@ export interface OutboxStore {
 	 * Used for TOCTOU-safe undo operations.
 	 * @returns true if item was deleted, false if not found or predicate failed
 	 */
-	deleteIf(id: string, predicate: (item: OutboxItem) => boolean): Promise<boolean>;
+	deleteIf(id: string, predicate: (item: OutboxItem<TCommand>) => boolean): Promise<boolean>;
 	/**
 	 * Close the database connection and release resources.
 	 * Called on user sign-out to prevent memory leaks.
 	 */
 	close(): void;
-}
-
-/**
- * Command sender interface.
- */
-export interface CommandSender {
-	/** Send a command and return the result */
-	send(command: OutboxCommand): Promise<SendResult>;
 }
 
 // =============================================================================

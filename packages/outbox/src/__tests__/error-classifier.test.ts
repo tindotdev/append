@@ -122,25 +122,12 @@ describe('isPermanentFailure', () => {
 
 describe('classifyResponse', () => {
 	describe('success cases', () => {
-		it('returns success for 201 with batchId', () => {
-			expect(classifyResponse(201, undefined, 'batch-123')).toEqual({
-				type: 'success',
-				batchId: 'batch-123',
-			});
+		it('returns success for 201', () => {
+			expect(classifyResponse(201)).toEqual({ type: 'success' });
 		});
 
-		it('returns success for 200 (replay) with batchId', () => {
-			expect(classifyResponse(200, undefined, 'batch-456')).toEqual({
-				type: 'success',
-				batchId: 'batch-456',
-			});
-		});
-
-		it('returns success with empty batchId if not provided', () => {
-			expect(classifyResponse(201)).toEqual({
-				type: 'success',
-				batchId: '',
-			});
+		it('returns success for 200 (replay)', () => {
+			expect(classifyResponse(200)).toEqual({ type: 'success' });
 		});
 	});
 
