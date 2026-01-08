@@ -126,6 +126,8 @@ export interface OutboxBroadcast<TResult = unknown> {
 	publish(message: OutboxBroadcastMessage<TResult>): void;
 	/** Subscribe to messages, returns unsubscribe function */
 	subscribe(handler: (message: OutboxBroadcastMessage<TResult>) => void): () => void;
+	/** Close the broadcast channel and release resources */
+	close(): void;
 }
 
 /**
