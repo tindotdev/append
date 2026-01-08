@@ -15,8 +15,13 @@ import type { Clock, OutboxBroadcast, OutboxItem, OutboxStore } from './types';
 
 /**
  * Options for creating an outbox instance.
+ *
+ * @template TCommand - The command type (application-specific)
+ * @template TResult - The transport result type (application-specific)
+ * @template TEnqueueOptions - The enqueue options type (application-specific)
+ * @template TBroadcastResult - The broadcast result payload type (application-specific, defaults to unknown)
  */
-export interface CreateOutboxOptions<TCommand, TResult, TEnqueueOptions> {
+export interface CreateOutboxOptions<TCommand, TResult, TEnqueueOptions, TBroadcastResult = unknown> {
 	/** User scope for isolation (typically session.user.id) */
 	userScope: string;
 	/** Transport for sending commands to the server */
@@ -24,7 +29,7 @@ export interface CreateOutboxOptions<TCommand, TResult, TEnqueueOptions> {
 	/** Factory function to create a command from enqueue options */
 	createCommand: (options: TEnqueueOptions) => TCommand;
 	/** Creates a result payload for broadcast (application-specific) */
-	createResultPayload: (item: OutboxItem<TCommand>, result: TResult) => unknown;
+	createResultPayload: (item: OutboxItem<TCommand>, result: TResult) => TBroadcastResult;
 	/** Clock for time operations (default: Date.now) */
 	clock?: Clock;
 	/** Called when an item is blocked on auth */
@@ -33,12 +38,16 @@ export interface CreateOutboxOptions<TCommand, TResult, TEnqueueOptions> {
 
 /**
  * A fully wired outbox instance.
+ *
+ * @template TCommand - The command type (application-specific)
+ * @template TEnqueueOptions - The enqueue options type (application-specific)
+ * @template TBroadcastResult - The broadcast result payload type (application-specific, defaults to unknown)
  */
-export interface OutboxInstance<TCommand, TEnqueueOptions> {
+export interface OutboxInstance<TCommand, TEnqueueOptions, TBroadcastResult = unknown> {
 	/** The underlying store (for direct access if needed) */
 	store: OutboxStore<TCommand>;
 	/** The broadcast channel (for subscribing to events) */
-	broadcast: OutboxBroadcast;
+	broadcast: OutboxBroadcast<TBroadcastResult>;
 	/** Enqueue a command */
 	enqueue: (options: TEnqueueOptions) => Promise<EnqueueResult<TCommand>>;
 	/** Attempt to undo an item (only works within grace window) */
@@ -93,17 +102,16 @@ export interface OutboxInstance<TCommand, TEnqueueOptions> {
  * await outbox.senderLoop.processOnce();
  * ```
  */
-export function createOutbox<TCommand, TResult, TEnqueueOptions>(
-	options: CreateOutboxOptions<TCommand, TResult, TEnqueueOptions>
-): OutboxInstance<TCommand, TEnqueueOptions> {
+export function createOutbox<TCommand, TResult, TEnqueueOptions, TBroadcastResult = unknown>(
+	options: CreateOutboxOptions<TCommand, TResult, TEnqueueOptions, TBroadcastResult>
+): OutboxInstance<TCommand, TEnqueueOptions, TBroadcastResult> {
 	const { userScope, transport, createCommand, createResultPayload, onAuthBlocked } = options;
 	const clock = options.clock ?? { now: () => Date.now() };
 
 	const store = createOutboxStore<TCommand>(userScope);
-	// Use unknown for broadcast result type since it's app-specific
-	const broadcast = createOutboxBroadcast<unknown>();
+	const broadcast = createOutboxBroadcast<TBroadcastResult>();
 
-	const senderLoop = createSenderLoop<TCommand, TResult, unknown>({
+	const senderLoop = createSenderLoop<TCommand, TResult, TBroadcastResult>({
 		store,
 		transport,
 		broadcast,

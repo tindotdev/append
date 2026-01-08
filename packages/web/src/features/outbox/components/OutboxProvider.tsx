@@ -22,6 +22,7 @@ import {
 	generateTabId,
 	type LeadershipProvider,
 	type OutboxBroadcastMessage,
+	type OutboxBroadcastResult,
 	type OutboxCounts,
 	type OutboxStatus,
 } from '@/lib/outbox-adapter';
@@ -272,7 +273,7 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 
 		// Handle broadcast messages
 		// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: broadcast handler is a small switch-based router
-		function handleBroadcast(msg: OutboxBroadcastMessage) {
+		function handleBroadcast(msg: OutboxBroadcastMessage<OutboxBroadcastResult>) {
 			if (!isMounted) return;
 
 			switch (msg.type) {
@@ -298,11 +299,8 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 						// Invalidate batch queries
 						queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
 
-						// Cast result to app-specific type
-						const result = msg.result as { batchId?: string };
-
-						// Show toast with Open action
-						const batchId = result.batchId;
+						// Show toast with Open action (msg.result is now properly typed as OutboxBroadcastResult)
+						const batchId = msg.result.batchId;
 						const isSafeBatchId = batchId && BATCH_ID_PATTERN.test(batchId);
 						if (batchId && !isSafeBatchId) {
 							console.warn('[Outbox] Ignoring invalid batchId in outbox_result:', batchId);
