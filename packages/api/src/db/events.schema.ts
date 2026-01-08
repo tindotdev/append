@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { user } from './auth.schema';
 
 export const DEVICE_TYPE = ['chrome_extension', 'web', 'unknown'] as const;
@@ -58,5 +58,31 @@ export const event = sqliteTable(
 		primaryKey({ columns: [table.userId, table.deviceId, table.eventId] }),
 		index('event_user_emitted_idx').on(table.userId, table.emittedAt),
 		index('event_user_artifact_emitted_idx').on(table.userId, table.artifactUrlHash, table.emittedAt),
+	]
+);
+
+/**
+ * DeviceToken: per-user token for non-cookie clients (MVP: Chrome extension).
+ *
+ * Token value is never stored; only a sha256 hash is persisted.
+ */
+export const deviceToken = sqliteTable(
+	'device_token',
+	{
+		id: text('id').primaryKey(), // server-generated UUID
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		label: text('label'),
+		tokenPrefix: text('token_prefix').notNull(),
+		tokenHash: text('token_hash').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsec') * 1000 as integer))`).notNull(),
+		lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' }),
+		revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+	},
+	(table) => [
+		uniqueIndex('device_token_hash_unique').on(table.tokenHash),
+		index('device_token_user_created_idx').on(table.userId, table.createdAt),
+		index('device_token_user_revoked_idx').on(table.userId, table.revokedAt),
 	]
 );

@@ -1,10 +1,13 @@
+import { and, eq, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { deviceToken } from './db';
 // Feature routes (vertical slice architecture)
 import { acceptRoutes } from './features/accept/routes';
 import { batchRoutes } from './features/batch/routes';
 import { bucketRoutes } from './features/bucket/routes';
 import { candidateRoutes } from './features/candidate/routes';
+import { deviceTokenRoutes } from './features/device-tokens/routes';
 import { eventsRoutes } from './features/events/routes';
 import { exportRoutes } from './features/export/routes';
 import { importRoutes } from './features/import/routes';
@@ -13,6 +16,7 @@ import { termRoutes } from './features/term/routes';
 import { termSenseRoutes } from './features/term-sense/routes';
 import { userBucketRoutes } from './features/user-bucket/routes';
 import { createAuth, getAllowedOrigins, isPreviewEnv } from './lib/auth';
+import { parseBearerToken, sha256Hex } from './lib/auth/device-token';
 import { e2eLoginRoute } from './lib/auth/e2e-login';
 import type { Variables as BaseVariables, Bindings } from './platform/bindings';
 import { attachDb } from './platform/context';
@@ -58,6 +62,15 @@ export function isOriginAllowed(origin: string, allowedOrigins: string[]): boole
 		}
 	}
 	return false;
+}
+
+function isChromeExtensionOrigin(origin: string | undefined | null): boolean {
+	if (!origin) return false;
+	if (!origin.startsWith('chrome-extension://')) return false;
+	// chrome-extension://<32-char-id>
+	const id = origin.slice('chrome-extension://'.length);
+	if (id.length !== 32) return false;
+	return /^[a-p]{32}$/.test(id);
 }
 
 type Variables = BaseVariables & {
@@ -130,9 +143,9 @@ app.use('/api/*', async (c, next) => {
 app.use('/events/*', async (c, next) => {
 	const allowedOrigins = getAllowedOrigins(c.env);
 	return cors({
-		origin: (origin) => (isOriginAllowed(origin, allowedOrigins) ? origin : null),
+		origin: (origin) => (isChromeExtensionOrigin(origin) || isOriginAllowed(origin, allowedOrigins) ? origin : null),
 		allowMethods: ['POST', 'GET', 'PUT', 'DELETE', 'OPTIONS'],
-		allowHeaders: ['Content-Type', 'X-Import-Id'],
+		allowHeaders: ['Content-Type', 'Authorization', 'X-Import-Id'],
 		credentials: true,
 	})(c, next);
 });
@@ -182,6 +195,12 @@ app.use('/events/*', async (c, next) => {
 	// Only apply to state-changing methods
 	const method = c.req.method;
 	if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+		return next();
+	}
+
+	// Token-auth clients don't use cookies; skip Origin enforcement.
+	const bearer = parseBearerToken(c.req.header('authorization'));
+	if (bearer) {
 		return next();
 	}
 
@@ -238,7 +257,30 @@ app.use('/api/*', async (c, next) => {
 	await next();
 });
 
+// DB context for /events/* routes must be available for bearer token auth.
+app.use('/events/*', attachDb);
+
 app.use('/events/*', async (c, next) => {
+	const bearer = parseBearerToken(c.req.header('authorization'));
+	if (bearer) {
+		const db = c.get('db');
+		const tokenHash = await sha256Hex(bearer);
+
+		const [row] = await db
+			.select({ id: deviceToken.id, userId: deviceToken.userId })
+			.from(deviceToken)
+			.where(and(eq(deviceToken.tokenHash, tokenHash), isNull(deviceToken.revokedAt)))
+			.limit(1);
+
+		if (!row) {
+			return apiError(c, 401, 'UNAUTHORIZED', 'Invalid token');
+		}
+
+		c.set('userId', row.userId);
+		await db.update(deviceToken).set({ lastUsedAt: new Date() }).where(eq(deviceToken.id, row.id));
+		return next();
+	}
+
 	const auth = c.get('auth');
 
 	// Call getSession with returnHeaders to capture set-cookie for token refresh
@@ -268,7 +310,6 @@ app.use('/events/*', async (c, next) => {
 // =============================================================================
 
 app.use('/api/*', attachDb);
-app.use('/events/*', attachDb);
 
 // =============================================================================
 // E2E Auth Bootstrap (ADR 0019) - must be BEFORE generic /auth/* handler
@@ -308,6 +349,7 @@ const apiRoutes = app
 	.route('/api/batch', batchRoutes)
 	.route('/api/bucket', bucketRoutes)
 	.route('/api/candidate', candidateRoutes)
+	.route('/api/device-tokens', deviceTokenRoutes)
 	.route('/api/export', exportRoutes)
 	.route('/api/import', importRoutes)
 	.route('/api', suggestionsRoutes)
