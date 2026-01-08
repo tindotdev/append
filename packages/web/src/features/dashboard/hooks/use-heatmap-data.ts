@@ -55,23 +55,38 @@ function calculateStats(data: HeatmapData): HeatmapStatsData {
 interface UseHeatmapDataOptions {
 	/** Force empty state for testing */
 	forceEmpty?: boolean;
+	/** Force loading state for testing */
+	forceLoading?: boolean;
 }
 
+const EMPTY_DATA: HeatmapData = {
+	year: 2026,
+	timezone: 'Asia/Bangkok',
+	days: [],
+};
+
+const EMPTY_STATS: HeatmapStatsData = {
+	totalMinutes: 0,
+	avgPerDay: 0,
+	activeDays: 0,
+};
+
 export function useHeatmapData(options: UseHeatmapDataOptions = {}) {
-	const { forceEmpty = false } = options;
+	const { forceEmpty = false, forceLoading = false } = options;
 
 	const data = useMemo(() => {
-		if (forceEmpty) {
-			return {
-				year: 2026,
-				timezone: 'Asia/Bangkok',
-				days: [],
-			};
+		if (forceLoading || forceEmpty) {
+			return EMPTY_DATA;
 		}
 		return generateMockData();
-	}, [forceEmpty]);
+	}, [forceEmpty, forceLoading]);
 
-	const stats = useMemo(() => calculateStats(data), [data]);
+	const stats = useMemo(() => {
+		if (forceLoading) {
+			return EMPTY_STATS;
+		}
+		return calculateStats(data);
+	}, [data, forceLoading]);
 
-	return { data, stats };
+	return { data, stats, isLoading: forceLoading };
 }

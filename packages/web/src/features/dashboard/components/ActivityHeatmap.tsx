@@ -4,6 +4,7 @@ import { Activity } from 'lucide-react';
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useHeatmapData } from '../hooks/use-heatmap-data';
 import type { HeatmapDay } from '../types';
 
@@ -22,9 +23,29 @@ function formatTime(minutes: number): string {
 	return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 }
 
+function ActivityHeatmapSkeleton() {
+	return (
+		<div className="space-y-3">
+			{/* Stats skeleton */}
+			<div className="flex items-center gap-4">
+				<Skeleton className="h-4 w-12" />
+				<Skeleton className="h-4 w-16" />
+				<Skeleton className="h-4 w-20" />
+				<Skeleton className="h-4 w-16" />
+			</div>
+			{/* Heatmap skeleton - approximates 53 weeks x 7 days grid */}
+			<Skeleton className="h-[91px] w-[720px]" />
+		</div>
+	);
+}
+
 export function ActivityHeatmap() {
-	const { data, stats } = useHeatmapData();
+	const { data, stats, isLoading } = useHeatmapData();
 	const convertedData = useMemo(() => convertToHeatmapFormat(data.days), [data.days]);
+
+	if (isLoading) {
+		return <ActivityHeatmapSkeleton />;
+	}
 
 	const isEmpty = stats.activeDays === 0;
 
