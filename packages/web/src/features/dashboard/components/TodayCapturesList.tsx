@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router';
 import { Bookmark } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -85,8 +84,8 @@ export function TodayCapturesList() {
 						<EmptyTitle className="text-sm">No captures today</EmptyTitle>
 						<EmptyDescription className="text-xs">Capture terms, questions, and notes as you learn</EmptyDescription>
 					</EmptyHeader>
-					<Button variant="outline" size="sm" asChild>
-						<Link to="/batch/new">Start capturing</Link>
+					<Button variant="outline" size="sm" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+						Add a capture
 					</Button>
 				</Empty>
 			</Card>

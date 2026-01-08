@@ -1,60 +1,7 @@
 import { useMemo } from 'react';
+import { useTelemetrySnapshot } from '../telemetry/hooks';
+import { computeHeatmapData } from '../telemetry/rollups';
 import type { HeatmapData, HeatmapStatsData } from '../types';
-
-function generateMockData(): HeatmapData {
-	const days: { date: string; minutes: number }[] = [];
-
-	// Find the Sunday before or on January 1, 2026
-	const jan1 = new Date('2026-01-01');
-	const startDate = new Date(jan1);
-	startDate.setDate(jan1.getDate() - jan1.getDay()); // Go back to Sunday
-
-	// Find the Saturday after or on December 31, 2026
-	const dec31 = new Date('2026-12-31');
-	const endDate = new Date(dec31);
-	endDate.setDate(dec31.getDate() + (6 - dec31.getDay())); // Go forward to Saturday
-
-	for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-		const dateStr = d.toISOString().split('T')[0];
-		const year = d.getFullYear();
-
-		// Only generate activity for 2026 days
-		// Padding days (Dec 2025 and Jan 2027) will have 0 minutes
-		let minutes = 0;
-		if (year === 2026) {
-			// 40% chance of activity for 2026 days only
-			const hasActivity = Math.random() > 0.6;
-			minutes = hasActivity
-				? Math.floor(Math.random() * 120) + 10 // 10-130 minutes
-				: 0;
-		}
-
-		days.push({
-			date: dateStr,
-			minutes,
-		});
-	}
-
-	return {
-		year: 2026,
-		timezone: 'Asia/Bangkok',
-		days,
-	};
-}
-
-function calculateStats(data: HeatmapData): HeatmapStatsData {
-	// Only count days from 2026 for stats (exclude December 2025 padding days)
-	const days2026 = data.days.filter((d) => d.date.startsWith('2026-'));
-	const activeDays = days2026.filter((d) => d.minutes > 0);
-	const totalMinutes = activeDays.reduce((sum, d) => sum + d.minutes, 0);
-	const avgPerDay = activeDays.length > 0 ? Math.round(totalMinutes / activeDays.length) : 0;
-
-	return {
-		totalMinutes,
-		avgPerDay,
-		activeDays: activeDays.length,
-	};
-}
 
 interface UseHeatmapDataOptions {
 	/** Force empty state for testing */
@@ -64,8 +11,8 @@ interface UseHeatmapDataOptions {
 }
 
 const EMPTY_DATA: HeatmapData = {
-	year: 2026,
-	timezone: 'Asia/Bangkok',
+	year: new Date().getFullYear(),
+	timezone: 'UTC',
 	days: [],
 };
 
@@ -75,22 +22,39 @@ const EMPTY_STATS: HeatmapStatsData = {
 	activeDays: 0,
 };
 
+let lastRevision: number | null = null;
+let lastTimezone: string | null = null;
+let lastYear: number | null = null;
+let lastComputed: { data: HeatmapData; stats: HeatmapStatsData } | null = null;
+
+function yearInTimezone(timezone: string, now = new Date()): number {
+	const y = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric' }).format(now);
+	return Number(y);
+}
+
+function getComputed(revision: number, events: Parameters<typeof computeHeatmapData>[0], timezone: string, year: number) {
+	if (lastComputed && lastRevision === revision && lastTimezone === timezone && lastYear === year) return lastComputed;
+	lastRevision = revision;
+	lastTimezone = timezone;
+	lastYear = year;
+	lastComputed = computeHeatmapData(events, timezone, year);
+	return lastComputed;
+}
+
 export function useHeatmapData(options: UseHeatmapDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
+	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
 
-	const data = useMemo(() => {
-		if (forceLoading || forceEmpty) {
-			return EMPTY_DATA;
+	const computed = useMemo(() => {
+		if (forceLoading || !isReady) {
+			return { data: EMPTY_DATA, stats: EMPTY_STATS };
 		}
-		return generateMockData();
-	}, [forceEmpty, forceLoading]);
-
-	const stats = useMemo(() => {
-		if (forceLoading) {
-			return EMPTY_STATS;
+		if (forceEmpty) {
+			return { data: { ...EMPTY_DATA, timezone, year: yearInTimezone(timezone) }, stats: EMPTY_STATS };
 		}
-		return calculateStats(data);
-	}, [data, forceLoading]);
+		const year = yearInTimezone(timezone);
+		return getComputed(revision, events, timezone, year);
+	}, [events, forceEmpty, forceLoading, isReady, revision, timezone]);
 
-	return { data, stats, isLoading: forceLoading };
+	return { data: computed.data, stats: computed.stats, isLoading: forceLoading || !isReady };
 }

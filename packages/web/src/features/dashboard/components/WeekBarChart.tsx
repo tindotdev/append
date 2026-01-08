@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router';
 import { BarChart3 } from 'lucide-react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -63,8 +62,8 @@ export function WeekBarChart() {
 						<EmptyTitle className="text-sm">No weekly data</EmptyTitle>
 						<EmptyDescription className="text-xs">Your 7-day activity will appear here</EmptyDescription>
 					</EmptyHeader>
-					<Button variant="outline" size="sm" asChild>
-						<Link to="/batch/new">Start session</Link>
+					<Button variant="outline" size="sm" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+						Add activity
 					</Button>
 				</Empty>
 			</Card>

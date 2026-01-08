@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router';
 import { List } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -88,8 +87,8 @@ export function TodayBreakdown() {
 						<EmptyTitle className="text-sm">No breakdown yet</EmptyTitle>
 						<EmptyDescription className="text-xs">Activity will appear here as you learn</EmptyDescription>
 					</EmptyHeader>
-					<Button variant="outline" size="sm" asChild>
-						<Link to="/batch/new">Start session</Link>
+					<Button variant="outline" size="sm" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+						Add activity
 					</Button>
 				</Empty>
 			</Card>

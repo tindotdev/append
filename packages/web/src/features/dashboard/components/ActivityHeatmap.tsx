@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router';
 import HeatMap from '@uiw/react-heat-map';
 import { Activity } from 'lucide-react';
 import { useMemo } from 'react';
@@ -89,8 +88,8 @@ export function ActivityHeatmap() {
 						<EmptyTitle className="text-sm">No activity yet</EmptyTitle>
 						<EmptyDescription className="text-xs">Start capturing to see your activity patterns here</EmptyDescription>
 					</EmptyHeader>
-					<Button variant="outline" size="sm" asChild>
-						<Link to="/batch/new">Start capturing</Link>
+					<Button variant="outline" size="sm" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+						Add activity
 					</Button>
 				</Empty>
 			</Card>
@@ -121,8 +120,8 @@ export function ActivityHeatmap() {
 							value={convertedData}
 							legendCellSize={0}
 							width={720}
-							startDate={new Date('2026/01/01')}
-							endDate={new Date('2026/12/31')}
+							startDate={new Date(`${data.year}/01/01`)}
+							endDate={new Date(`${data.year}/12/31`)}
 							rectSize={10}
 							space={3}
 							weekLabels={false}

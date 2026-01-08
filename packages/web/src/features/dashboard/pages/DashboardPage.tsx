@@ -1,6 +1,7 @@
 import {
 	ActivityHeatmap,
 	StreakCard,
+	TelemetryControls,
 	TodayBreakdown,
 	TodayCapturesList,
 	TodayHeroCard,
@@ -15,8 +16,10 @@ export function DashboardPage() {
 			{/* Header */}
 			<div className="mb-4">
 				<h2 className="text-xl font-semibold">Dashboard</h2>
-				<p className="mt-1 text-sm text-zinc-500">Track your daily activity across the year</p>
+				<p className="mt-1 text-sm text-zinc-500">Learning minutes, sources, topics, and captures — derived from events</p>
 			</div>
+
+			<TelemetryControls />
 
 			{/* Dashboard grid */}
 			<div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @4xl/main:grid-cols-3">

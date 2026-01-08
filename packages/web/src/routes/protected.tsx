@@ -24,7 +24,7 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 		getParentRoute: () => protectedRoute,
 		path: '/',
 		beforeLoad: () => {
-			throw redirect({ to: '/batch/new' });
+			throw redirect({ to: '/dashboard' });
 		},
 	});
 
