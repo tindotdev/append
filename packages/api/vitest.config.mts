@@ -1,9 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import {
-	defineWorkersConfig,
-	readD1Migrations,
-} from '@cloudflare/vitest-pool-workers/config';
+import { defineWorkersConfig, readD1Migrations } from '@cloudflare/vitest-pool-workers/config';
 
 // Wrangler writes debug logs under XDG config. Ensure it points at a writable path.
 const xdgConfigHome = resolve(process.cwd(), '..', '..', 'tmp', 'xdg-config');
