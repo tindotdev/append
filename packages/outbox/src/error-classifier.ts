@@ -55,19 +55,18 @@ export function isPermanentFailure(status: number, code?: string): boolean {
 /**
  * Classified response type.
  */
-export type ClassifiedResponse = { type: 'success'; batchId: string } | { type: 'retry' } | { type: 'blocked_auth' } | { type: 'failed' };
+export type ResponseClassification = { type: 'success' } | { type: 'retry' } | { type: 'blocked_auth' } | { type: 'failed' };
 
 /**
  * Classify an API response into an actionable category.
  *
  * @param status - HTTP status code
  * @param code - API error code (if available)
- * @param batchId - Batch ID from successful response (if available)
  */
-export function classifyResponse(status: number, code?: string, batchId?: string): ClassifiedResponse {
+export function classifyResponse(status: number, code?: string): ResponseClassification {
 	// Success: 200 (replay) or 201 (created)
 	if (status === 200 || status === 201) {
-		return { type: 'success', batchId: batchId ?? '' };
+		return { type: 'success' };
 	}
 
 	// 404: Treat as permanent failure (endpoint/version mismatch).
