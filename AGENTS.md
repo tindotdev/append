@@ -1,21 +1,17 @@
 # Agent Guide
 
-## **THIS BRANCH: `dev/ux-ui-prototype`**
+## **THIS BRANCH: `feat/event-ingest`**
 
-**⚠️ CRITICAL: WEB PACKAGE DEVELOPMENT ONLY ⚠️**
+**Product direction:** events-first learning telemetry (WakaTime-for-learning) → dashboard-first UX (ADR 0020).
 
-- **ONLY develop the web package (`packages/web`).**
-- **NO API CALLS. NO DATABASE INTERACTIONS.**
-- **Design UX/UI FREELY without server-side constraints.**
-- **Use MOCK DATA and CLIENT-SIDE LOGIC ONLY.**
-
-**The goal is to explore and iterate on the user experience WITHOUT being limited by backend implementation details. DO NOT implement or design any server-side code on this branch.**
+Primary focus for this branch is shipping the **real ingest path** and the client emitters (extension) that feed it.
 
 ---
 
 ## Quick commands
 
 - `pnpm -r --if-present typecheck`
+- Run web app: `pnpm --filter @append/web dev`
 
 ## Source of truth
 
@@ -23,6 +19,7 @@
 
 - Design snapshot: `docs/design.md`
 - Decisions: `docs/adr/README.md` (+ individual ADRs)
+- Product direction pivot: `docs/adr/0020-events-first-learning-telemetry.md`
 
 **Allowed supporting docs (only if essential)**
 
@@ -38,6 +35,12 @@
 - Keep `docs/design.md` current as the snapshot; capture material decisions in ADRs.
 - Track progress/plans in PR descriptions and the issue tracker (avoid persisting plan/proposal docs).
 - Material decision change → add a new ADR and mark the old one “Superseded”.
+
+## Scope notes (implementation)
+
+- Prefer **append-only, idempotent** event ingestion (dedupe by `(user_id, device_id, event_id)`).
+- Keep client emitters retry-safe (outbox + acked deletes; never drop silently).
+- Keep the web telemetry simulator available as a dev tool, but treat API + extension as source of truth.
 
 ## Current stage
 
