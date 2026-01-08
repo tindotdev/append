@@ -267,6 +267,11 @@ Defaults for MVP:
 
 ## Milestones
 
+## Current stage
+
+- M0 is complete (extension heartbeats ingest end-to-end).
+- Building M1 (dashboard read models, captures, export, privacy statement).
+
 ### M0 — Instrumentation skeleton (extension + ingest)
 
 - `artifact_active` heartbeats emitted and ingested end-to-end.
@@ -289,7 +294,7 @@ Defaults for MVP:
 
 ## Definition of Done for MVP (ship and not die)
 
-- [ ] Chrome extension emits heartbeats reliably (foreground use).
+- [x] Chrome extension emits heartbeats reliably (foreground use).
 - [x] `/events/ingest` stores real events and dedupes by `(user_id, device_id, event_id)`.
 - [ ] Today/Week/Heatmap dashboards show real totals and breakdowns.
 - [ ] `/events/export` works and is documented in-app.
