@@ -166,7 +166,7 @@ export interface CreateAppOutboxOptions {
 export function createAppOutbox(options: CreateAppOutboxOptions) {
 	const { userScope, onAuthBlocked } = options;
 
-	return createGenericOutbox<OutboxCommand, CaptureTermsResult, EnqueueOptions>({
+	return createGenericOutbox<OutboxCommand, CaptureTermsResult, EnqueueOptions, OutboxBroadcastResult>({
 		userScope,
 		transport: createAppTransport(),
 		createCommand: (opts: EnqueueOptions): OutboxCommand => ({
