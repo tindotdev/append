@@ -30,6 +30,28 @@ function formatDate(dateStr: string): string {
 	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+const HEATMAP_COLORS = [
+	'rgba(255,255,255,0.04)', // 0 - no activity
+	'rgba(52,211,153,0.2)', // 8+ min
+	'rgba(52,211,153,0.4)', // 30+ min
+	'rgba(52,211,153,0.6)', // 60+ min
+	'rgba(52,211,153,0.85)', // 90+ min
+];
+
+function ActivityHeatmapLegend() {
+	return (
+		<div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+			<span>Less</span>
+			<div className="flex gap-0.5">
+				{HEATMAP_COLORS.map((color) => (
+					<div key={color} className="size-2.5 rounded-sm" style={{ backgroundColor: color }} />
+				))}
+			</div>
+			<span>More</span>
+		</div>
+	);
+}
+
 function ActivityHeatmapSkeleton() {
 	return (
 		<div className="space-y-3">
@@ -89,38 +111,41 @@ export function ActivityHeatmap() {
 				</span>
 			</div>
 
-			{/* Compact heatmap */}
-			<div className="overflow-x-auto">
-				<HeatMap
-					value={convertedData}
-					legendCellSize={0}
-					width={720}
-					startDate={new Date('2026/01/01')}
-					endDate={new Date('2026/12/31')}
-					rectSize={10}
-					space={3}
-					weekLabels={false}
-					monthLabels={['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']}
-					style={{ color: 'var(--color-zinc-500)' }}
-					panelColors={{
-						0: 'rgba(255,255,255,0.04)',
-						8: 'rgba(52,211,153,0.2)',
-						30: 'rgba(52,211,153,0.4)',
-						60: 'rgba(52,211,153,0.6)',
-						90: 'rgba(52,211,153,0.85)',
-					}}
-					rectRender={(props, data) => (
-						<Tooltip key={props.key}>
-							<TooltipTrigger asChild>
-								<rect {...props} />
-							</TooltipTrigger>
-							<TooltipContent side="top" sideOffset={5}>
-								<span className="font-medium">{formatDate(data.date)}</span>
-								<span className="text-muted-foreground ml-1.5">{data.count ? formatTime(data.count) : 'No activity'}</span>
-							</TooltipContent>
-						</Tooltip>
-					)}
-				/>
+			{/* Compact heatmap with legend */}
+			<div className="space-y-1.5">
+				<div className="overflow-x-auto">
+					<HeatMap
+						value={convertedData}
+						legendCellSize={0}
+						width={720}
+						startDate={new Date('2026/01/01')}
+						endDate={new Date('2026/12/31')}
+						rectSize={10}
+						space={3}
+						weekLabels={false}
+						monthLabels={['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']}
+						style={{ color: 'var(--color-zinc-500)' }}
+						panelColors={{
+							0: HEATMAP_COLORS[0],
+							8: HEATMAP_COLORS[1],
+							30: HEATMAP_COLORS[2],
+							60: HEATMAP_COLORS[3],
+							90: HEATMAP_COLORS[4],
+						}}
+						rectRender={(props, data) => (
+							<Tooltip key={props.key}>
+								<TooltipTrigger asChild>
+									<rect {...props} />
+								</TooltipTrigger>
+								<TooltipContent side="top" sideOffset={5}>
+									<span className="font-medium">{formatDate(data.date)}</span>
+									<span className="text-muted-foreground ml-1.5">{data.count ? formatTime(data.count) : 'No activity'}</span>
+								</TooltipContent>
+							</Tooltip>
+						)}
+					/>
+				</div>
+				<ActivityHeatmapLegend />
 			</div>
 		</div>
 	);
