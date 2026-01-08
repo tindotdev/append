@@ -290,7 +290,7 @@ Defaults for MVP:
 ## Definition of Done for MVP (ship and not die)
 
 - [ ] Chrome extension emits heartbeats reliably (foreground use).
-- [ ] `/events/ingest` stores real events and dedupes by `(user_id, device_id, event_id)`.
+- [x] `/events/ingest` stores real events and dedupes by `(user_id, device_id, event_id)`.
 - [ ] Today/Week/Heatmap dashboards show real totals and breakdowns.
 - [ ] `/events/export` works and is documented in-app.
 - [ ] Privacy statement exists and matches actual collection.

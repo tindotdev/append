@@ -5,6 +5,7 @@ import { acceptRoutes } from './features/accept/routes';
 import { batchRoutes } from './features/batch/routes';
 import { bucketRoutes } from './features/bucket/routes';
 import { candidateRoutes } from './features/candidate/routes';
+import { eventsRoutes } from './features/events/routes';
 import { exportRoutes } from './features/export/routes';
 import { importRoutes } from './features/import/routes';
 import { suggestionsRoutes } from './features/suggestions/routes';
@@ -71,7 +72,7 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 app.onError((err, c) => {
 	// Only apply contract error shape to /api/* routes
-	if (!c.req.path.startsWith('/api/')) {
+	if (!c.req.path.startsWith('/api/') && !c.req.path.startsWith('/events/')) {
 		throw err;
 	}
 
@@ -88,7 +89,7 @@ app.onError((err, c) => {
 
 app.notFound((c) => {
 	// Only apply contract error shape to /api/* routes
-	if (c.req.path.startsWith('/api/')) {
+	if (c.req.path.startsWith('/api/') || c.req.path.startsWith('/events/')) {
 		return apiError(c, 404, 'NOT_FOUND', 'Resource not found');
 	}
 	// Default behavior for non-API routes
@@ -126,9 +127,20 @@ app.use('/api/*', async (c, next) => {
 	})(c, next);
 });
 
+app.use('/events/*', async (c, next) => {
+	const allowedOrigins = getAllowedOrigins(c.env);
+	return cors({
+		origin: (origin) => (isOriginAllowed(origin, allowedOrigins) ? origin : null),
+		allowMethods: ['POST', 'GET', 'PUT', 'DELETE', 'OPTIONS'],
+		allowHeaders: ['Content-Type', 'X-Import-Id'],
+		credentials: true,
+	})(c, next);
+});
+
 // Explicit OPTIONS preflight handler for /api/* (§3.1)
 // Prevents auth middleware from intercepting preflight requests
 app.options('/api/*', (c) => c.body(null, 204));
+app.options('/events/*', (c) => c.body(null, 204));
 
 // =============================================================================
 // Preview-only origin validation for state-changing requests (ADR 0019)
@@ -136,6 +148,32 @@ app.options('/api/*', (c) => c.body(null, 204));
 // =============================================================================
 
 app.use('/api/*', async (c, next) => {
+	// Only apply in preview environment
+	if (!isPreviewEnv(c.env)) {
+		return next();
+	}
+
+	// Only apply to state-changing methods
+	const method = c.req.method;
+	if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+		return next();
+	}
+
+	// Require valid Origin header for POST/PUT/DELETE in preview
+	const origin = c.req.header('origin');
+	if (!origin) {
+		return apiError(c, 403, 'ORIGIN_FORBIDDEN', 'Origin header required');
+	}
+
+	const allowedOrigins = getAllowedOrigins(c.env);
+	if (!isOriginAllowed(origin, allowedOrigins)) {
+		return apiError(c, 403, 'ORIGIN_FORBIDDEN', 'Invalid origin');
+	}
+
+	return next();
+});
+
+app.use('/events/*', async (c, next) => {
 	// Only apply in preview environment
 	if (!isPreviewEnv(c.env)) {
 		return next();
@@ -200,11 +238,37 @@ app.use('/api/*', async (c, next) => {
 	await next();
 });
 
+app.use('/events/*', async (c, next) => {
+	const auth = c.get('auth');
+
+	// Call getSession with returnHeaders to capture set-cookie for token refresh
+	const { headers, response: session } = await auth.api.getSession({
+		headers: c.req.raw.headers,
+		returnHeaders: true,
+	});
+
+	// Forward set-cookie headers for token refresh (use append semantics)
+	const setCookie = headers.get('set-cookie');
+	if (setCookie) {
+		c.res.headers.append('set-cookie', setCookie);
+	}
+
+	// 401 if no valid session
+	if (!session) {
+		return apiError(c, 401, 'UNAUTHORIZED', 'Authentication required');
+	}
+
+	// Set userId for downstream handlers
+	c.set('userId', session.user.id);
+	await next();
+});
+
 // =============================================================================
 // DB context for /api/* routes
 // =============================================================================
 
 app.use('/api/*', attachDb);
+app.use('/events/*', attachDb);
 
 // =============================================================================
 // E2E Auth Bootstrap (ADR 0019) - must be BEFORE generic /auth/* handler
@@ -226,6 +290,12 @@ app.all('/auth/*', async (c) => {
 // =============================================================================
 
 app.get('/', (c) => c.json({ status: 'ok' }));
+
+// =============================================================================
+// Events ingest (telemetry)
+// =============================================================================
+
+app.route('/events', eventsRoutes);
 
 // =============================================================================
 // API routes

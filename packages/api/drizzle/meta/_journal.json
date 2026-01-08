@@ -43,6 +43,13 @@
       "when": 1767346924910,
       "tag": "0005_black_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1767889562588,
+      "tag": "0006_slim_callisto",
+      "breakpoints": true
     }
   ]
 }
