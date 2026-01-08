@@ -1,5 +1,9 @@
+import { Link } from '@tanstack/react-router';
 import HeatMap from '@uiw/react-heat-map';
+import { Activity } from 'lucide-react';
 import { useMemo } from 'react';
+import { Button } from '@/components/ui/button';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { useHeatmapData } from '../hooks/use-heatmap-data';
 import type { HeatmapDay } from '../types';
 
@@ -21,6 +25,25 @@ function formatTime(minutes: number): string {
 export function ActivityHeatmap() {
 	const { data, stats } = useHeatmapData();
 	const convertedData = useMemo(() => convertToHeatmapFormat(data.days), [data.days]);
+
+	const isEmpty = stats.activeDays === 0;
+
+	if (isEmpty) {
+		return (
+			<Empty className="border p-6">
+				<EmptyHeader>
+					<EmptyMedia variant="icon">
+						<Activity />
+					</EmptyMedia>
+					<EmptyTitle>No activity yet</EmptyTitle>
+					<EmptyDescription>Start capturing to see your activity patterns here</EmptyDescription>
+				</EmptyHeader>
+				<Button variant="outline" size="sm" asChild>
+					<Link to="/batch/new">Start capturing</Link>
+				</Button>
+			</Empty>
+		);
+	}
 
 	return (
 		<div className="space-y-3">

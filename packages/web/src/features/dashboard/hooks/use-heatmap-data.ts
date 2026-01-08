@@ -52,8 +52,25 @@ function calculateStats(data: HeatmapData): HeatmapStatsData {
 	};
 }
 
-export function useHeatmapData() {
-	const data = useMemo(() => generateMockData(), []);
+interface UseHeatmapDataOptions {
+	/** Force empty state for testing */
+	forceEmpty?: boolean;
+}
+
+export function useHeatmapData(options: UseHeatmapDataOptions = {}) {
+	const { forceEmpty = false } = options;
+
+	const data = useMemo(() => {
+		if (forceEmpty) {
+			return {
+				year: 2026,
+				timezone: 'Asia/Bangkok',
+				days: [],
+			};
+		}
+		return generateMockData();
+	}, [forceEmpty]);
+
 	const stats = useMemo(() => calculateStats(data), [data]);
 
 	return { data, stats };
