@@ -232,6 +232,11 @@ Key cards (MVP):
 - **Top topic** (by minutes, week)
 - **Captures today** (term/question list)
 
+UX prototyping note:
+
+- The current web UX prototype includes a local telemetry simulator to drive these dashboards without any backend/API dependencies.
+- Production replaces this with the real `/dashboard/*` queries backed by ingested events.
+
 ## Browser extension (emitter)
 
 ### Responsibilities (MVP)
