@@ -8,6 +8,7 @@
 		"dev": "pnpm -r --parallel dev",
 		"dev:api": "pnpm --filter @append/api run dev",
 		"dev:web": "pnpm --filter @append/web run dev",
+		"dev:extension": "pnpm --filter @append/extension dev",
 		"build": "pnpm -r --if-present build",
 		"docs:policy": "node scripts/check-docs-policy.mjs",
 		"typecheck": "pnpm -r --if-present typecheck",
