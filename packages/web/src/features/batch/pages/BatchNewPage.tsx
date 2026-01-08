@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useOutboxSafe } from '@/features/outbox';
-import { UNDO_GRACE_MS } from '@/lib/outbox';
+import { UNDO_GRACE_MS } from '@/lib/outbox-adapter';
 
 // --- Constants ---
 const TERM_MIN = 1;
@@ -238,8 +238,8 @@ export function BatchNewPage() {
 					label: 'Undo',
 					onClick: async () => {
 						const result = await outbox.undo(item.id);
-						if (result.success && result.terms) {
-							restoreDraft(result.terms);
+						if (result.success && result.command?.type === 'capture_terms') {
+							restoreDraft(result.command.request.terms);
 							toast.success('Restored to composer');
 						} else {
 							toast.error('Cannot undo — already sent');

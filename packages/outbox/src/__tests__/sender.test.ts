@@ -3,7 +3,30 @@ import { createMockBroadcast } from '../broadcast';
 import { UNDO_GRACE_MS } from '../constants';
 import { createEnqueueHelper, createSenderLoop, createUndoHelper } from '../sender';
 import { createMockOutboxStore } from '../store';
-import type { CaptureTermsCommand, Clock, CommandSender, OutboxItem, SendResult } from '../types';
+import type { Transport, TransportResult } from '../transport';
+import type { Clock, OutboxItem } from '../types';
+
+// =============================================================================
+// Test Types
+// =============================================================================
+
+interface TestCommand {
+	type: 'test_command';
+	request: {
+		data: string;
+		clientRequestId: string;
+	};
+}
+
+interface TestResult {
+	resultId: string;
+}
+
+interface TestBroadcastResult {
+	commandType: string;
+	itemId: string;
+	resultId: string;
+}
 
 // =============================================================================
 // Test Helpers
@@ -22,33 +45,35 @@ function createMockClock(initialTime = 1000): Clock & { advance: (ms: number) =>
 	};
 }
 
-function createMockSender(defaultResult: SendResult = { outcome: 'success', batchId: 'batch-123' }): CommandSender & {
-	setResult: (result: SendResult) => void;
-	calls: Array<{ command: CaptureTermsCommand }>;
+function createMockTransport(
+	defaultResult: TransportResult<TestResult> = { outcome: 'success', result: { resultId: 'result-123' } }
+): Transport<TestCommand, TestResult> & {
+	setResult: (result: TransportResult<TestResult>) => void;
+	calls: Array<{ command: TestCommand }>;
 } {
 	let result = defaultResult;
-	const calls: Array<{ command: CaptureTermsCommand }> = [];
+	const calls: Array<{ command: TestCommand }> = [];
 	return {
 		calls,
-		setResult: (r: SendResult) => {
+		setResult: (r: TransportResult<TestResult>) => {
 			result = r;
 		},
-		send: async (command) => {
-			calls.push({ command: command as CaptureTermsCommand });
+		execute: async (command) => {
+			calls.push({ command });
 			return result;
 		},
 	};
 }
 
-function createTestItem(overrides: Partial<OutboxItem<CaptureTermsCommand>> = {}): OutboxItem<CaptureTermsCommand> {
+function createTestItem(overrides: Partial<OutboxItem<TestCommand>> = {}): OutboxItem<TestCommand> {
 	const now = 1000;
 	return {
 		id: overrides.id ?? `item-${Math.random().toString(36).slice(2)}`,
 		userScope: 'user-123',
 		command: {
-			type: 'capture_terms',
+			type: 'test_command',
 			request: {
-				terms: 'test term',
+				data: 'test data',
 				clientRequestId: 'req-123',
 			},
 		},
@@ -62,73 +87,81 @@ function createTestItem(overrides: Partial<OutboxItem<CaptureTermsCommand>> = {}
 	};
 }
 
+function createResultPayload(item: OutboxItem<TestCommand>, result: TestResult): TestBroadcastResult {
+	return {
+		commandType: item.command.type,
+		itemId: item.id,
+		resultId: result.resultId,
+	};
+}
+
 // =============================================================================
 // Sender Loop Tests
 // =============================================================================
 
 describe('createSenderLoop', () => {
-	let store: ReturnType<typeof createMockOutboxStore>;
-	let broadcast: ReturnType<typeof createMockBroadcast>;
+	let store: ReturnType<typeof createMockOutboxStore<TestCommand>>;
+	let broadcast: ReturnType<typeof createMockBroadcast<TestBroadcastResult>>;
 	let clock: ReturnType<typeof createMockClock>;
-	let sender: ReturnType<typeof createMockSender>;
+	let transport: ReturnType<typeof createMockTransport>;
 	const userScope = 'user-123';
 
 	beforeEach(() => {
-		store = createMockOutboxStore();
-		broadcast = createMockBroadcast();
+		store = createMockOutboxStore<TestCommand>();
+		broadcast = createMockBroadcast<TestBroadcastResult>();
 		clock = createMockClock(1000);
-		sender = createMockSender();
+		transport = createMockTransport();
 	});
 
 	describe('processOnce', () => {
 		it('returns false when no items are due', async () => {
-			const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+			const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 
 			const result = await loop.processOnce();
 
 			expect(result).toBe(false);
-			expect(sender.calls).toHaveLength(0);
+			expect(transport.calls).toHaveLength(0);
 		});
 
 		it('processes due items and returns true', async () => {
 			const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
 			await store.put(item);
 
-			const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+			const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 			const result = await loop.processOnce();
 
 			expect(result).toBe(true);
-			expect(sender.calls).toHaveLength(1);
+			expect(transport.calls).toHaveLength(1);
 		});
 
 		it('skips items not yet due', async () => {
 			const item = createTestItem({ id: 'item-1', nextAttemptAt: 2000 }); // Future
 			await store.put(item);
 
-			const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+			const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 			const result = await loop.processOnce();
 
 			expect(result).toBe(false);
-			expect(sender.calls).toHaveLength(0);
+			expect(transport.calls).toHaveLength(0);
 		});
 
 		it('skips items with wrong userScope', async () => {
 			const item = createTestItem({ id: 'item-1', userScope: 'other-user', nextAttemptAt: 500 });
 			await store.put(item);
 
-			const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+			const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 			const result = await loop.processOnce();
 
 			expect(result).toBe(false);
 		});
 
-		describe('on success (201/200)', () => {
+		describe('on success', () => {
 			it('deletes the item from store', async () => {
 				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
 				await store.put(item);
-				sender.setResult({ outcome: 'success', batchId: 'batch-abc' });
+				transport.setResult({ outcome: 'success', result: { resultId: 'result-abc' } });
 
-				const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+				const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 				await loop.processOnce();
 
 				expect(await store.get('item-1')).toBeUndefined();
@@ -137,9 +170,9 @@ describe('createSenderLoop', () => {
 			it('broadcasts outbox_changed and outbox_result', async () => {
 				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
 				await store.put(item);
-				sender.setResult({ outcome: 'success', batchId: 'batch-abc' });
+				transport.setResult({ outcome: 'success', result: { resultId: 'result-abc' } });
 
-				const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+				const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 				await loop.processOnce();
 
 				expect(broadcast.messages).toContainEqual({ type: 'outbox_changed', userScope });
@@ -147,9 +180,9 @@ describe('createSenderLoop', () => {
 					type: 'outbox_result',
 					userScope,
 					result: {
-						commandType: 'capture_terms',
+						commandType: 'test_command',
 						itemId: 'item-1',
-						batchId: 'batch-abc',
+						resultId: 'result-abc',
 					},
 				});
 			});
@@ -159,9 +192,9 @@ describe('createSenderLoop', () => {
 			it('increments attemptCount', async () => {
 				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500, attemptCount: 2 });
 				await store.put(item);
-				sender.setResult({ outcome: 'retry', error: { message: 'Server error' } });
+				transport.setResult({ outcome: 'retry', error: { message: 'Server error' } });
 
-				const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+				const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 				await loop.processOnce();
 
 				const updated = await store.get('item-1');
@@ -171,9 +204,9 @@ describe('createSenderLoop', () => {
 			it('schedules next attempt with backoff', async () => {
 				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500, attemptCount: 0 });
 				await store.put(item);
-				sender.setResult({ outcome: 'retry', error: { message: 'Server error' } });
+				transport.setResult({ outcome: 'retry', error: { message: 'Server error' } });
 
-				const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+				const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 				await loop.processOnce();
 
 				const updated = await store.get('item-1');
@@ -184,9 +217,9 @@ describe('createSenderLoop', () => {
 			it('stores lastError', async () => {
 				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
 				await store.put(item);
-				sender.setResult({ outcome: 'retry', error: { status: 503, message: 'Service Unavailable' } });
+				transport.setResult({ outcome: 'retry', error: { status: 503, message: 'Service Unavailable' } });
 
-				const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+				const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 				await loop.processOnce();
 
 				const updated = await store.get('item-1');
@@ -196,9 +229,9 @@ describe('createSenderLoop', () => {
 			it('keeps status as pending', async () => {
 				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
 				await store.put(item);
-				sender.setResult({ outcome: 'retry', error: { message: 'Error' } });
+				transport.setResult({ outcome: 'retry', error: { message: 'Error' } });
 
-				const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+				const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 				await loop.processOnce();
 
 				const updated = await store.get('item-1');
@@ -208,9 +241,9 @@ describe('createSenderLoop', () => {
 			it('broadcasts outbox_changed', async () => {
 				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
 				await store.put(item);
-				sender.setResult({ outcome: 'retry', error: { message: 'Error' } });
+				transport.setResult({ outcome: 'retry', error: { message: 'Error' } });
 
-				const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+				const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 				await loop.processOnce();
 
 				expect(broadcast.messages).toContainEqual({ type: 'outbox_changed', userScope });
@@ -221,9 +254,9 @@ describe('createSenderLoop', () => {
 			it('marks item as blocked_auth', async () => {
 				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
 				await store.put(item);
-				sender.setResult({ outcome: 'blocked_auth', error: { status: 401, message: 'Unauthorized' } });
+				transport.setResult({ outcome: 'blocked_auth', error: { status: 401, message: 'Unauthorized' } });
 
-				const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+				const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 				await loop.processOnce();
 
 				const updated = await store.get('item-1');
@@ -233,10 +266,10 @@ describe('createSenderLoop', () => {
 			it('calls onAuthBlocked callback', async () => {
 				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
 				await store.put(item);
-				sender.setResult({ outcome: 'blocked_auth', error: { status: 401, message: 'Unauthorized' } });
+				transport.setResult({ outcome: 'blocked_auth', error: { status: 401, message: 'Unauthorized' } });
 
 				const onAuthBlocked = vi.fn();
-				const loop = createSenderLoop({ store, sender, broadcast, clock, userScope, onAuthBlocked });
+				const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, onAuthBlocked, createResultPayload });
 				await loop.processOnce();
 
 				expect(onAuthBlocked).toHaveBeenCalledTimes(1);
@@ -249,12 +282,12 @@ describe('createSenderLoop', () => {
 				await store.put(item2);
 
 				let callCount = 0;
-				sender.send = async () => {
+				transport.execute = async () => {
 					callCount++;
 					return { outcome: 'blocked_auth', error: { status: 401, message: 'Unauthorized' } };
 				};
 
-				const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+				const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 				await loop.processOnce();
 
 				// Should only process one item before stopping
@@ -266,9 +299,9 @@ describe('createSenderLoop', () => {
 			it('marks item as failed', async () => {
 				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
 				await store.put(item);
-				sender.setResult({ outcome: 'failed', error: { status: 400, code: 'VALIDATION_ERROR', message: 'Invalid' } });
+				transport.setResult({ outcome: 'failed', error: { status: 400, code: 'VALIDATION_ERROR', message: 'Invalid' } });
 
-				const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+				const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 				await loop.processOnce();
 
 				const updated = await store.get('item-1');
@@ -278,12 +311,12 @@ describe('createSenderLoop', () => {
 			it('stores lastError', async () => {
 				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
 				await store.put(item);
-				sender.setResult({
+				transport.setResult({
 					outcome: 'failed',
 					error: { status: 409, code: 'IDEMPOTENCY_CONFLICT', message: 'Conflict' },
 				});
 
-				const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+				const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 				await loop.processOnce();
 
 				const updated = await store.get('item-1');
@@ -297,9 +330,9 @@ describe('createSenderLoop', () => {
 			it('broadcasts outbox_changed', async () => {
 				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
 				await store.put(item);
-				sender.setResult({ outcome: 'failed', error: { message: 'Error' } });
+				transport.setResult({ outcome: 'failed', error: { message: 'Error' } });
 
-				const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+				const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 				await loop.processOnce();
 
 				expect(broadcast.messages).toContainEqual({ type: 'outbox_changed', userScope });
@@ -307,27 +340,39 @@ describe('createSenderLoop', () => {
 		});
 
 		it('processes multiple items in FIFO order', async () => {
-			const item1 = createTestItem({ id: 'item-1', nextAttemptAt: 300 });
-			const item2 = createTestItem({ id: 'item-2', nextAttemptAt: 400 });
-			const item3 = createTestItem({ id: 'item-3', nextAttemptAt: 500 });
+			const item1 = createTestItem({
+				id: 'item-1',
+				nextAttemptAt: 300,
+				command: { type: 'test_command', request: { data: 'data1', clientRequestId: 'req-1' } },
+			});
+			const item2 = createTestItem({
+				id: 'item-2',
+				nextAttemptAt: 400,
+				command: { type: 'test_command', request: { data: 'data2', clientRequestId: 'req-2' } },
+			});
+			const item3 = createTestItem({
+				id: 'item-3',
+				nextAttemptAt: 500,
+				command: { type: 'test_command', request: { data: 'data3', clientRequestId: 'req-3' } },
+			});
 			await store.put(item2);
 			await store.put(item3);
 			await store.put(item1);
 
-			const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+			const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 			await loop.processOnce();
 
 			// All three should be processed in order
-			expect(sender.calls).toHaveLength(3);
-			expect(sender.calls[0].command.request.clientRequestId).toBe(item1.command.request.clientRequestId);
-			expect(sender.calls[1].command.request.clientRequestId).toBe(item2.command.request.clientRequestId);
-			expect(sender.calls[2].command.request.clientRequestId).toBe(item3.command.request.clientRequestId);
+			expect(transport.calls).toHaveLength(3);
+			expect(transport.calls[0].command.request.clientRequestId).toBe('req-1');
+			expect(transport.calls[1].command.request.clientRequestId).toBe('req-2');
+			expect(transport.calls[2].command.request.clientRequestId).toBe('req-3');
 		});
 	});
 
 	describe('getNextDueTime', () => {
 		it('returns null when no pending items', async () => {
-			const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+			const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 
 			const result = await loop.getNextDueTime();
 
@@ -339,7 +384,7 @@ describe('createSenderLoop', () => {
 			await store.put(createTestItem({ id: 'item-2', nextAttemptAt: 1500 }));
 			await store.put(createTestItem({ id: 'item-3', nextAttemptAt: 2000 }));
 
-			const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+			const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 			const result = await loop.getNextDueTime();
 
 			expect(result).toBe(1500);
@@ -349,7 +394,7 @@ describe('createSenderLoop', () => {
 			await store.put(createTestItem({ id: 'item-1', status: 'failed', nextAttemptAt: 1000 }));
 			await store.put(createTestItem({ id: 'item-2', status: 'pending', nextAttemptAt: 2000 }));
 
-			const loop = createSenderLoop({ store, sender, broadcast, clock, userScope });
+			const loop = createSenderLoop({ store, transport, broadcast, clock, userScope, createResultPayload });
 			const result = await loop.getNextDueTime();
 
 			expect(result).toBe(2000);
@@ -361,72 +406,86 @@ describe('createSenderLoop', () => {
 // Enqueue Helper Tests
 // =============================================================================
 
+interface EnqueueOptions {
+	data: string;
+}
+
+function createCommand(options: EnqueueOptions): TestCommand {
+	return {
+		type: 'test_command',
+		request: {
+			data: options.data,
+			clientRequestId: crypto.randomUUID(),
+		},
+	};
+}
+
 describe('createEnqueueHelper', () => {
-	let store: ReturnType<typeof createMockOutboxStore>;
+	let store: ReturnType<typeof createMockOutboxStore<TestCommand>>;
 	let broadcast: ReturnType<typeof createMockBroadcast>;
 	let clock: ReturnType<typeof createMockClock>;
 	const userScope = 'user-123';
 
 	beforeEach(() => {
-		store = createMockOutboxStore();
+		store = createMockOutboxStore<TestCommand>();
 		broadcast = createMockBroadcast();
 		clock = createMockClock(1000);
 	});
 
 	it('creates an item with correct properties', async () => {
-		const enqueue = createEnqueueHelper({ store, broadcast, clock, userScope });
+		const enqueue = createEnqueueHelper<TestCommand, EnqueueOptions>({ store, broadcast, clock, userScope }, createCommand);
 
-		const { item } = await enqueue({ terms: 'term1\nterm2' });
+		const { item } = await enqueue({ data: 'test data' });
 
 		expect(item.id).toBeDefined();
 		expect(item.userScope).toBe(userScope);
-		expect(item.command.type).toBe('capture_terms');
-		expect(item.command.request.terms).toBe('term1\nterm2');
+		expect(item.command.type).toBe('test_command');
+		expect(item.command.request.data).toBe('test data');
 		expect(item.command.request.clientRequestId).toBeDefined();
 		expect(item.status).toBe('pending');
 		expect(item.attemptCount).toBe(0);
 	});
 
 	it('sets undoUntil = now + UNDO_GRACE_MS', async () => {
-		const enqueue = createEnqueueHelper({ store, broadcast, clock, userScope });
+		const enqueue = createEnqueueHelper<TestCommand, EnqueueOptions>({ store, broadcast, clock, userScope }, createCommand);
 
-		const { item } = await enqueue({ terms: 'test' });
+		const { item } = await enqueue({ data: 'test' });
 
 		expect(item.undoUntil).toBe(clock.now() + UNDO_GRACE_MS);
 	});
 
 	it('sets nextAttemptAt = undoUntil (prevents send during grace window)', async () => {
-		const enqueue = createEnqueueHelper({ store, broadcast, clock, userScope });
+		const enqueue = createEnqueueHelper<TestCommand, EnqueueOptions>({ store, broadcast, clock, userScope }, createCommand);
 
-		const { item } = await enqueue({ terms: 'test' });
+		const { item } = await enqueue({ data: 'test' });
 
 		expect(item.nextAttemptAt).toBe(item.undoUntil);
 	});
 
 	it('persists item to store', async () => {
-		const enqueue = createEnqueueHelper({ store, broadcast, clock, userScope });
+		const enqueue = createEnqueueHelper<TestCommand, EnqueueOptions>({ store, broadcast, clock, userScope }, createCommand);
 
-		const { item } = await enqueue({ terms: 'test' });
+		const { item } = await enqueue({ data: 'test' });
 
 		const stored = await store.get(item.id);
 		expect(stored).toBeDefined();
-		expect(stored?.command.request.terms).toBe('test');
+		expect(stored?.command.request.data).toBe('test');
 	});
 
 	it('broadcasts outbox_changed and kick', async () => {
-		const enqueue = createEnqueueHelper({ store, broadcast, clock, userScope });
+		const enqueue = createEnqueueHelper<TestCommand, EnqueueOptions>({ store, broadcast, clock, userScope }, createCommand);
 
-		await enqueue({ terms: 'test' });
+		await enqueue({ data: 'test' });
 
 		expect(broadcast.messages).toContainEqual({ type: 'outbox_changed', userScope });
 		expect(broadcast.messages).toContainEqual({ type: 'kick' });
 	});
 
 	it('generates unique IDs for each enqueue', async () => {
-		const enqueue = createEnqueueHelper({ store, broadcast, clock, userScope });
+		const enqueue = createEnqueueHelper<TestCommand, EnqueueOptions>({ store, broadcast, clock, userScope }, createCommand);
 
-		const { item: item1 } = await enqueue({ terms: 'test1' });
-		const { item: item2 } = await enqueue({ terms: 'test2' });
+		const { item: item1 } = await enqueue({ data: 'test1' });
+		const { item: item2 } = await enqueue({ data: 'test2' });
 
 		expect(item1.id).not.toBe(item2.id);
 		expect(item1.command.request.clientRequestId).not.toBe(item2.command.request.clientRequestId);
@@ -438,37 +497,38 @@ describe('createEnqueueHelper', () => {
 // =============================================================================
 
 describe('createUndoHelper', () => {
-	let store: ReturnType<typeof createMockOutboxStore>;
+	let store: ReturnType<typeof createMockOutboxStore<TestCommand>>;
 	let broadcast: ReturnType<typeof createMockBroadcast>;
 	let clock: ReturnType<typeof createMockClock>;
 	const userScope = 'user-123';
 
 	beforeEach(() => {
-		store = createMockOutboxStore();
+		store = createMockOutboxStore<TestCommand>();
 		broadcast = createMockBroadcast();
 		clock = createMockClock(1000);
 	});
 
-	it('returns success and terms when within grace window', async () => {
+	it('returns success and command when within grace window', async () => {
+		const command: TestCommand = { type: 'test_command', request: { data: 'my data', clientRequestId: 'req-1' } };
 		const item = createTestItem({
 			id: 'item-1',
 			undoUntil: clock.now() + 5000, // 5 seconds from now
-			command: { type: 'capture_terms', request: { terms: 'my terms', clientRequestId: 'req-1' } },
+			command,
 		});
 		await store.put(item);
 
-		const undo = createUndoHelper({ store, broadcast, clock, userScope });
+		const undo = createUndoHelper<TestCommand>({ store, broadcast, clock, userScope });
 		const result = await undo('item-1');
 
 		expect(result.success).toBe(true);
-		expect(result.terms).toBe('my terms');
+		expect(result.command).toEqual(command);
 	});
 
 	it('deletes item from store on successful undo', async () => {
 		const item = createTestItem({ id: 'item-1', undoUntil: clock.now() + 5000 });
 		await store.put(item);
 
-		const undo = createUndoHelper({ store, broadcast, clock, userScope });
+		const undo = createUndoHelper<TestCommand>({ store, broadcast, clock, userScope });
 		await undo('item-1');
 
 		expect(await store.get('item-1')).toBeUndefined();
@@ -478,7 +538,7 @@ describe('createUndoHelper', () => {
 		const item = createTestItem({ id: 'item-1', undoUntil: clock.now() + 5000 });
 		await store.put(item);
 
-		const undo = createUndoHelper({ store, broadcast, clock, userScope });
+		const undo = createUndoHelper<TestCommand>({ store, broadcast, clock, userScope });
 		await undo('item-1');
 
 		expect(broadcast.messages).toContainEqual({ type: 'outbox_changed', userScope });
@@ -491,25 +551,25 @@ describe('createUndoHelper', () => {
 		});
 		await store.put(item);
 
-		const undo = createUndoHelper({ store, broadcast, clock, userScope });
+		const undo = createUndoHelper<TestCommand>({ store, broadcast, clock, userScope });
 		const result = await undo('item-1');
 
 		expect(result.success).toBe(false);
-		expect(result.terms).toBeUndefined();
+		expect(result.command).toBeUndefined();
 	});
 
 	it('does not delete item when undo window has expired', async () => {
 		const item = createTestItem({ id: 'item-1', undoUntil: clock.now() - 1 });
 		await store.put(item);
 
-		const undo = createUndoHelper({ store, broadcast, clock, userScope });
+		const undo = createUndoHelper<TestCommand>({ store, broadcast, clock, userScope });
 		await undo('item-1');
 
 		expect(await store.get('item-1')).toBeDefined();
 	});
 
 	it('returns failure for non-existent item', async () => {
-		const undo = createUndoHelper({ store, broadcast, clock, userScope });
+		const undo = createUndoHelper<TestCommand>({ store, broadcast, clock, userScope });
 		const result = await undo('non-existent');
 
 		expect(result.success).toBe(false);
@@ -523,7 +583,7 @@ describe('createUndoHelper', () => {
 		});
 		await store.put(item);
 
-		const undo = createUndoHelper({ store, broadcast, clock, userScope });
+		const undo = createUndoHelper<TestCommand>({ store, broadcast, clock, userScope });
 		const result = await undo('item-1');
 
 		expect(result.success).toBe(false);
@@ -536,7 +596,7 @@ describe('createUndoHelper', () => {
 		});
 		await store.put(item);
 
-		const undo = createUndoHelper({ store, broadcast, clock, userScope });
+		const undo = createUndoHelper<TestCommand>({ store, broadcast, clock, userScope });
 		const result = await undo('item-1');
 
 		// At exactly undoUntil, undo should fail (now >= undoUntil)

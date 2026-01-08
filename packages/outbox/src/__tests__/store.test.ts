@@ -2,18 +2,21 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createMockOutboxStore, createOutboxStore, getDatabaseName } from '../store';
 import type { OutboxItem } from '../types';
 
+// Test command type
+interface TestCommand {
+	type: 'test';
+	data: string;
+}
+
 // Helper to create a test item
-function createTestItem(overrides: Partial<OutboxItem> = {}): OutboxItem {
+function createTestItem(overrides: Partial<OutboxItem<TestCommand>> = {}): OutboxItem<TestCommand> {
 	const now = Date.now();
 	return {
 		id: overrides.id ?? `item-${Math.random().toString(36).slice(2)}`,
 		userScope: 'user-123',
 		command: {
-			type: 'capture_terms',
-			request: {
-				terms: 'test term',
-				clientRequestId: 'req-123',
-			},
+			type: 'test',
+			data: 'test data',
 		},
 		createdAt: now,
 		updatedAt: now,
@@ -33,10 +36,10 @@ describe('getDatabaseName', () => {
 });
 
 describe('createMockOutboxStore', () => {
-	let store: ReturnType<typeof createMockOutboxStore>;
+	let store: ReturnType<typeof createMockOutboxStore<TestCommand>>;
 
 	beforeEach(() => {
-		store = createMockOutboxStore();
+		store = createMockOutboxStore<TestCommand>();
 	});
 
 	describe('put/get', () => {
@@ -254,7 +257,7 @@ describe('createOutboxStore (IndexedDB)', () => {
 	describe('put/get', () => {
 		it('stores and retrieves an item', async () => {
 			const userScope = getUniqueScope();
-			const store = createOutboxStore(userScope);
+			const store = createOutboxStore<TestCommand>(userScope);
 			const item = createTestItem({ id: 'idb-test-1', userScope });
 
 			await store.put(item);
@@ -265,7 +268,7 @@ describe('createOutboxStore (IndexedDB)', () => {
 
 		it('returns undefined for non-existent item', async () => {
 			const userScope = getUniqueScope();
-			const store = createOutboxStore(userScope);
+			const store = createOutboxStore<TestCommand>(userScope);
 
 			const retrieved = await store.get('non-existent');
 			expect(retrieved).toBeUndefined();
@@ -275,7 +278,7 @@ describe('createOutboxStore (IndexedDB)', () => {
 	describe('delete', () => {
 		it('removes an item', async () => {
 			const userScope = getUniqueScope();
-			const store = createOutboxStore(userScope);
+			const store = createOutboxStore<TestCommand>(userScope);
 			const item = createTestItem({ id: 'idb-delete-1', userScope });
 
 			await store.put(item);
@@ -289,7 +292,7 @@ describe('createOutboxStore (IndexedDB)', () => {
 	describe('listDue', () => {
 		it('returns pending items with nextAttemptAt <= now', async () => {
 			const userScope = getUniqueScope();
-			const store = createOutboxStore(userScope);
+			const store = createOutboxStore<TestCommand>(userScope);
 			const now = Date.now();
 			const pastItem = createTestItem({ id: 'idb-past', userScope, nextAttemptAt: now - 1000 });
 			const futureItem = createTestItem({ id: 'idb-future', userScope, nextAttemptAt: now + 10000 });
@@ -307,7 +310,7 @@ describe('createOutboxStore (IndexedDB)', () => {
 	describe('countByStatus', () => {
 		it('counts items by status', async () => {
 			const userScope = getUniqueScope();
-			const store = createOutboxStore(userScope);
+			const store = createOutboxStore<TestCommand>(userScope);
 
 			await store.put(createTestItem({ id: 'idb-p1', userScope, status: 'pending' }));
 			await store.put(createTestItem({ id: 'idb-p2', userScope, status: 'pending' }));
@@ -324,7 +327,7 @@ describe('createOutboxStore (IndexedDB)', () => {
 	describe('listByStatus', () => {
 		it('lists items by status', async () => {
 			const userScope = getUniqueScope();
-			const store = createOutboxStore(userScope);
+			const store = createOutboxStore<TestCommand>(userScope);
 
 			await store.put(createTestItem({ id: 'idb-s1', userScope, status: 'pending' }));
 			await store.put(createTestItem({ id: 'idb-s2', userScope, status: 'failed' }));
