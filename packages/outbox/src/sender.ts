@@ -13,103 +13,46 @@
  * - Respects undoUntil by setting nextAttemptAt = undoUntil for new items
  */
 
-import { api, buildApiRequestError } from '@/lib/api-rpc';
 import { UNDO_GRACE_MS } from './constants';
-import { calculateNextAttemptAt, classifyResponse, isNetworkError } from './error-classifier';
-import type {
-	CaptureTermsCommand,
-	Clock,
-	CommandSender,
-	OutboxBroadcast,
-	OutboxCommand,
-	OutboxError,
-	OutboxItem,
-	OutboxStore,
-	SendResult,
-} from './types';
-
-// =============================================================================
-// Command Sender Implementation
-// =============================================================================
-
-/**
- * Send a capture_terms command to the API.
- */
-async function sendCaptureTerms(command: CaptureTermsCommand): Promise<SendResult> {
-	try {
-		const res = await api.api.batch.$post({
-			json: command.request,
-		});
-
-		const status = res.status;
-
-		if (res.ok) {
-			const body = (await res.json()) as { id: string };
-			return { outcome: 'success', batchId: body.id };
-		}
-
-		// Parse error response
-		const error = await buildApiRequestError(res);
-		const classification = classifyResponse(status, error.code);
-
-		const outboxError: OutboxError = {
-			status,
-			code: error.code,
-			message: error.message,
-		};
-
-		switch (classification.type) {
-			case 'blocked_auth':
-				return { outcome: 'blocked_auth', error: outboxError };
-			case 'failed':
-				return { outcome: 'failed', error: outboxError };
-			default:
-				return { outcome: 'retry', error: outboxError };
-		}
-	} catch (err) {
-		// Network error - retryable
-		if (isNetworkError(err)) {
-			return {
-				outcome: 'retry',
-				error: { message: 'Network error' },
-			};
-		}
-		// Unknown error - treat as retryable
-		return {
-			outcome: 'retry',
-			error: { message: err instanceof Error ? err.message : 'Unknown error' },
-		};
-	}
-}
-
-/**
- * Create a command sender that dispatches to the appropriate API endpoint.
- */
-export function createCommandSender(): CommandSender {
-	return {
-		async send(command: OutboxCommand): Promise<SendResult> {
-			// v1: Only capture_terms is supported
-			// When more command types are added, use a switch statement
-			return sendCaptureTerms(command);
-		},
-	};
-}
+import { calculateNextAttemptAt } from './error-classifier';
+import type { Transport, TransportResult } from './transport';
+import type { Clock, OutboxBroadcast, OutboxItem, OutboxStore } from './types';
 
 // =============================================================================
 // Sender Loop
 // =============================================================================
 
+/** Outcome of processing an item */
+export type ProcessOutcome = 'success' | 'retry' | 'blocked_auth' | 'failed';
+
 /**
  * Dependencies for the sender loop.
  */
-export interface SenderLoopDeps {
-	store: OutboxStore;
-	sender: CommandSender;
-	broadcast: OutboxBroadcast;
+export interface SenderLoopDeps<TCommand, TResult, TBroadcastResult = unknown> {
+	store: OutboxStore<TCommand>;
+	transport: Transport<TCommand, TResult>;
+	broadcast: OutboxBroadcast<TBroadcastResult>;
 	clock: Clock;
 	userScope: string;
 	/** Called when an item is blocked on auth */
 	onAuthBlocked?: () => void;
+	/** Creates a result payload for broadcast (application-specific) */
+	createResultPayload: (item: OutboxItem<TCommand>, result: TResult) => TBroadcastResult;
+	/**
+	 * Maximum number of retry attempts before marking item as failed.
+	 * Default: undefined (unlimited retries with exponential backoff)
+	 */
+	maxAttempts?: number;
+	/**
+	 * Called after each item is processed (for observability).
+	 * Includes the item and the outcome of the processing attempt.
+	 */
+	onItemProcessed?: (item: OutboxItem<TCommand>, outcome: ProcessOutcome) => void;
+	/**
+	 * Called when a retry is scheduled (for observability).
+	 * Includes the item and the delay in ms until the next attempt.
+	 */
+	onRetryScheduled?: (item: OutboxItem<TCommand>, delayMs: number) => void;
 }
 
 /**
@@ -132,8 +75,21 @@ export interface SenderLoop {
 /**
  * Create a sender loop that processes due items one at a time.
  */
-export function createSenderLoop(deps: SenderLoopDeps): SenderLoop {
-	const { store, sender, broadcast, clock, userScope, onAuthBlocked } = deps;
+export function createSenderLoop<TCommand, TResult, TBroadcastResult = unknown>(
+	deps: SenderLoopDeps<TCommand, TResult, TBroadcastResult>
+): SenderLoop {
+	const {
+		store,
+		transport,
+		broadcast,
+		clock,
+		userScope,
+		onAuthBlocked,
+		createResultPayload,
+		maxAttempts,
+		onItemProcessed,
+		onRetryScheduled,
+	} = deps;
 
 	// Track items currently being processed to prevent duplicate sends
 	// from rapid processOnce() calls within the same tab
@@ -173,7 +129,7 @@ export function createSenderLoop(deps: SenderLoopDeps): SenderLoop {
 
 			try {
 				processedAny = true;
-				const result = await sender.send(current.command);
+				const result: TransportResult<TResult> = await transport.execute(current.command);
 
 				switch (result.outcome) {
 					case 'success':
@@ -183,32 +139,53 @@ export function createSenderLoop(deps: SenderLoopDeps): SenderLoop {
 						broadcast.publish({
 							type: 'outbox_result',
 							userScope,
-							result: {
-								commandType: 'capture_terms',
-								itemId: current.id,
-								batchId: result.batchId,
-							},
+							result: createResultPayload(current, result.result),
 						});
+						onItemProcessed?.(current, 'success');
 						break;
 
 					case 'retry': {
-						// Update attempt count and schedule next attempt
+						const newAttemptCount = current.attemptCount + 1;
+
+						// Check if max attempts exceeded
+						if (maxAttempts !== undefined && newAttemptCount >= maxAttempts) {
+							// Convert to permanent failure
+							const failed: OutboxItem<TCommand> = {
+								...current,
+								status: 'failed',
+								attemptCount: newAttemptCount,
+								lastError: { message: `Max attempts (${maxAttempts}) exceeded` },
+								updatedAt: clock.now(),
+							};
+							await store.put(failed);
+							broadcast.publish({ type: 'outbox_changed', userScope });
+							onItemProcessed?.(current, 'failed');
+							break;
+						}
+
+						// Calculate backoff BEFORE incrementing attemptCount.
+						// This is intentional: attemptCount represents completed attempts, so after
+						// the first failure (attemptCount=0), we use 2^0 = 1s backoff. After the
+						// second failure (attemptCount=1), we use 2^1 = 2s backoff, etc.
 						const nextAttemptAt = calculateNextAttemptAt(clock.now(), current.attemptCount);
-						const updated: OutboxItem = {
+						const delayMs = nextAttemptAt - clock.now();
+						const updated: OutboxItem<TCommand> = {
 							...current,
-							attemptCount: current.attemptCount + 1,
+							attemptCount: newAttemptCount,
 							nextAttemptAt,
 							lastError: result.error,
 							updatedAt: clock.now(),
 						};
 						await store.put(updated);
 						broadcast.publish({ type: 'outbox_changed', userScope });
+						onItemProcessed?.(current, 'retry');
+						onRetryScheduled?.(updated, delayMs);
 						break;
 					}
 
 					case 'blocked_auth': {
 						// Mark as blocked, notify auth blocked handler
-						const blocked: OutboxItem = {
+						const blocked: OutboxItem<TCommand> = {
 							...current,
 							status: 'blocked_auth',
 							lastError: result.error,
@@ -216,6 +193,7 @@ export function createSenderLoop(deps: SenderLoopDeps): SenderLoop {
 						};
 						await store.put(blocked);
 						broadcast.publish({ type: 'outbox_changed', userScope });
+						onItemProcessed?.(current, 'blocked_auth');
 						onAuthBlocked?.();
 						// Stop processing - auth is broken
 						return true;
@@ -223,7 +201,7 @@ export function createSenderLoop(deps: SenderLoopDeps): SenderLoop {
 
 					case 'failed': {
 						// Mark as failed permanently
-						const failed: OutboxItem = {
+						const failed: OutboxItem<TCommand> = {
 							...current,
 							status: 'failed',
 							lastError: result.error,
@@ -231,6 +209,7 @@ export function createSenderLoop(deps: SenderLoopDeps): SenderLoop {
 						};
 						await store.put(failed);
 						broadcast.publish({ type: 'outbox_changed', userScope });
+						onItemProcessed?.(current, 'failed');
 						break;
 					}
 				}
@@ -268,58 +247,51 @@ export function createSenderLoop(deps: SenderLoopDeps): SenderLoop {
 // =============================================================================
 
 /**
- * Options for enqueueing a capture_terms command.
- */
-export interface EnqueueOptions {
-	/** Newline-separated terms */
-	terms: string;
-}
-
-/**
  * Result of enqueueing a command.
  */
-export interface EnqueueResult {
+export interface EnqueueResult<TCommand> {
 	/** The created outbox item */
-	item: OutboxItem<CaptureTermsCommand>;
+	item: OutboxItem<TCommand>;
 }
 
 /**
  * Dependencies for the enqueue helper.
  */
-export interface EnqueueDeps {
-	store: OutboxStore;
+export interface EnqueueDeps<TCommand> {
+	store: OutboxStore<TCommand>;
 	broadcast: OutboxBroadcast;
 	clock: Clock;
 	userScope: string;
+	/** Grace period in ms during which undo is allowed (default: UNDO_GRACE_MS) */
+	undoGraceMs?: number;
 }
 
 /**
- * Create an enqueue helper for capture_terms commands.
+ * Create an enqueue helper for any command type.
+ *
+ * @param deps - Dependencies
+ * @param createCommand - Factory function to create a command from options
  */
-export function createEnqueueHelper(deps: EnqueueDeps): (options: EnqueueOptions) => Promise<EnqueueResult> {
-	const { store, broadcast, clock, userScope } = deps;
+export function createEnqueueHelper<TCommand, TOptions>(
+	deps: EnqueueDeps<TCommand>,
+	createCommand: (options: TOptions) => TCommand
+): (options: TOptions) => Promise<EnqueueResult<TCommand>> {
+	const { store, broadcast, clock, userScope, undoGraceMs = UNDO_GRACE_MS } = deps;
 
-	return async function enqueue(options: EnqueueOptions): Promise<EnqueueResult> {
+	return async function enqueue(options: TOptions): Promise<EnqueueResult<TCommand>> {
 		const now = clock.now();
 		const id = crypto.randomUUID();
-		const clientRequestId = crypto.randomUUID();
 
-		const item: OutboxItem<CaptureTermsCommand> = {
+		const item: OutboxItem<TCommand> = {
 			id,
 			userScope,
-			command: {
-				type: 'capture_terms',
-				request: {
-					terms: options.terms,
-					clientRequestId,
-				},
-			},
+			command: createCommand(options),
 			createdAt: now,
 			updatedAt: now,
-			undoUntil: now + UNDO_GRACE_MS,
+			undoUntil: now + undoGraceMs,
 			status: 'pending',
 			attemptCount: 0,
-			nextAttemptAt: now + UNDO_GRACE_MS, // Not eligible until after undo window
+			nextAttemptAt: now + undoGraceMs, // Not eligible until after undo window
 		};
 
 		await store.put(item);
@@ -337,18 +309,18 @@ export function createEnqueueHelper(deps: EnqueueDeps): (options: EnqueueOptions
 /**
  * Result of attempting to undo an item.
  */
-export interface UndoResult {
+export interface UndoResult<TCommand> {
 	/** Whether the undo was successful */
 	success: boolean;
-	/** The terms that were restored (if successful) */
-	terms?: string;
+	/** The original command (if successful, for restoring UI state) */
+	command?: TCommand;
 }
 
 /**
  * Dependencies for the undo helper.
  */
-export interface UndoDeps {
-	store: OutboxStore;
+export interface UndoDeps<TCommand> {
+	store: OutboxStore<TCommand>;
 	broadcast: OutboxBroadcast;
 	clock: Clock;
 	userScope: string;
@@ -357,11 +329,11 @@ export interface UndoDeps {
 /**
  * Create an undo helper that can cancel items before they're sent.
  */
-export function createUndoHelper(deps: UndoDeps): (itemId: string) => Promise<UndoResult> {
+export function createUndoHelper<TCommand>(deps: UndoDeps<TCommand>): (itemId: string) => Promise<UndoResult<TCommand>> {
 	const { store, broadcast, clock, userScope } = deps;
 
-	return async function undo(itemId: string): Promise<UndoResult> {
-		// First, get the item to extract terms for restoration (before deletion)
+	return async function undo(itemId: string): Promise<UndoResult<TCommand>> {
+		// First, get the item to extract command for restoration (before deletion)
 		const item = await store.get(itemId);
 		if (!item) {
 			return { success: false }; // Already deleted
@@ -371,8 +343,8 @@ export function createUndoHelper(deps: UndoDeps): (itemId: string) => Promise<Un
 			return { success: false }; // Wrong user
 		}
 
-		// Extract terms for restoration before attempting deletion
-		const terms = item.command.type === 'capture_terms' ? item.command.request.terms : undefined;
+		// Extract command for restoration before attempting deletion
+		const command = item.command;
 
 		// Use atomic deleteIf to prevent TOCTOU race condition:
 		// The item could be sent between our check and delete, so we verify
@@ -387,6 +359,6 @@ export function createUndoHelper(deps: UndoDeps): (itemId: string) => Promise<Un
 		}
 
 		broadcast.publish({ type: 'outbox_changed', userScope });
-		return { success: true, terms };
+		return { success: true, command };
 	};
 }

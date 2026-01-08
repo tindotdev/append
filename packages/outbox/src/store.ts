@@ -87,7 +87,7 @@ export function openDatabase(userScope: string): Promise<IDBDatabase> {
  *
  * @param userScope - User scope for database isolation (typically session.user.id)
  */
-export function createOutboxStore(userScope: string): OutboxStore {
+export function createOutboxStore<TCommand = unknown>(userScope: string): OutboxStore<TCommand> {
 	let dbPromise: Promise<IDBDatabase> | null = null;
 
 	function getDb(): Promise<IDBDatabase> {
@@ -98,7 +98,7 @@ export function createOutboxStore(userScope: string): OutboxStore {
 	}
 
 	return {
-		async put(item: OutboxItem): Promise<void> {
+		async put(item: OutboxItem<TCommand>): Promise<void> {
 			const db = await getDb();
 			return new Promise((resolve, reject) => {
 				const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
@@ -112,7 +112,7 @@ export function createOutboxStore(userScope: string): OutboxStore {
 			});
 		},
 
-		async get(id: string): Promise<OutboxItem | undefined> {
+		async get(id: string): Promise<OutboxItem<TCommand> | undefined> {
 			const db = await getDb();
 			return new Promise((resolve, reject) => {
 				const tx = db.transaction(IDB_STORE_NAME, 'readonly');
@@ -137,7 +137,7 @@ export function createOutboxStore(userScope: string): OutboxStore {
 			});
 		},
 
-		async listDue(now: number, _userScope: string): Promise<OutboxItem[]> {
+		async listDue(now: number, _userScope: string): Promise<OutboxItem<TCommand>[]> {
 			const db = await getDb();
 			return new Promise((resolve, reject) => {
 				const tx = db.transaction(IDB_STORE_NAME, 'readonly');
@@ -148,14 +148,14 @@ export function createOutboxStore(userScope: string): OutboxStore {
 				// IDB compound index range: lower bound ['pending', 0], upper bound ['pending', now]
 				const range = IDBKeyRange.bound(['pending', 0], ['pending', now]);
 				const request = index.openCursor(range);
-				const items: OutboxItem[] = [];
+				const items: OutboxItem<TCommand>[] = [];
 
 				tx.onerror = () => reject(tx.error);
 				request.onerror = () => reject(request.error);
 				request.onsuccess = () => {
 					const cursor = request.result;
 					if (cursor) {
-						items.push(cursor.value as OutboxItem);
+						items.push(cursor.value as OutboxItem<TCommand>);
 						try {
 							cursor.continue();
 						} catch (e) {
@@ -177,7 +177,7 @@ export function createOutboxStore(userScope: string): OutboxStore {
 
 				request.onerror = () => reject(request.error);
 				request.onsuccess = () => {
-					const items = request.result as OutboxItem[];
+					const items = request.result as OutboxItem<TCommand>[];
 					const counts: Record<OutboxStatus, number> = {
 						pending: 0,
 						failed: 0,
@@ -191,7 +191,7 @@ export function createOutboxStore(userScope: string): OutboxStore {
 			});
 		},
 
-		async listByStatus(_userScope: string, status: OutboxStatus): Promise<OutboxItem[]> {
+		async listByStatus(_userScope: string, status: OutboxStatus): Promise<OutboxItem<TCommand>[]> {
 			const db = await getDb();
 			return new Promise((resolve, reject) => {
 				const tx = db.transaction(IDB_STORE_NAME, 'readonly');
@@ -202,7 +202,7 @@ export function createOutboxStore(userScope: string): OutboxStore {
 				request.onerror = () => reject(request.error);
 				request.onsuccess = () => {
 					// Sort by createdAt (oldest first)
-					const items = (request.result as OutboxItem[]).sort((a, b) => a.createdAt - b.createdAt);
+					const items = (request.result as OutboxItem<TCommand>[]).sort((a, b) => a.createdAt - b.createdAt);
 					resolve(items);
 				};
 			});
@@ -218,12 +218,12 @@ export function createOutboxStore(userScope: string): OutboxStore {
 
 				request.onerror = () => reject(request.error);
 				request.onsuccess = () => {
-					const items = request.result as OutboxItem[];
+					const items = request.result as OutboxItem<TCommand>[];
 					let count = 0;
 
 					for (const item of items) {
 						// Convert to pending and set nextAttemptAt to now for immediate retry
-						const updated: OutboxItem = {
+						const updated: OutboxItem<TCommand> = {
 							...item,
 							status: 'pending',
 							nextAttemptAt: now,
@@ -247,7 +247,7 @@ export function createOutboxStore(userScope: string): OutboxStore {
 		 * predicate check and the delete. Callers must tolerate this (e.g., undo
 		 * racing with send is OK because the sender re-validates status).
 		 */
-		async deleteIf(id: string, predicate: (item: OutboxItem) => boolean): Promise<boolean> {
+		async deleteIf(id: string, predicate: (item: OutboxItem<TCommand>) => boolean): Promise<boolean> {
 			const db = await getDb();
 			return new Promise((resolve, reject) => {
 				const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
@@ -260,7 +260,7 @@ export function createOutboxStore(userScope: string): OutboxStore {
 				tx.onabort = () => reject(tx.error);
 				getReq.onerror = () => reject(getReq.error);
 				getReq.onsuccess = () => {
-					const item = getReq.result as OutboxItem | undefined;
+					const item = getReq.result as OutboxItem<TCommand> | undefined;
 					if (!item || !predicate(item)) {
 						return;
 					}
@@ -287,13 +287,13 @@ export function createOutboxStore(userScope: string): OutboxStore {
  *
  * This avoids requiring IndexedDB in tests that don't need persistence.
  */
-export function createMockOutboxStore(): OutboxStore & {
+export function createMockOutboxStore<TCommand = unknown>(): OutboxStore<TCommand> & {
 	/** Direct access to items map for test assertions */
-	items: Map<string, OutboxItem>;
+	items: Map<string, OutboxItem<TCommand>>;
 	/** Clear all items */
 	clear(): void;
 } {
-	const items = new Map<string, OutboxItem>();
+	const items = new Map<string, OutboxItem<TCommand>>();
 
 	return {
 		items,
@@ -302,11 +302,11 @@ export function createMockOutboxStore(): OutboxStore & {
 			items.clear();
 		},
 
-		async put(item: OutboxItem): Promise<void> {
+		async put(item: OutboxItem<TCommand>): Promise<void> {
 			items.set(item.id, { ...item });
 		},
 
-		async get(id: string): Promise<OutboxItem | undefined> {
+		async get(id: string): Promise<OutboxItem<TCommand> | undefined> {
 			const item = items.get(id);
 			return item ? { ...item } : undefined;
 		},
@@ -315,7 +315,7 @@ export function createMockOutboxStore(): OutboxStore & {
 			items.delete(id);
 		},
 
-		async listDue(now: number, userScope: string): Promise<OutboxItem[]> {
+		async listDue(now: number, userScope: string): Promise<OutboxItem<TCommand>[]> {
 			return Array.from(items.values())
 				.filter((item) => item.userScope === userScope && item.status === 'pending' && item.nextAttemptAt <= now)
 				.sort((a, b) => a.nextAttemptAt - b.nextAttemptAt);
@@ -335,7 +335,7 @@ export function createMockOutboxStore(): OutboxStore & {
 			return counts;
 		},
 
-		async listByStatus(userScope: string, status: OutboxStatus): Promise<OutboxItem[]> {
+		async listByStatus(userScope: string, status: OutboxStatus): Promise<OutboxItem<TCommand>[]> {
 			return Array.from(items.values())
 				.filter((item) => item.userScope === userScope && item.status === status)
 				.sort((a, b) => a.createdAt - b.createdAt);
@@ -357,7 +357,7 @@ export function createMockOutboxStore(): OutboxStore & {
 			return count;
 		},
 
-		async deleteIf(id: string, predicate: (item: OutboxItem) => boolean): Promise<boolean> {
+		async deleteIf(id: string, predicate: (item: OutboxItem<TCommand>) => boolean): Promise<boolean> {
 			const item = items.get(id);
 			if (!item || !predicate(item)) {
 				return false;
