@@ -4,11 +4,15 @@ import type { HeatmapData, HeatmapStatsData } from '../types';
 function generateMockData(): HeatmapData {
 	const days: { date: string; minutes: number }[] = [];
 
-	// Start from the Sunday before January 1, 2026 (Dec 28, 2025)
-	// End on the Saturday after December 31, 2026 (Jan 2, 2027)
-	// This ensures complete weeks at both ends of the heatmap
-	const startDate = new Date('2026/01/01'); // Sunday before Jan 1, 2026
-	const endDate = new Date('2026/12/31'); // Saturday after Dec 31, 2026
+	// Find the Sunday before or on January 1, 2026
+	const jan1 = new Date('2026-01-01');
+	const startDate = new Date(jan1);
+	startDate.setDate(jan1.getDate() - jan1.getDay()); // Go back to Sunday
+
+	// Find the Saturday after or on December 31, 2026
+	const dec31 = new Date('2026-12-31');
+	const endDate = new Date(dec31);
+	endDate.setDate(dec31.getDate() + (6 - dec31.getDay())); // Go forward to Saturday
 
 	for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
 		const dateStr = d.toISOString().split('T')[0];

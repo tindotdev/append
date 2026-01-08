@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useHeatmapData } from '../hooks/use-heatmap-data';
 import type { HeatmapDay } from '../types';
 
@@ -21,6 +22,12 @@ function formatTime(minutes: number): string {
 	const hours = Math.floor(minutes / 60);
 	const mins = Math.round(minutes % 60);
 	return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
+function formatDate(dateStr: string): string {
+	// Convert "2026/01/15" to "Jan 15, 2026"
+	const date = new Date(dateStr);
+	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function ActivityHeatmapSkeleton() {
@@ -102,6 +109,17 @@ export function ActivityHeatmap() {
 						60: 'rgba(52,211,153,0.6)',
 						90: 'rgba(52,211,153,0.85)',
 					}}
+					rectRender={(props, data) => (
+						<Tooltip key={props.key}>
+							<TooltipTrigger asChild>
+								<rect {...props} />
+							</TooltipTrigger>
+							<TooltipContent side="top" sideOffset={5}>
+								<span className="font-medium">{formatDate(data.date)}</span>
+								<span className="text-muted-foreground ml-1.5">{data.count ? formatTime(data.count) : 'No activity'}</span>
+							</TooltipContent>
+						</Tooltip>
+					)}
 				/>
 			</div>
 		</div>
