@@ -22,6 +22,9 @@ import type { Clock, OutboxBroadcast, OutboxItem, OutboxStore } from './types';
 // Sender Loop
 // =============================================================================
 
+/** Outcome of processing an item */
+export type ProcessOutcome = 'success' | 'retry' | 'blocked_auth' | 'failed';
+
 /**
  * Dependencies for the sender loop.
  */
@@ -35,6 +38,21 @@ export interface SenderLoopDeps<TCommand, TResult, TBroadcastResult = unknown> {
 	onAuthBlocked?: () => void;
 	/** Creates a result payload for broadcast (application-specific) */
 	createResultPayload: (item: OutboxItem<TCommand>, result: TResult) => TBroadcastResult;
+	/**
+	 * Maximum number of retry attempts before marking item as failed.
+	 * Default: undefined (unlimited retries with exponential backoff)
+	 */
+	maxAttempts?: number;
+	/**
+	 * Called after each item is processed (for observability).
+	 * Includes the item and the outcome of the processing attempt.
+	 */
+	onItemProcessed?: (item: OutboxItem<TCommand>, outcome: ProcessOutcome) => void;
+	/**
+	 * Called when a retry is scheduled (for observability).
+	 * Includes the item and the delay in ms until the next attempt.
+	 */
+	onRetryScheduled?: (item: OutboxItem<TCommand>, delayMs: number) => void;
 }
 
 /**
@@ -60,7 +78,18 @@ export interface SenderLoop {
 export function createSenderLoop<TCommand, TResult, TBroadcastResult = unknown>(
 	deps: SenderLoopDeps<TCommand, TResult, TBroadcastResult>
 ): SenderLoop {
-	const { store, transport, broadcast, clock, userScope, onAuthBlocked, createResultPayload } = deps;
+	const {
+		store,
+		transport,
+		broadcast,
+		clock,
+		userScope,
+		onAuthBlocked,
+		createResultPayload,
+		maxAttempts,
+		onItemProcessed,
+		onRetryScheduled,
+	} = deps;
 
 	// Track items currently being processed to prevent duplicate sends
 	// from rapid processOnce() calls within the same tab
@@ -112,20 +141,45 @@ export function createSenderLoop<TCommand, TResult, TBroadcastResult = unknown>(
 							userScope,
 							result: createResultPayload(current, result.result),
 						});
+						onItemProcessed?.(current, 'success');
 						break;
 
 					case 'retry': {
-						// Update attempt count and schedule next attempt
+						const newAttemptCount = current.attemptCount + 1;
+
+						// Check if max attempts exceeded
+						if (maxAttempts !== undefined && newAttemptCount >= maxAttempts) {
+							// Convert to permanent failure
+							const failed: OutboxItem<TCommand> = {
+								...current,
+								status: 'failed',
+								attemptCount: newAttemptCount,
+								lastError: { message: `Max attempts (${maxAttempts}) exceeded` },
+								updatedAt: clock.now(),
+							};
+							await store.put(failed);
+							broadcast.publish({ type: 'outbox_changed', userScope });
+							onItemProcessed?.(current, 'failed');
+							break;
+						}
+
+						// Calculate backoff BEFORE incrementing attemptCount.
+						// This is intentional: attemptCount represents completed attempts, so after
+						// the first failure (attemptCount=0), we use 2^0 = 1s backoff. After the
+						// second failure (attemptCount=1), we use 2^1 = 2s backoff, etc.
 						const nextAttemptAt = calculateNextAttemptAt(clock.now(), current.attemptCount);
+						const delayMs = nextAttemptAt - clock.now();
 						const updated: OutboxItem<TCommand> = {
 							...current,
-							attemptCount: current.attemptCount + 1,
+							attemptCount: newAttemptCount,
 							nextAttemptAt,
 							lastError: result.error,
 							updatedAt: clock.now(),
 						};
 						await store.put(updated);
 						broadcast.publish({ type: 'outbox_changed', userScope });
+						onItemProcessed?.(current, 'retry');
+						onRetryScheduled?.(updated, delayMs);
 						break;
 					}
 
@@ -139,6 +193,7 @@ export function createSenderLoop<TCommand, TResult, TBroadcastResult = unknown>(
 						};
 						await store.put(blocked);
 						broadcast.publish({ type: 'outbox_changed', userScope });
+						onItemProcessed?.(current, 'blocked_auth');
 						onAuthBlocked?.();
 						// Stop processing - auth is broken
 						return true;
@@ -154,6 +209,7 @@ export function createSenderLoop<TCommand, TResult, TBroadcastResult = unknown>(
 						};
 						await store.put(failed);
 						broadcast.publish({ type: 'outbox_changed', userScope });
+						onItemProcessed?.(current, 'failed');
 						break;
 					}
 				}

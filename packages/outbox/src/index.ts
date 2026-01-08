@@ -40,7 +40,13 @@
 // Factory
 // =============================================================================
 
-export { type CreateOutboxOptions, createOutbox, type OutboxInstance } from './create-outbox';
+export {
+	type CreateOutboxOptions,
+	createOutbox,
+	type OutboxInstance,
+	type ProcessOutcome,
+	type RetryResult,
+} from './create-outbox';
 
 // =============================================================================
 // Types

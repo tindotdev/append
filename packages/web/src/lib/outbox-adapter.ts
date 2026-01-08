@@ -94,7 +94,10 @@ async function sendCaptureTerms(command: CaptureTermsCommand): Promise<Transport
 			return { outcome: 'success', result: { batchId: body.id } };
 		}
 
-		// Parse error response
+		// Parse error response.
+		// Note: If JSON parsing fails here, the error bubbles to the outer catch block,
+		// which treats all unknown errors as retryable. This is intentional - if we can't
+		// parse the error response, retrying is a reasonable fallback.
 		const error = await buildApiRequestError(res);
 		const classification = classifyResponse(status, error.code);
 

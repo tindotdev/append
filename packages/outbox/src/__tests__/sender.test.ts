@@ -339,6 +339,197 @@ describe('createSenderLoop', () => {
 			});
 		});
 
+		describe('maxAttempts', () => {
+			it('marks item as failed when max attempts exceeded', async () => {
+				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500, attemptCount: 2 });
+				await store.put(item);
+				transport.setResult({ outcome: 'retry', error: { message: 'Server error' } });
+
+				const loop = createSenderLoop({
+					store,
+					transport,
+					broadcast,
+					clock,
+					userScope,
+					createResultPayload,
+					maxAttempts: 3, // Item has 2 attempts, next would be 3rd
+				});
+				await loop.processOnce();
+
+				const updated = await store.get('item-1');
+				expect(updated?.status).toBe('failed');
+				expect(updated?.lastError?.message).toBe('Max attempts (3) exceeded');
+				expect(updated?.attemptCount).toBe(3);
+			});
+
+			it('allows retries when under max attempts', async () => {
+				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500, attemptCount: 1 });
+				await store.put(item);
+				transport.setResult({ outcome: 'retry', error: { message: 'Server error' } });
+
+				const loop = createSenderLoop({
+					store,
+					transport,
+					broadcast,
+					clock,
+					userScope,
+					createResultPayload,
+					maxAttempts: 3,
+				});
+				await loop.processOnce();
+
+				const updated = await store.get('item-1');
+				expect(updated?.status).toBe('pending');
+				expect(updated?.attemptCount).toBe(2);
+			});
+
+			it('retries indefinitely when maxAttempts is undefined', async () => {
+				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500, attemptCount: 100 });
+				await store.put(item);
+				transport.setResult({ outcome: 'retry', error: { message: 'Server error' } });
+
+				const loop = createSenderLoop({
+					store,
+					transport,
+					broadcast,
+					clock,
+					userScope,
+					createResultPayload,
+					// No maxAttempts set
+				});
+				await loop.processOnce();
+
+				const updated = await store.get('item-1');
+				expect(updated?.status).toBe('pending');
+				expect(updated?.attemptCount).toBe(101);
+			});
+		});
+
+		describe('observability callbacks', () => {
+			it('calls onItemProcessed on success', async () => {
+				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
+				await store.put(item);
+				transport.setResult({ outcome: 'success', result: { resultId: 'result-123' } });
+
+				const onItemProcessed = vi.fn();
+				const loop = createSenderLoop({
+					store,
+					transport,
+					broadcast,
+					clock,
+					userScope,
+					createResultPayload,
+					onItemProcessed,
+				});
+				await loop.processOnce();
+
+				expect(onItemProcessed).toHaveBeenCalledWith(expect.objectContaining({ id: 'item-1' }), 'success');
+			});
+
+			it('calls onItemProcessed on retry', async () => {
+				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
+				await store.put(item);
+				transport.setResult({ outcome: 'retry', error: { message: 'Error' } });
+
+				const onItemProcessed = vi.fn();
+				const loop = createSenderLoop({
+					store,
+					transport,
+					broadcast,
+					clock,
+					userScope,
+					createResultPayload,
+					onItemProcessed,
+				});
+				await loop.processOnce();
+
+				expect(onItemProcessed).toHaveBeenCalledWith(expect.objectContaining({ id: 'item-1' }), 'retry');
+			});
+
+			it('calls onItemProcessed on blocked_auth', async () => {
+				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
+				await store.put(item);
+				transport.setResult({ outcome: 'blocked_auth', error: { message: 'Unauthorized' } });
+
+				const onItemProcessed = vi.fn();
+				const loop = createSenderLoop({
+					store,
+					transport,
+					broadcast,
+					clock,
+					userScope,
+					createResultPayload,
+					onItemProcessed,
+				});
+				await loop.processOnce();
+
+				expect(onItemProcessed).toHaveBeenCalledWith(expect.objectContaining({ id: 'item-1' }), 'blocked_auth');
+			});
+
+			it('calls onItemProcessed on failed', async () => {
+				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
+				await store.put(item);
+				transport.setResult({ outcome: 'failed', error: { message: 'Validation error' } });
+
+				const onItemProcessed = vi.fn();
+				const loop = createSenderLoop({
+					store,
+					transport,
+					broadcast,
+					clock,
+					userScope,
+					createResultPayload,
+					onItemProcessed,
+				});
+				await loop.processOnce();
+
+				expect(onItemProcessed).toHaveBeenCalledWith(expect.objectContaining({ id: 'item-1' }), 'failed');
+			});
+
+			it('calls onRetryScheduled with delay when retry is scheduled', async () => {
+				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500, attemptCount: 0 });
+				await store.put(item);
+				transport.setResult({ outcome: 'retry', error: { message: 'Error' } });
+
+				const onRetryScheduled = vi.fn();
+				const loop = createSenderLoop({
+					store,
+					transport,
+					broadcast,
+					clock,
+					userScope,
+					createResultPayload,
+					onRetryScheduled,
+				});
+				await loop.processOnce();
+
+				expect(onRetryScheduled).toHaveBeenCalledWith(expect.objectContaining({ id: 'item-1', attemptCount: 1 }), expect.any(Number));
+				// Delay should be positive
+				const delayMs = onRetryScheduled.mock.calls[0][1];
+				expect(delayMs).toBeGreaterThan(0);
+			});
+
+			it('does not call onRetryScheduled on success', async () => {
+				const item = createTestItem({ id: 'item-1', nextAttemptAt: 500 });
+				await store.put(item);
+				transport.setResult({ outcome: 'success', result: { resultId: 'result-123' } });
+
+				const onRetryScheduled = vi.fn();
+				const loop = createSenderLoop({
+					store,
+					transport,
+					broadcast,
+					clock,
+					userScope,
+					createResultPayload,
+					onRetryScheduled,
+				});
+				await loop.processOnce();
+
+				expect(onRetryScheduled).not.toHaveBeenCalled();
+			});
+		});
+
 		it('processes multiple items in FIFO order', async () => {
 			const item1 = createTestItem({
 				id: 'item-1',
