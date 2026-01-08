@@ -2,7 +2,9 @@ import { Link } from '@tanstack/react-router';
 import HeatMap from '@uiw/react-heat-map';
 import { Activity } from 'lucide-react';
 import { useMemo } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -54,17 +56,15 @@ function ActivityHeatmapLegend() {
 
 function ActivityHeatmapSkeleton() {
 	return (
-		<div className="space-y-3">
-			{/* Stats skeleton */}
-			<div className="flex items-center gap-4">
-				<Skeleton className="h-4 w-12" />
-				<Skeleton className="h-4 w-16" />
-				<Skeleton className="h-4 w-20" />
-				<Skeleton className="h-4 w-16" />
-			</div>
-			{/* Heatmap skeleton - approximates 53 weeks x 7 days grid */}
-			<Skeleton className="h-[91px] w-[720px]" />
-		</div>
+		<Card className="@container/card gap-2 py-4">
+			<CardHeader className="gap-1 px-4">
+				<Skeleton className="h-3 w-16" />
+				<Skeleton className="h-5 w-20" />
+			</CardHeader>
+			<CardContent className="px-4">
+				<Skeleton className="h-[91px] w-full max-w-[720px]" />
+			</CardContent>
+		</Card>
 	);
 }
 
@@ -80,73 +80,80 @@ export function ActivityHeatmap() {
 
 	if (isEmpty) {
 		return (
-			<Empty className="border p-6">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<Activity />
-					</EmptyMedia>
-					<EmptyTitle>No activity yet</EmptyTitle>
-					<EmptyDescription>Start capturing to see your activity patterns here</EmptyDescription>
-				</EmptyHeader>
-				<Button variant="outline" size="sm" asChild>
-					<Link to="/batch/new">Start capturing</Link>
-				</Button>
-			</Empty>
+			<Card className="@container/card gap-2 py-4">
+				<Empty className="px-4">
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<Activity />
+						</EmptyMedia>
+						<EmptyTitle className="text-sm">No activity yet</EmptyTitle>
+						<EmptyDescription className="text-xs">Start capturing to see your activity patterns here</EmptyDescription>
+					</EmptyHeader>
+					<Button variant="outline" size="sm" asChild>
+						<Link to="/batch/new">Start capturing</Link>
+					</Button>
+				</Empty>
+			</Card>
 		);
 	}
 
 	return (
-		<div className="space-y-3">
-			{/* Compact inline stats */}
-			<div className="flex items-center gap-4 text-[13px]">
-				<span className="font-medium text-zinc-100">{formatTime(stats.totalMinutes)}</span>
-				<span className="text-zinc-500">this year</span>
-				<span className="text-zinc-600">·</span>
-				<span className="text-zinc-500">
-					<span className="text-zinc-300 tabular-nums">{stats.activeDays}</span> active days
-				</span>
-				<span className="text-zinc-600">·</span>
-				<span className="text-zinc-500">
-					<span className="text-zinc-300 tabular-nums">{formatTime(stats.avgPerDay)}</span>/day avg
-				</span>
-			</div>
-
-			{/* Compact heatmap with legend */}
-			<div className="space-y-1.5">
-				<div className="overflow-x-auto">
-					<HeatMap
-						value={convertedData}
-						legendCellSize={0}
-						width={720}
-						startDate={new Date('2026/01/01')}
-						endDate={new Date('2026/12/31')}
-						rectSize={10}
-						space={3}
-						weekLabels={false}
-						monthLabels={['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']}
-						style={{ color: 'var(--color-zinc-500)' }}
-						panelColors={{
-							0: HEATMAP_COLORS[0],
-							8: HEATMAP_COLORS[1],
-							30: HEATMAP_COLORS[2],
-							60: HEATMAP_COLORS[3],
-							90: HEATMAP_COLORS[4],
-						}}
-						rectRender={(props, data) => (
-							<Tooltip key={props.key}>
-								<TooltipTrigger asChild>
-									<rect {...props} />
-								</TooltipTrigger>
-								<TooltipContent side="top" sideOffset={5}>
-									<span className="font-medium">{formatDate(data.date)}</span>
-									<span className="text-muted-foreground ml-1.5">{data.count ? formatTime(data.count) : 'No activity'}</span>
-								</TooltipContent>
-							</Tooltip>
-						)}
-					/>
+		<Card className="@container/card gap-2 py-4">
+			<CardHeader className="gap-1 px-4">
+				<CardDescription className="text-xs">This year</CardDescription>
+				<CardTitle className="text-lg tabular-nums">{formatTime(stats.totalMinutes)}</CardTitle>
+				<CardAction>
+					<div className="flex items-center gap-2">
+						<Badge variant="outline" className="rounded-lg text-xs">
+							{stats.activeDays} days
+						</Badge>
+						<Badge variant="outline" className="rounded-lg text-xs">
+							{formatTime(stats.avgPerDay)}/day
+						</Badge>
+					</div>
+				</CardAction>
+			</CardHeader>
+			<CardContent className="px-4">
+				<div className="relative">
+					{/* Centered heatmap */}
+					<div className="flex justify-center overflow-x-auto">
+						<HeatMap
+							value={convertedData}
+							legendCellSize={0}
+							width={720}
+							startDate={new Date('2026/01/01')}
+							endDate={new Date('2026/12/31')}
+							rectSize={10}
+							space={3}
+							weekLabels={false}
+							monthLabels={['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']}
+							style={{ color: 'var(--color-zinc-500)' }}
+							panelColors={{
+								0: HEATMAP_COLORS[0],
+								8: HEATMAP_COLORS[1],
+								30: HEATMAP_COLORS[2],
+								60: HEATMAP_COLORS[3],
+								90: HEATMAP_COLORS[4],
+							}}
+							rectRender={(props, data) => (
+								<Tooltip key={props.key}>
+									<TooltipTrigger asChild>
+										<rect {...props} />
+									</TooltipTrigger>
+									<TooltipContent side="top" sideOffset={5}>
+										<span className="font-medium">{formatDate(data.date)}</span>
+										<span className="text-muted-foreground ml-1.5">{data.count ? formatTime(data.count) : 'No activity'}</span>
+									</TooltipContent>
+								</Tooltip>
+							)}
+						/>
+					</div>
+					{/* Legend at bottom right */}
+					<div className="mt-1.5 flex justify-end">
+						<ActivityHeatmapLegend />
+					</div>
 				</div>
-				<ActivityHeatmapLegend />
-			</div>
-		</div>
+			</CardContent>
+		</Card>
 	);
 }
