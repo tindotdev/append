@@ -54,10 +54,10 @@ importers:
         version: 1.5.0(valibot@1.2.0(typescript@5.9.3))
       ai:
         specifier: ^6.0.3
-        version: 6.0.23(zod@4.3.4)
+        version: 6.0.25(zod@4.3.4)
       ai-gateway-provider:
         specifier: ^3.0.1
-        version: 3.0.2(@ai-sdk/openai-compatible@2.0.1(zod@4.3.4))(@ai-sdk/provider-utils@4.0.4(zod@4.3.4))(@ai-sdk/provider@3.0.2)(ai@6.0.23(zod@4.3.4))(zod@4.3.4)
+        version: 3.0.2(@ai-sdk/openai-compatible@2.0.1(zod@4.3.4))(@ai-sdk/provider-utils@4.0.4(zod@4.3.4))(@ai-sdk/provider@3.0.2)(ai@6.0.25(zod@4.3.4))(zod@4.3.4)
       valibot:
         specifier: ^1.2.0
         version: 1.2.0(typescript@5.9.3)
@@ -85,10 +85,10 @@ importers:
         version: 0.6.1(hono@4.11.3)(valibot@1.2.0(typescript@5.9.3))
       ai:
         specifier: ^6.0.3
-        version: 6.0.23(zod@4.3.4)
+        version: 6.0.25(zod@4.3.4)
       ai-gateway-provider:
         specifier: ^3.0.1
-        version: 3.0.2(@ai-sdk/openai-compatible@2.0.1(zod@4.3.4))(@ai-sdk/provider-utils@4.0.4(zod@4.3.4))(@ai-sdk/provider@3.0.2)(ai@6.0.23(zod@4.3.4))(zod@4.3.4)
+        version: 3.0.2(@ai-sdk/openai-compatible@2.0.1(zod@4.3.4))(@ai-sdk/provider-utils@4.0.4(zod@4.3.4))(@ai-sdk/provider@3.0.2)(ai@6.0.25(zod@4.3.4))(zod@4.3.4)
       better-auth:
         specifier: ^1.4.7
         version: 1.4.10(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20260109.0)(@opentelemetry/api@1.9.0)(kysely@0.28.9))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(solid-js@1.9.10)(vitest@3.2.4(@types/node@25.0.3)(jiti@2.6.1)(jsdom@27.4.0)(lightningcss@1.30.2)(tsx@4.21.0))
@@ -2876,8 +2876,8 @@ packages:
       '@ai-sdk/provider-utils': ^4.0.0
       ai: ^6.0.0
 
-  ai@6.0.23:
-    resolution: {integrity: sha512-IV8hqp6sQvZ0XVlu8bCnFlwG7+2d40ff26RZ1k4yw/zVuk2F6SXlONURtTo9vwPOPYeF7auXvyPA+dMDoepWxg==}
+  ai@6.0.25:
+    resolution: {integrity: sha512-KErk9JWkRaN4j9Xzxuo+twa0TxcYKdYbrRV8iGktduvUeGb0Yd5seWe3yOfuLGERbDBiKI1ajQz28O2FG3WO5A==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -5753,10 +5753,10 @@ snapshots:
 
   '@noble/hashes@2.0.1': {}
 
-  '@openrouter/ai-sdk-provider@1.5.4(ai@6.0.23(zod@4.3.4))(zod@4.3.4)':
+  '@openrouter/ai-sdk-provider@1.5.4(ai@6.0.25(zod@4.3.4))(zod@4.3.4)':
     dependencies:
       '@openrouter/sdk': 0.1.27
-      ai: 6.0.23(zod@4.3.4)
+      ai: 6.0.25(zod@4.3.4)
       zod: 4.3.4
     optional: true
 
@@ -6938,12 +6938,12 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai-gateway-provider@3.0.2(@ai-sdk/openai-compatible@2.0.1(zod@4.3.4))(@ai-sdk/provider-utils@4.0.4(zod@4.3.4))(@ai-sdk/provider@3.0.2)(ai@6.0.23(zod@4.3.4))(zod@4.3.4):
+  ai-gateway-provider@3.0.2(@ai-sdk/openai-compatible@2.0.1(zod@4.3.4))(@ai-sdk/provider-utils@4.0.4(zod@4.3.4))(@ai-sdk/provider@3.0.2)(ai@6.0.25(zod@4.3.4))(zod@4.3.4):
     dependencies:
       '@ai-sdk/openai-compatible': 2.0.1(zod@4.3.4)
       '@ai-sdk/provider': 3.0.2
       '@ai-sdk/provider-utils': 4.0.4(zod@4.3.4)
-      ai: 6.0.23(zod@4.3.4)
+      ai: 6.0.25(zod@4.3.4)
     optionalDependencies:
       '@ai-sdk/amazon-bedrock': 4.0.3(zod@4.3.4)
       '@ai-sdk/anthropic': 3.0.1(zod@4.3.4)
@@ -6961,12 +6961,12 @@ snapshots:
       '@ai-sdk/openai': 3.0.7(zod@4.3.4)
       '@ai-sdk/perplexity': 3.0.1(zod@4.3.4)
       '@ai-sdk/xai': 3.0.2(zod@4.3.4)
-      '@openrouter/ai-sdk-provider': 1.5.4(ai@6.0.23(zod@4.3.4))(zod@4.3.4)
+      '@openrouter/ai-sdk-provider': 1.5.4(ai@6.0.25(zod@4.3.4))(zod@4.3.4)
     transitivePeerDependencies:
       - supports-color
       - zod
 
-  ai@6.0.23(zod@4.3.4):
+  ai@6.0.25(zod@4.3.4):
     dependencies:
       '@ai-sdk/gateway': 3.0.10(zod@4.3.4)
       '@ai-sdk/provider': 3.0.2
