@@ -4,6 +4,7 @@ import type { IngestResponse, TelemetryEvent } from './types';
 const OUTBOX_KEY = 'append_outbox_v1';
 const DEADLETTER_KEY = 'append_outbox_deadletter_v1';
 const BACKOFF_KEY = 'append_outbox_backoff_v1';
+const AUTH_ERROR_KEY = 'append_outbox_auth_error_v1';
 
 const MAX_OUTBOX_EVENTS = 5000;
 const BATCH_SIZE = 200;
@@ -16,6 +17,11 @@ const BACKOFF_MULTIPLIER = 2;
 type BackoffState = {
 	consecutiveFailures: number;
 	nextRetryAt: number;
+};
+
+type AuthErrorState = {
+	hasAuthError: boolean;
+	lastAuthErrorAt: number;
 };
 
 type DeadletterItem = {
@@ -53,12 +59,35 @@ async function setBackoffState(state: BackoffState): Promise<void> {
 	await chrome.storage.local.set({ [BACKOFF_KEY]: state });
 }
 
+async function getAuthErrorState(): Promise<AuthErrorState> {
+	const raw = await chrome.storage.local.get(AUTH_ERROR_KEY);
+	const state = raw[AUTH_ERROR_KEY];
+	if (state && typeof state === 'object' && 'hasAuthError' in state && 'lastAuthErrorAt' in state) {
+		return state as AuthErrorState;
+	}
+	return { hasAuthError: false, lastAuthErrorAt: 0 };
+}
+
+async function setAuthErrorState(state: AuthErrorState): Promise<void> {
+	await chrome.storage.local.set({ [AUTH_ERROR_KEY]: state });
+}
+
 function calculateBackoffMs(consecutiveFailures: number): number {
 	const backoffMs = BACKOFF_INITIAL_MS * BACKOFF_MULTIPLIER ** (consecutiveFailures - 1);
 	return Math.min(backoffMs, BACKOFF_MAX_MS);
 }
 
-async function updateBadge(outboxCount: number): Promise<void> {
+async function updateBadge(outboxCount: number, hasAuthError = false): Promise<void> {
+	// Auth error takes precedence - show critical error state
+	if (hasAuthError) {
+		await chrome.action.setBadgeText({ text: '!' });
+		await chrome.action.setBadgeBackgroundColor({ color: '#dc2626' });
+		await chrome.action.setTitle({ title: 'Append: Authentication error - please check your device token' });
+		return;
+	}
+
+	await chrome.action.setTitle({ title: 'Append' });
+
 	if (outboxCount === 0) {
 		await chrome.action.setBadgeText({ text: '' });
 		await chrome.action.setBadgeBackgroundColor({ color: '#6366f1' });
@@ -83,12 +112,20 @@ export async function enqueueEvent(event: TelemetryEvent): Promise<void> {
 	outbox.push(event);
 	const trimmed = outbox.length > MAX_OUTBOX_EVENTS ? outbox.slice(-MAX_OUTBOX_EVENTS) : outbox;
 	await setOutbox(trimmed);
-	await updateBadge(trimmed.length);
+	const authErrorState = await getAuthErrorState();
+	await updateBadge(trimmed.length, authErrorState.hasAuthError);
 }
 
 export async function getOutboxCount(): Promise<number> {
 	const outbox = await getOutbox();
 	return outbox.length;
+}
+
+export async function clearAuthError(): Promise<void> {
+	await setAuthErrorState({ hasAuthError: false, lastAuthErrorAt: 0 });
+	const outbox = await getOutbox();
+	await updateBadge(outbox.length, false);
+	console.log('[append][outbox] auth error cleared');
 }
 
 export async function flushOutbox(): Promise<void> {
@@ -97,6 +134,14 @@ export async function flushOutbox(): Promise<void> {
 
 	const outbox = await getOutbox();
 	if (outbox.length === 0) return;
+
+	// Check if we have an auth error - if so, stop flushing until user fixes token
+	const authErrorState = await getAuthErrorState();
+	if (authErrorState.hasAuthError) {
+		console.warn('[append][outbox] auth error detected, skipping flush until token is updated');
+		await updateBadge(outbox.length, true);
+		return;
+	}
 
 	// Check if we're in backoff period
 	const backoffState = await getBackoffState();
@@ -134,7 +179,13 @@ export async function flushOutbox(): Promise<void> {
 	}
 
 	if (res.status === 401) {
-		console.warn('[append][outbox] unauthorized (check token)');
+		// Treat 401 as terminal auth error - stop flushing until user updates token
+		await setAuthErrorState({ hasAuthError: true, lastAuthErrorAt: now });
+		await updateBadge(outbox.length, true);
+		console.error(
+			'[append][outbox] UNAUTHORIZED: Authentication failed. ' +
+				'Please check your device token. Outbox flushing paused until token is updated.'
+		);
 		return;
 	}
 
@@ -179,10 +230,11 @@ export async function flushOutbox(): Promise<void> {
 	}
 
 	await setOutbox(remaining);
-	await updateBadge(remaining.length);
 
-	// Success - reset backoff state
+	// Success - reset backoff state and clear any auth errors
 	await setBackoffState({ consecutiveFailures: 0, nextRetryAt: 0 });
+	await setAuthErrorState({ hasAuthError: false, lastAuthErrorAt: 0 });
+	await updateBadge(remaining.length, false);
 
 	if (deadletter.length > 0) {
 		await appendDeadletter(deadletter);

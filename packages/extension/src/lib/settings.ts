@@ -1,3 +1,5 @@
+import { clearAuthError } from './outbox';
+
 const API_BASE_URL_KEY = 'append_api_base_url';
 const DEVICE_TOKEN_KEY = 'append_device_token';
 
@@ -36,6 +38,11 @@ export async function setSettings(partial: Partial<ExtensionSettings>): Promise<
 		[API_BASE_URL_KEY]: next.apiBaseUrl,
 		[DEVICE_TOKEN_KEY]: next.deviceToken ?? '',
 	});
+
+	// If device token was updated, clear any auth errors to allow retrying
+	if (partial.deviceToken !== undefined && next.deviceToken !== current.deviceToken) {
+		await clearAuthError();
+	}
 
 	return next;
 }
