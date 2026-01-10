@@ -60,3 +60,11 @@ export function cleanupRateLimitStore(): void {
 		}
 	}
 }
+
+/**
+ * Clear all rate limit entries.
+ * Primarily for testing purposes.
+ */
+export function clearRateLimitStore(): void {
+	rateLimitStore.clear();
+}
