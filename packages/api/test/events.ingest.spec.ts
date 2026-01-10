@@ -241,4 +241,119 @@ describe('POST /events/ingest', () => {
 		expect(body3.error.code).toBe('RATE_LIMIT_EXCEEDED');
 		expect(body3.error.message).toContain('Rate limit exceeded');
 	});
+
+	it('rejects events from devices owned by other users', async () => {
+		// Setup: Create a second user with a different email
+		const secondAuth = await getAuthCookieAndUserId('test+b@example.com', 'test-password-123', 'Test User B');
+		const secondUserCookie = secondAuth.cookie;
+		const secondUserId = secondAuth.userId;
+
+		const deviceId = generateUUID();
+		const now = Date.now();
+
+		// First user creates a device by sending an event
+		const res1 = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({
+				events: [heartbeatEvent({ deviceId, eventId: generateUUID(), emittedAtMs: now })],
+			}),
+		});
+
+		expect(res1.status).toBe(200);
+		const body1 = (await res1.json()) as any;
+		expect(body1.accepted).toBe(1);
+
+		// Verify device is owned by first user
+		const [deviceRow] = await db.select().from(device).where(eq(device.id, deviceId));
+		expect(deviceRow?.userId).toBe(testUserId);
+
+		// Second user attempts to send events with first user's device ID
+		const maliciousEventId = generateUUID();
+		const res2 = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: { cookie: secondUserCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({
+				events: [heartbeatEvent({ deviceId, eventId: maliciousEventId, emittedAtMs: now + 1000 })],
+			}),
+		});
+
+		// The request should succeed but reject the event
+		expect(res2.status).toBe(200);
+		const body2 = (await res2.json()) as any;
+		expect(body2.accepted).toBe(0);
+		expect(body2.rejected).toHaveLength(1);
+		expect(body2.rejected[0].event_id).toBe(maliciousEventId);
+		expect(body2.rejected[0].reason).toBe('Device belongs to another user');
+
+		// Verify no event was created for the second user with this device
+		const [eventCount] = await db.select({ count: count() }).from(event).where(eq(event.userId, secondUserId));
+		expect(eventCount?.count).toBe(0);
+
+		// Verify device ownership didn't change
+		const [deviceRowAfter] = await db.select().from(device).where(eq(device.id, deviceId));
+		expect(deviceRowAfter?.userId).toBe(testUserId);
+
+		// Verify total events for first user is still 1
+		const [firstUserEvents] = await db.select({ count: count() }).from(event).where(eq(event.userId, testUserId));
+		expect(firstUserEvents?.count).toBe(1);
+	});
+
+	it('accepts events for new devices while rejecting events for foreign devices in the same batch', async () => {
+		// Setup: Create a second user with a different email
+		const secondAuth = await getAuthCookieAndUserId('test+c@example.com', 'test-password-123', 'Test User C');
+		const secondUserCookie = secondAuth.cookie;
+		const secondUserId = secondAuth.userId;
+
+		const foreignDeviceId = generateUUID();
+		const ownDeviceId = generateUUID();
+		const now = Date.now();
+
+		// First user creates a device
+		const res1 = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({
+				events: [heartbeatEvent({ deviceId: foreignDeviceId, eventId: generateUUID(), emittedAtMs: now })],
+			}),
+		});
+
+		expect(res1.status).toBe(200);
+		const body1 = (await res1.json()) as any;
+		expect(body1.accepted).toBe(1);
+
+		// Second user sends a batch with both a foreign device and their own new device
+		const foreignEventId = generateUUID();
+		const ownEventId = generateUUID();
+		const res2 = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: { cookie: secondUserCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({
+				events: [
+					heartbeatEvent({ deviceId: foreignDeviceId, eventId: foreignEventId, emittedAtMs: now + 1000 }),
+					heartbeatEvent({ deviceId: ownDeviceId, eventId: ownEventId, emittedAtMs: now + 2000 }),
+				],
+			}),
+		});
+
+		expect(res2.status).toBe(200);
+		const body2 = (await res2.json()) as any;
+		expect(body2.accepted).toBe(1);
+		expect(body2.rejected).toHaveLength(1);
+		expect(body2.rejected[0].event_id).toBe(foreignEventId);
+		expect(body2.rejected[0].reason).toBe('Device belongs to another user');
+
+		// Verify second user has exactly 1 event (their own device)
+		const [secondUserEvents] = await db.select({ count: count() }).from(event).where(eq(event.userId, secondUserId));
+		expect(secondUserEvents?.count).toBe(1);
+
+		// Verify the accepted event is for the own device
+		const [acceptedEvent] = await db.select().from(event).where(eq(event.userId, secondUserId));
+		expect(acceptedEvent?.deviceId).toBe(ownDeviceId);
+		expect(acceptedEvent?.eventId).toBe(ownEventId);
+
+		// Verify own device was created with correct ownership
+		const [ownDeviceRow] = await db.select().from(device).where(eq(device.id, ownDeviceId));
+		expect(ownDeviceRow?.userId).toBe(secondUserId);
+	});
 });
