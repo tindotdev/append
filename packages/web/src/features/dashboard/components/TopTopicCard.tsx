@@ -17,11 +17,11 @@ function formatTime(minutes: number): string {
 function TopTopicCardSkeleton() {
 	return (
 		<Card className="@container/card gap-2 py-4">
-			<CardHeader className="gap-1 px-4">
+			<CardHeader className="gap-1 px-5">
 				<Skeleton className="h-3 w-24" />
 				<Skeleton className="h-5 w-20" />
 			</CardHeader>
-			<CardFooter className="px-4">
+			<CardFooter className="px-5">
 				<Skeleton className="h-3 w-24" />
 			</CardFooter>
 		</Card>
@@ -38,7 +38,7 @@ export function TopTopicCard() {
 	if (isEmpty) {
 		return (
 			<Card className="@container/card gap-2 py-4">
-				<Empty className="px-4">
+				<Empty className="px-5">
 					<EmptyHeader>
 						<EmptyMedia variant="icon">
 							<Tag className="size-4" />
@@ -58,7 +58,7 @@ export function TopTopicCard() {
 
 	return (
 		<Card className="@container/card gap-2 py-4">
-			<CardHeader className="gap-1 px-4">
+			<CardHeader className="gap-1 px-5">
 				<CardDescription className="text-xs">Top topic this week</CardDescription>
 				<CardTitle className="truncate text-sm">{data.topic}</CardTitle>
 				<CardAction>
@@ -68,7 +68,7 @@ export function TopTopicCard() {
 					</Badge>
 				</CardAction>
 			</CardHeader>
-			<CardFooter className="px-4 text-xs text-muted-foreground">{percentage}% of weekly time</CardFooter>
+			<CardFooter className="px-5 text-xs text-muted-foreground">{percentage}% of weekly time</CardFooter>
 		</Card>
 	);
 }
