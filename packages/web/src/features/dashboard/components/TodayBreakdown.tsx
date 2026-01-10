@@ -26,7 +26,7 @@ function BarListItem({ item, maxMinutes }: BarListItemProps) {
 	const percentage = (item.minutes / maxMinutes) * 100;
 
 	return (
-		<div className="group relative flex items-center gap-3 py-1">
+		<div className="group relative flex items-center gap-3 px-2 py-1">
 			{/* Background bar */}
 			<div className="absolute inset-y-0 left-0 right-0 overflow-hidden rounded">
 				<div className="h-full bg-emerald-400/10 transition-all group-hover:bg-emerald-400/15" style={{ width: `${percentage}%` }} />
