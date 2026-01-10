@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useTodayBreakdownData } from '../hooks/use-dashboard-data';
 import type { BreakdownItem } from '../types';
+import { BreakdownDrawer } from './BreakdownDrawer';
 
 type View = 'topic' | 'source';
 
@@ -69,7 +70,7 @@ function TodayBreakdownSkeleton() {
 
 export function TodayBreakdown() {
 	const [view, setView] = useState<View>('topic');
-	const [showAll, setShowAll] = useState(false);
+	const [drawerOpen, setDrawerOpen] = useState(false);
 	const { data, isLoading, isEmpty } = useTodayBreakdownData();
 
 	if (isLoading) {
@@ -97,57 +98,69 @@ export function TodayBreakdown() {
 
 	const items = view === 'topic' ? data.topics : data.sources;
 	const totalMinutes = items.reduce((sum, i) => sum + i.minutes, 0);
-	const maxMinutes = Math.max(...items.map((i) => i.minutes));
-	const displayItems = showAll ? items : items.slice(0, 4);
+	const maxMinutes = Math.max(...items.map((i) => i.minutes), 1);
+	const displayItems = items.slice(0, 4);
 	const hasMore = items.length > 4;
 
 	return (
-		<Card className="@container/card gap-2 py-4">
-			<CardHeader className="gap-1 px-4">
-				<CardDescription className="text-xs">Today by {view}</CardDescription>
-				<CardTitle className="text-lg tabular-nums">{formatTime(totalMinutes)}</CardTitle>
-				<CardAction>
-					{/* Toggle */}
-					<div className="flex items-center gap-0.5 rounded-md bg-zinc-900 p-0.5">
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => setView('topic')}
-							className={cn('h-6 px-2 text-[11px]', view === 'topic' ? 'bg-zinc-800 text-zinc-100 hover:bg-zinc-800' : 'text-zinc-500')}
-						>
-							Topic
-						</Button>
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => setView('source')}
-							className={cn('h-6 px-2 text-[11px]', view === 'source' ? 'bg-zinc-800 text-zinc-100 hover:bg-zinc-800' : 'text-zinc-500')}
-						>
-							Source
-						</Button>
+		<>
+			<Card className="@container/card gap-2 py-4">
+				<CardHeader className="gap-1 px-4">
+					<CardDescription className="text-xs">Today by {view}</CardDescription>
+					<CardTitle className="min-w-[4.5rem] text-lg tabular-nums">{formatTime(totalMinutes)}</CardTitle>
+					<CardAction>
+						{/* Toggle */}
+						<div className="flex items-center gap-0.5 rounded-md bg-zinc-900 p-0.5">
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={() => setView('topic')}
+								className={cn(
+									'h-6 min-w-[52px] px-2 text-[11px]',
+									view === 'topic' ? 'bg-zinc-800 text-zinc-100 hover:bg-zinc-800' : 'text-zinc-500'
+								)}
+							>
+								Topic
+							</Button>
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={() => setView('source')}
+								className={cn(
+									'h-6 min-w-[52px] px-2 text-[11px]',
+									view === 'source' ? 'bg-zinc-800 text-zinc-100 hover:bg-zinc-800' : 'text-zinc-500'
+								)}
+							>
+								Source
+							</Button>
+						</div>
+					</CardAction>
+				</CardHeader>
+				<CardContent className="px-4">
+					{/* Bar list - fixed height container to prevent layout shift */}
+					<div className="min-h-[122px] space-y-0.5">
+						{displayItems.map((item) => (
+							<BarListItem key={item.id} item={item} maxMinutes={maxMinutes} />
+						))}
 					</div>
-				</CardAction>
-			</CardHeader>
-			<CardContent className="px-4">
-				{/* Bar list */}
-				<div className="space-y-0.5">
-					{displayItems.map((item) => (
-						<BarListItem key={item.id} item={item} maxMinutes={maxMinutes} />
-					))}
-				</div>
 
-				{/* Show all toggle */}
-				{hasMore && (
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={() => setShowAll(!showAll)}
-						className="mt-2 h-auto px-0 text-[12px] text-zinc-500 hover:bg-transparent hover:text-zinc-300"
-					>
-						{showAll ? 'Show less' : `Show all (${items.length})`}
-					</Button>
-				)}
-			</CardContent>
-		</Card>
+					{/* View all button container - fixed height to prevent layout shift */}
+					<div className="mt-2 h-5">
+						{hasMore && (
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={() => setDrawerOpen(true)}
+								className="h-auto px-0 text-[12px] text-zinc-500 hover:bg-transparent hover:text-zinc-300"
+							>
+								+{items.length - 4} more · View all →
+							</Button>
+						)}
+					</div>
+				</CardContent>
+			</Card>
+
+			<BreakdownDrawer open={drawerOpen} onOpenChange={setDrawerOpen} type={view} items={items} />
+		</>
 	);
 }

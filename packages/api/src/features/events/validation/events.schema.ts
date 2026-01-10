@@ -85,3 +85,22 @@ export const IngestEventsRequestSchema = v.object({
 });
 
 export type IngestEventsRequestInput = v.InferOutput<typeof IngestEventsRequestSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Export endpoint validation
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DayKeyRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+const DayKeySchema = v.pipe(
+	v.string(),
+	v.check((s) => DayKeyRegex.test(s), 'Invalid date format. Must be YYYY-MM-DD.')
+);
+
+export const ExportEventsQuerySchema = v.object({
+	from: DayKeySchema,
+	to: DayKeySchema,
+	format: v.literal('ndjson'),
+});
+
+export type ExportEventsQuery = v.InferOutput<typeof ExportEventsQuerySchema>;

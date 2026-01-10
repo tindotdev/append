@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { shouldUseApi, useDashboardHeatmap } from '../api/dashboard';
 import { useTelemetrySnapshot } from '../telemetry/hooks';
 import { computeHeatmapData } from '../telemetry/rollups';
 import type { HeatmapData, HeatmapStatsData } from '../types';
@@ -43,18 +44,31 @@ function getComputed(revision: number, events: Parameters<typeof computeHeatmapD
 
 export function useHeatmapData(options: UseHeatmapDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
+	const useApi = shouldUseApi();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
+	const year = yearInTimezone(timezone);
+	const apiQuery = useDashboardHeatmap(year, timezone);
 
 	const computed = useMemo(() => {
-		if (forceLoading || !isReady) {
+		if (forceLoading) {
 			return { data: EMPTY_DATA, stats: EMPTY_STATS };
 		}
 		if (forceEmpty) {
-			return { data: { ...EMPTY_DATA, timezone, year: yearInTimezone(timezone) }, stats: EMPTY_STATS };
+			return { data: { ...EMPTY_DATA, timezone, year }, stats: EMPTY_STATS };
 		}
-		const year = yearInTimezone(timezone);
-		return getComputed(revision, events, timezone, year);
-	}, [events, forceEmpty, forceLoading, isReady, revision, timezone]);
 
-	return { data: computed.data, stats: computed.stats, isLoading: forceLoading || !isReady };
+		// Use API data if enabled and available
+		if (useApi && apiQuery.data) {
+			return { data: apiQuery.data.data, stats: apiQuery.data.stats };
+		}
+
+		// Fall back to local computation
+		if (!isReady) {
+			return { data: EMPTY_DATA, stats: EMPTY_STATS };
+		}
+		return getComputed(revision, events, timezone, year);
+	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi, year]);
+
+	const isLoading = forceLoading || (useApi ? apiQuery.isLoading : !isReady);
+	return { data: computed.data, stats: computed.stats, isLoading };
 }
