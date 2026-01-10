@@ -7,6 +7,7 @@ export type DeviceTokenListItem = {
 	token_prefix: string;
 	created_at_ms: number;
 	last_used_at_ms: number | null;
+	expires_at_ms: number | null;
 	revoked_at_ms: number | null;
 };
 
@@ -18,6 +19,7 @@ export type CreateDeviceTokenResponse = {
 	token_id: string;
 	token: string;
 	created_at_ms: number;
+	expires_at_ms: number | null;
 };
 
 export const deviceTokenKeys = {
@@ -39,9 +41,12 @@ export function useCreateDeviceToken() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (input: { label?: string }): Promise<CreateDeviceTokenResponse> => {
+		mutationFn: async (input: { label?: string; expires_in_days?: number }): Promise<CreateDeviceTokenResponse> => {
 			const res = await api.api['device-tokens'].$post({
-				json: { label: input.label?.trim() ? input.label.trim() : undefined },
+				json: {
+					label: input.label?.trim() ? input.label.trim() : undefined,
+					expires_in_days: input.expires_in_days,
+				},
 			});
 			return parseRpcJson<CreateDeviceTokenResponse>(res);
 		},

@@ -18,6 +18,7 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 const CreateDeviceTokenRequestSchema = v.object({
 	label: v.optional(v.pipe(v.string(), v.maxLength(64, 'label must be <= 64 chars'))),
+	expires_in_days: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(3650, 'expiration must be <= 10 years'))),
 });
 
 function firstIssueMessage(issues: v.BaseIssue<unknown>[] | undefined): string {
@@ -41,6 +42,11 @@ export const deviceTokenRoutes = app
 		const id = crypto.randomUUID();
 		const createdAt = new Date();
 
+		// Calculate expiration date if expires_in_days is provided
+		const expiresAt = parsed.output.expires_in_days
+			? new Date(createdAt.getTime() + parsed.output.expires_in_days * 24 * 60 * 60 * 1000)
+			: null;
+
 		await db.insert(deviceToken).values({
 			id,
 			userId,
@@ -48,12 +54,14 @@ export const deviceTokenRoutes = app
 			tokenPrefix,
 			tokenHash,
 			createdAt,
+			expiresAt,
 		});
 
 		return c.json({
 			token_id: id,
 			token,
 			created_at_ms: createdAt.getTime(),
+			expires_at_ms: expiresAt?.getTime() ?? null,
 		});
 	})
 	.get('/', async (c) => {
@@ -67,6 +75,7 @@ export const deviceTokenRoutes = app
 				tokenPrefix: deviceToken.tokenPrefix,
 				createdAt: deviceToken.createdAt,
 				lastUsedAt: deviceToken.lastUsedAt,
+				expiresAt: deviceToken.expiresAt,
 				revokedAt: deviceToken.revokedAt,
 			})
 			.from(deviceToken)
@@ -81,6 +90,7 @@ export const deviceTokenRoutes = app
 				token_prefix: r.tokenPrefix,
 				created_at_ms: r.createdAt.getTime(),
 				last_used_at_ms: r.lastUsedAt?.getTime() ?? null,
+				expires_at_ms: r.expiresAt?.getTime() ?? null,
 				revoked_at_ms: r.revokedAt?.getTime() ?? null,
 			})),
 		});

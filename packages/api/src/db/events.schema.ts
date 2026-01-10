@@ -65,6 +65,7 @@ export const event = sqliteTable(
  * DeviceToken: per-user token for non-cookie clients (MVP: Chrome extension).
  *
  * Token value is never stored; only a sha256 hash is persisted.
+ * Optional expiration allows users to create time-limited tokens for security.
  */
 export const deviceToken = sqliteTable(
 	'device_token',
@@ -78,6 +79,7 @@ export const deviceToken = sqliteTable(
 		tokenHash: text('token_hash').notNull(),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsec') * 1000 as integer))`).notNull(),
 		lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' }),
+		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }),
 		revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
 	},
 	(table) => [

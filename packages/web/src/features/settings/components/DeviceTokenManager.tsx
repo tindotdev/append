@@ -15,6 +15,7 @@ import {
 	DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { type DeviceTokenListItem, useCreateDeviceToken, useDeviceTokens, useRevokeDeviceToken } from '../api/device-tokens';
 
@@ -29,6 +30,7 @@ function formatDate(ms: number | null): string {
 
 function TokenRow({ token, onRevoke }: { token: DeviceTokenListItem; onRevoke: () => void }) {
 	const revoked = token.revoked_at_ms !== null;
+	const expired = token.expires_at_ms !== null && token.expires_at_ms < Date.now();
 
 	return (
 		<div className="flex items-start justify-between gap-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
@@ -38,6 +40,7 @@ function TokenRow({ token, onRevoke }: { token: DeviceTokenListItem; onRevoke: (
 					<div className="font-medium text-zinc-100 truncate">{token.label || 'Untitled token'}</div>
 					<div className="text-xs text-zinc-500">({token.token_prefix}…)</div>
 					{revoked && <span className="text-xs rounded bg-zinc-800 px-2 py-0.5 text-zinc-300">Revoked</span>}
+					{!revoked && expired && <span className="text-xs rounded bg-orange-900/50 px-2 py-0.5 text-orange-300">Expired</span>}
 				</div>
 				<div className="mt-1 grid grid-cols-1 gap-1 text-xs text-zinc-500 @md/main:grid-cols-2">
 					<div>
@@ -46,6 +49,11 @@ function TokenRow({ token, onRevoke }: { token: DeviceTokenListItem; onRevoke: (
 					<div>
 						<span className="text-zinc-400">Last used:</span> {formatDate(token.last_used_at_ms)}
 					</div>
+					{token.expires_at_ms && (
+						<div className={expired ? 'text-orange-400' : ''}>
+							<span className="text-zinc-400">Expires:</span> {formatDate(token.expires_at_ms)}
+						</div>
+					)}
 				</div>
 			</div>
 			<div className="flex items-center gap-2">
@@ -65,6 +73,7 @@ function TokenRow({ token, onRevoke }: { token: DeviceTokenListItem; onRevoke: (
 export function DeviceTokenManager() {
 	const [createOpen, setCreateOpen] = useState(false);
 	const [label, setLabel] = useState('');
+	const [expiresInDays, setExpiresInDays] = useState<string>('never');
 	const [createdToken, setCreatedToken] = useState<string | null>(null);
 	const [createdTokenId, setCreatedTokenId] = useState<string | null>(null);
 	const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
@@ -78,7 +87,8 @@ export function DeviceTokenManager() {
 
 	const handleCreate = async () => {
 		try {
-			const res = await createMutation.mutateAsync({ label });
+			const expires_in_days = expiresInDays === 'never' ? undefined : Number.parseInt(expiresInDays, 10);
+			const res = await createMutation.mutateAsync({ label, expires_in_days });
 			setCreatedToken(res.token);
 			setCreatedTokenId(res.token_id);
 			toast.success('Device token created. Copy it now — it will only be shown once.');
@@ -100,6 +110,7 @@ export function DeviceTokenManager() {
 	const closeCreate = () => {
 		setCreateOpen(false);
 		setLabel('');
+		setExpiresInDays('never');
 		setCreatedToken(null);
 		setCreatedTokenId(null);
 	};
@@ -157,6 +168,22 @@ export function DeviceTokenManager() {
 										maxLength={64}
 										disabled={createMutation.isPending}
 									/>
+								</div>
+
+								<div className="space-y-1">
+									<div className="text-xs text-zinc-500">Expiration (optional)</div>
+									<Select value={expiresInDays} onValueChange={setExpiresInDays} disabled={createMutation.isPending}>
+										<SelectTrigger className="w-full">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="never">Never expires</SelectItem>
+											<SelectItem value="30">30 days</SelectItem>
+											<SelectItem value="90">90 days</SelectItem>
+											<SelectItem value="180">180 days (6 months)</SelectItem>
+											<SelectItem value="365">365 days (1 year)</SelectItem>
+										</SelectContent>
+									</Select>
 								</div>
 
 								{createdToken ? (

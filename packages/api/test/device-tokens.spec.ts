@@ -213,4 +213,150 @@ describe('Device tokens', () => {
 		expect(secondUseTime).toBeGreaterThanOrEqual(beforeSecondUse);
 		expect(secondUseTime).toBeLessThanOrEqual(afterSecondUse);
 	});
+
+	it('can create a token with expiration and returns expires_at_ms', async () => {
+		const expiresInDays = 30;
+		const beforeMint = Date.now();
+		const mintRes = await SELF.fetch('https://example.com/api/device-tokens', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ label: 'expiring token', expires_in_days: expiresInDays }),
+		});
+		const afterMint = Date.now();
+
+		expect(mintRes.status).toBe(200);
+		const mintBody = (await mintRes.json()) as any;
+		expect(typeof mintBody.token).toBe('string');
+		expect(typeof mintBody.expires_at_ms).toBe('number');
+
+		// Verify expiration is approximately 30 days from now
+		const expectedExpiration = beforeMint + expiresInDays * 24 * 60 * 60 * 1000;
+		const actualExpiration = mintBody.expires_at_ms;
+		expect(actualExpiration).toBeGreaterThanOrEqual(expectedExpiration);
+		expect(actualExpiration).toBeLessThanOrEqual(expectedExpiration + (afterMint - beforeMint));
+	});
+
+	it('tokens without expiration have null expires_at_ms', async () => {
+		const mintRes = await SELF.fetch('https://example.com/api/device-tokens', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ label: 'never expires' }),
+		});
+
+		expect(mintRes.status).toBe(200);
+		const mintBody = (await mintRes.json()) as any;
+		expect(mintBody.expires_at_ms).toBeNull();
+	});
+
+	it('expired tokens are rejected with 401', async () => {
+		// Create a token that expires in 1 day
+		const mintRes = await SELF.fetch('https://example.com/api/device-tokens', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ label: 'soon to expire', expires_in_days: 1 }),
+		});
+		const mintBody = (await mintRes.json()) as any;
+		const tokenId = mintBody.token_id;
+		const token = mintBody.token;
+
+		// Manually set the expiration to the past by updating the database
+		const pastExpiration = new Date(Date.now() - 1000); // 1 second ago
+		await db.update(deviceToken).set({ expiresAt: pastExpiration }).where(eq(deviceToken.id, tokenId));
+
+		// Try to use the expired token
+		const deviceId = generateUUID();
+		const ingestRes = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+			body: JSON.stringify({ events: [heartbeatEvent({ deviceId, eventId: generateUUID(), emittedAtMs: Date.now() })] }),
+		});
+
+		expect(ingestRes.status).toBe(401);
+		const errorBody = (await ingestRes.json()) as any;
+		expect(errorBody.error.code).toBe('UNAUTHORIZED');
+		expect(errorBody.error.message).toBe('Token expired');
+	});
+
+	it('non-expired tokens work normally', async () => {
+		// Create a token that expires in 30 days
+		const mintRes = await SELF.fetch('https://example.com/api/device-tokens', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ label: 'valid token', expires_in_days: 30 }),
+		});
+		const mintBody = (await mintRes.json()) as any;
+		const token = mintBody.token;
+
+		// Use the token - should work fine
+		const deviceId = generateUUID();
+		const ingestRes = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+			body: JSON.stringify({ events: [heartbeatEvent({ deviceId, eventId: generateUUID(), emittedAtMs: Date.now() })] }),
+		});
+
+		expect(ingestRes.status).toBe(200);
+		const ingestBody = (await ingestRes.json()) as any;
+		expect(ingestBody.accepted).toBe(1);
+	});
+
+	it('GET /api/device-tokens includes expires_at_ms', async () => {
+		// Create two tokens: one with expiration, one without
+		await SELF.fetch('https://example.com/api/device-tokens', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ label: 'expires in 90 days', expires_in_days: 90 }),
+		});
+
+		await SELF.fetch('https://example.com/api/device-tokens', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ label: 'never expires' }),
+		});
+
+		// List tokens
+		const listRes = await SELF.fetch('https://example.com/api/device-tokens', {
+			headers: { cookie: authCookie },
+		});
+
+		expect(listRes.status).toBe(200);
+		const listBody = (await listRes.json()) as any;
+		expect(listBody.tokens).toHaveLength(2);
+
+		const expiringToken = listBody.tokens.find((t: any) => t.label === 'expires in 90 days');
+		const permanentToken = listBody.tokens.find((t: any) => t.label === 'never expires');
+
+		expect(expiringToken).toBeDefined();
+		expect(expiringToken.expires_at_ms).not.toBeNull();
+		expect(typeof expiringToken.expires_at_ms).toBe('number');
+
+		expect(permanentToken).toBeDefined();
+		expect(permanentToken.expires_at_ms).toBeNull();
+	});
+
+	it('rejects tokens with invalid expires_in_days values', async () => {
+		// Test negative value
+		const negativeRes = await SELF.fetch('https://example.com/api/device-tokens', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ label: 'invalid', expires_in_days: -1 }),
+		});
+		expect(negativeRes.status).toBe(400);
+
+		// Test zero
+		const zeroRes = await SELF.fetch('https://example.com/api/device-tokens', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ label: 'invalid', expires_in_days: 0 }),
+		});
+		expect(zeroRes.status).toBe(400);
+
+		// Test value exceeding max (10 years = 3650 days)
+		const tooLargeRes = await SELF.fetch('https://example.com/api/device-tokens', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ label: 'invalid', expires_in_days: 5000 }),
+		});
+		expect(tooLargeRes.status).toBe(400);
+	});
 });

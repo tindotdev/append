@@ -283,15 +283,21 @@ app.use('/events/*', async (c, next) => {
 	if (bearer) {
 		const db = c.get('db');
 		const tokenHash = await sha256Hex(bearer);
+		const now = new Date();
 
 		const [row] = await db
-			.select({ id: deviceToken.id, userId: deviceToken.userId })
+			.select({ id: deviceToken.id, userId: deviceToken.userId, expiresAt: deviceToken.expiresAt })
 			.from(deviceToken)
 			.where(and(eq(deviceToken.tokenHash, tokenHash), isNull(deviceToken.revokedAt)))
 			.limit(1);
 
 		if (!row) {
 			return apiError(c, 401, 'UNAUTHORIZED', 'Invalid token');
+		}
+
+		// Check if token has expired
+		if (row.expiresAt && row.expiresAt < now) {
+			return apiError(c, 401, 'UNAUTHORIZED', 'Token expired');
 		}
 
 		c.set('userId', row.userId);
