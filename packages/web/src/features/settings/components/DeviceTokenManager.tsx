@@ -67,6 +67,8 @@ export function DeviceTokenManager() {
 	const [label, setLabel] = useState('');
 	const [createdToken, setCreatedToken] = useState<string | null>(null);
 	const [createdTokenId, setCreatedTokenId] = useState<string | null>(null);
+	const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
+	const [tokenToRevoke, setTokenToRevoke] = useState<string | null>(null);
 
 	const { data, isLoading, isError, refetch } = useDeviceTokens();
 	const createMutation = useCreateDeviceToken();
@@ -102,11 +104,18 @@ export function DeviceTokenManager() {
 		setCreatedTokenId(null);
 	};
 
-	const handleRevoke = async (tokenId: string) => {
-		if (!window.confirm('Revoke this token? The extension will stop ingesting until you replace it.')) return;
+	const openRevokeDialog = (tokenId: string) => {
+		setTokenToRevoke(tokenId);
+		setRevokeDialogOpen(true);
+	};
+
+	const confirmRevoke = async () => {
+		if (!tokenToRevoke) return;
 		try {
-			await revokeMutation.mutateAsync(tokenId);
+			await revokeMutation.mutateAsync(tokenToRevoke);
 			toast.success('Token revoked.');
+			setRevokeDialogOpen(false);
+			setTokenToRevoke(null);
 		} catch (err) {
 			toast.error(err instanceof Error ? err.message : 'Failed to revoke token');
 		}
@@ -208,7 +217,7 @@ export function DeviceTokenManager() {
 				) : (
 					<div className="space-y-2">
 						{tokens.map((t) => (
-							<TokenRow key={t.id} token={t} onRevoke={() => handleRevoke(t.id)} />
+							<TokenRow key={t.id} token={t} onRevoke={() => openRevokeDialog(t.id)} />
 						))}
 					</div>
 				)}
@@ -219,6 +228,25 @@ export function DeviceTokenManager() {
 					</p>
 				) : null}
 			</CardContent>
+
+			<Dialog open={revokeDialogOpen} onOpenChange={setRevokeDialogOpen}>
+				<DialogContent className="max-w-md">
+					<DialogHeader>
+						<DialogTitle>Revoke token?</DialogTitle>
+						<DialogDescription>
+							The extension will stop ingesting events until you create and configure a new token. This action cannot be undone.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<DialogClose asChild>
+							<Button variant="ghost">Cancel</Button>
+						</DialogClose>
+						<Button variant="destructive" onClick={confirmRevoke} disabled={revokeMutation.isPending}>
+							{revokeMutation.isPending ? 'Revoking…' : 'Revoke'}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</Card>
 	);
 }

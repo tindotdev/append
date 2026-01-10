@@ -9,6 +9,7 @@ import * as v from 'valibot';
 import { device as deviceTable, event as eventTable } from '../../db';
 import type { Bindings, Variables } from '../../platform/env';
 import { apiError } from '../../shared/api-error';
+import { checkRateLimit } from '../../shared/rate-limit';
 import { IngestEventsRequestSchema, type TelemetryEventInput, TelemetryEventSchema } from './validation/events.schema';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -31,6 +32,12 @@ export const eventsRoutes = app.post('/ingest', async (c) => {
 	}
 
 	const events = base.output.events as unknown[];
+
+	// Rate limiting: max 1000 events per minute per user
+	const rateLimit = checkRateLimit(userId, events.length);
+	if (!rateLimit.allowed) {
+		return apiError(c, 429, 'RATE_LIMIT_EXCEEDED', `Rate limit exceeded. Max 1000 events per minute. ${rateLimit.remaining} remaining.`);
+	}
 	const rejected: Array<{ index: number; event_id?: string; reason: string }> = [];
 	const validEvents: TelemetryEventInput[] = [];
 

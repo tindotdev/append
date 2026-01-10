@@ -3,6 +3,19 @@ import { enqueueEvent, flushOutbox } from './lib/outbox';
 import { computeUrlHash, normalizeUrlForHash } from './lib/url';
 
 const HEARTBEAT_ALARM_NAME = 'append_heartbeat';
+
+/**
+ * Heartbeat interval configuration.
+ *
+ * IMPORTANT: Chrome alarms have a minimum interval of ~30 seconds and may drift
+ * slightly due to system load and browser optimization. This is acceptable because:
+ * - Server-side sessionization handles gaps gracefully
+ * - Events include client timestamps for accurate timing
+ * - Drift is typically <1-2 seconds per interval
+ *
+ * The idle detection uses 60s (chrome.idle.queryState) which is intentionally
+ * 2x the heartbeat interval to avoid false positives from brief inactivity.
+ */
 const HEARTBEAT_INTERVAL_MINUTES = 0.5;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
