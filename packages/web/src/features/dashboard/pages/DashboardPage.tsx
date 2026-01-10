@@ -19,8 +19,6 @@ export function DashboardPage() {
 				<p className="mt-1 text-sm text-zinc-500">Learning minutes, sources, topics, and captures — derived from events</p>
 			</div>
 
-			<TelemetryControls />
-
 			{/* Dashboard grid */}
 			<div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @4xl/main:grid-cols-3">
 				{/* Row 1: Hero + Streak + Top Source (3 cols) */}
@@ -43,6 +41,9 @@ export function DashboardPage() {
 					<ActivityHeatmap />
 				</div>
 			</div>
+
+			{/* Floating telemetry controls (dev tool) */}
+			<TelemetryControls />
 		</div>
 	);
 }

@@ -1,11 +1,10 @@
-import { Download, Flame, Plus, RotateCcw } from 'lucide-react';
+import { Download, Flame, FlaskConical, Plus, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { addActivity, addCapture, exportEventsNdjson, resetTelemetry } from '../telemetry/actions';
 import { useTelemetrySnapshot } from '../telemetry/hooks';
@@ -64,127 +63,144 @@ export function TelemetryControls() {
 	};
 
 	return (
-		<Card className="mb-4">
-			<CardHeader className="gap-1">
-				<CardDescription className="text-xs">Telemetry (local simulator)</CardDescription>
-				<CardTitle className="text-base">Drive the dashboard with real event-shaped data</CardTitle>
-			</CardHeader>
-			<CardContent className="flex flex-col gap-3">
-				<div className="flex flex-col gap-2 @xl/main:flex-row @xl/main:items-end">
-					<div className="flex-1">
-						<div className="text-xs text-zinc-500">Source URL</div>
-						<Select value={url} onValueChange={setUrl}>
-							<SelectTrigger className="mt-1">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{QUICK_SOURCES.map((s) => (
-									<SelectItem key={s.url} value={s.url}>
-										{s.label}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
-					<div className="w-full @xl/main:w-36">
-						<label className="text-xs text-zinc-500" htmlFor={MINUTES_ID}>
-							Minutes
-						</label>
-						<Input id={MINUTES_ID} className="mt-1" inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value)} />
-					</div>
-					<Button onClick={handleAddActivity} className="@xl/main:shrink-0">
-						<Flame className="mr-2 size-4" />
-						Add activity
-					</Button>
-				</div>
+		<Sheet>
+			<SheetTrigger asChild>
+				<Button
+					variant="outline"
+					size="icon"
+					className="fixed bottom-4 right-4 z-40 size-9 rounded-full border-zinc-800 bg-zinc-950/80 shadow-sm backdrop-blur-sm hover:bg-zinc-900"
+					title="Open telemetry controls"
+				>
+					<FlaskConical className="size-4" />
+				</Button>
+			</SheetTrigger>
+			<SheetContent className="w-full overflow-y-auto sm:max-w-md">
+				<SheetHeader>
+					<SheetTitle>Telemetry Controls</SheetTitle>
+					<SheetDescription>Local simulator for driving the dashboard with event data</SheetDescription>
+				</SheetHeader>
 
-				<div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-					<span>
-						Events: <span className="tabular-nums text-zinc-300">{eventCount}</span>
-					</span>
-					<span className="text-zinc-700">•</span>
-					<span>
-						Timezone: <span className="text-zinc-300">{timezone}</span>
-					</span>
-				</div>
+				<div className="mt-6 flex flex-col gap-6 px-4 pb-6">
+					{/* Stats */}
+					<div className="flex flex-wrap items-center gap-3 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-400">
+						<span>
+							Events: <span className="tabular-nums text-zinc-300">{eventCount}</span>
+						</span>
+						<span className="text-zinc-700">•</span>
+						<span>
+							Timezone: <span className="text-zinc-300">{timezone}</span>
+						</span>
+					</div>
 
-				<div className="flex flex-wrap gap-2">
-					<Dialog>
-						<DialogTrigger asChild>
-							<Button variant="outline">
-								<Plus className="mr-2 size-4" />
-								Add capture
-							</Button>
-						</DialogTrigger>
-						<DialogContent className="max-w-md">
-							<DialogHeader>
-								<DialogTitle>New capture</DialogTitle>
-								<DialogDescription>Creates a `capture` event tied to the selected URL.</DialogDescription>
-							</DialogHeader>
-							<div className="space-y-3">
-								<div className="space-y-1">
-									<div className="text-xs text-zinc-500">Type</div>
-									<Select value={captureType} onValueChange={(v) => setCaptureType(v as 'term' | 'question')}>
-										<SelectTrigger>
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="term">term</SelectItem>
-											<SelectItem value="question">question</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
-								<div className="space-y-1">
-									<label className="text-xs text-zinc-500" htmlFor={CAPTURE_TEXT_ID}>
-										Text
-									</label>
-									<Input
-										id={CAPTURE_TEXT_ID}
-										value={captureLabel}
-										onChange={(e) => setCaptureLabel(e.target.value)}
-										placeholder="e.g. idempotency key"
-									/>
-								</div>
-								<div className="space-y-1">
-									<label className="text-xs text-zinc-500" htmlFor={CAPTURE_NOTE_ID}>
-										Note (optional)
-									</label>
-									<Textarea
-										id={CAPTURE_NOTE_ID}
-										value={captureNote}
-										onChange={(e) => setCaptureNote(e.target.value)}
-										rows={3}
-										placeholder="Short context to help future-you"
-									/>
-								</div>
-								<div className="flex justify-end gap-2">
-									<Button variant="outline" onClick={() => setCaptureLabel('')}>
-										Clear
-									</Button>
-									<Button onClick={handleAddCapture}>Save capture</Button>
-								</div>
+					{/* Add Activity Section */}
+					<div className="space-y-3">
+						<h3 className="text-sm font-medium">Add Activity</h3>
+						<div className="space-y-3">
+							<div>
+								<div className="text-xs text-zinc-500">Source URL</div>
+								<Select value={url} onValueChange={setUrl}>
+									<SelectTrigger className="mt-1">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{QUICK_SOURCES.map((s) => (
+											<SelectItem key={s.url} value={s.url}>
+												{s.label}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
 							</div>
-						</DialogContent>
-					</Dialog>
+							<div>
+								<label className="text-xs text-zinc-500" htmlFor={MINUTES_ID}>
+									Minutes
+								</label>
+								<Input id={MINUTES_ID} className="mt-1" inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value)} />
+							</div>
+							<Button onClick={handleAddActivity} className="w-full">
+								<Flame className="mr-2 size-4" />
+								Add activity
+							</Button>
+						</div>
+					</div>
 
-					<Button variant="outline" onClick={() => exportEventsNdjson()}>
-						<Download className="mr-2 size-4" />
-						Export events (ndjson)
-					</Button>
+					{/* Add Capture Section */}
+					<div className="space-y-3">
+						<h3 className="text-sm font-medium">Add Capture</h3>
+						<div className="space-y-3">
+							<div>
+								<div className="text-xs text-zinc-500">Type</div>
+								<Select value={captureType} onValueChange={(v) => setCaptureType(v as 'term' | 'question')}>
+									<SelectTrigger className="mt-1">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="term">term</SelectItem>
+										<SelectItem value="question">question</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+							<div>
+								<label className="text-xs text-zinc-500" htmlFor={CAPTURE_TEXT_ID}>
+									Text
+								</label>
+								<Input
+									id={CAPTURE_TEXT_ID}
+									className="mt-1"
+									value={captureLabel}
+									onChange={(e) => setCaptureLabel(e.target.value)}
+									placeholder="e.g. idempotency key"
+								/>
+							</div>
+							<div>
+								<label className="text-xs text-zinc-500" htmlFor={CAPTURE_NOTE_ID}>
+									Note (optional)
+								</label>
+								<Textarea
+									id={CAPTURE_NOTE_ID}
+									className="mt-1"
+									value={captureNote}
+									onChange={(e) => setCaptureNote(e.target.value)}
+									rows={3}
+									placeholder="Short context to help future-you"
+								/>
+							</div>
+							<div className="flex gap-2">
+								<Button variant="outline" onClick={() => setCaptureLabel('')} className="flex-1">
+									Clear
+								</Button>
+								<Button onClick={handleAddCapture} className="flex-1">
+									<Plus className="mr-2 size-4" />
+									Save
+								</Button>
+							</div>
+						</div>
+					</div>
 
-					<Button
-						variant="outline"
-						onClick={() => {
-							if (!window.confirm('Reset local telemetry events?')) return;
-							resetTelemetry();
-							toast.success('Telemetry reset.');
-						}}
-					>
-						<RotateCcw className="mr-2 size-4" />
-						Reset
-					</Button>
+					{/* Actions Section */}
+					<div className="space-y-3 border-t border-zinc-800 pt-6">
+						<h3 className="text-sm font-medium">Actions</h3>
+						<div className="flex flex-col gap-2">
+							<Button variant="outline" onClick={() => exportEventsNdjson()} className="w-full justify-start">
+								<Download className="mr-2 size-4" />
+								Export events (ndjson)
+							</Button>
+							<Button
+								variant="outline"
+								onClick={() => {
+									if (!window.confirm('Reset local telemetry events?')) return;
+									resetTelemetry();
+									toast.success('Telemetry reset.');
+								}}
+								className="w-full justify-start"
+							>
+								<RotateCcw className="mr-2 size-4" />
+								Reset telemetry
+							</Button>
+						</div>
+					</div>
 				</div>
-			</CardContent>
-		</Card>
+			</SheetContent>
+		</Sheet>
 	);
 }
