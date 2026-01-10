@@ -17,9 +17,9 @@ The current web dashboard is a UI prototype driven by a **local telemetry simula
 Ship M1 by implementing:
 
 1. **Dashboard read models** computed **on read** from the canonical `event` store (no materialized rollup tables required for MVP):
-   - `GET /dashboard/today?tz=...`
-   - `GET /dashboard/week?start=YYYY-MM-DD&tz=...`
-   - `GET /dashboard/heatmap?year=YYYY&tz=...`
+   - `GET /api/dashboard/today?tz=...`
+   - `GET /api/dashboard/week?start=YYYY-MM-DD&tz=...`
+   - `GET /api/dashboard/heatmap?year=YYYY&tz=...`
 
 2. **Raw events export** as NDJSON:
    - `GET /events/export?from=YYYY-MM-DD&to=YYYY-MM-DD&format=ndjson`
@@ -35,15 +35,16 @@ Ship M1 by implementing:
 
 ### API: dashboard
 
-- [ ] `/dashboard/*` routes exist and require cookie session auth (same user identity as `/api/*`).
-- [ ] `GET /dashboard/today` returns real totals + breakdowns derived from `event` for the authenticated user.
-- [ ] `GET /dashboard/week` returns a real 7-day series + per-topic/per-source totals for the authenticated user.
-- [ ] `GET /dashboard/heatmap` returns per-day minutes for a year + stats for the authenticated user.
+- [ ] `/api/dashboard/*` routes exist and require cookie session auth (same user identity as `/api/*`).
+- [ ] `GET /api/dashboard/today` returns real totals + breakdowns derived from `event` for the authenticated user.
+- [ ] `GET /api/dashboard/week` returns a real 7-day series + per-topic/per-source totals for the authenticated user.
+- [ ] `GET /api/dashboard/heatmap` returns per-day minutes for a year + stats for the authenticated user.
 - [ ] Rollup logic matches the MVP algorithm in `docs/design.md`:
   - `HEARTBEAT_INTERVAL_MS = 30_000`, `IDLE_CUTOFF_MS = 300_000`, `MAX_CREDIT_PER_HEARTBEAT_MS = interval_ms`
   - credit only when `active_signals` are active (`!user_idle && window_focused && tab_active`)
   - streak uses `learning_minutes >= 10` in the requested timezone
 - [ ] Topics are assigned via MVP rules/heuristics, with `topic_override` events taking precedence.
+  - Guardrail: endpoints may return 413 `RANGE_TOO_LARGE` with details `{ max_events_scanned: 250000 }`.
 
 ### API: export
 
@@ -52,7 +53,7 @@ Ship M1 by implementing:
 
 ### Web
 
-- [ ] Dashboard UI reads from `/dashboard/*` endpoints (no mock/local telemetry required for production path).
+- [ ] Dashboard UI reads from `/api/dashboard/*` endpoints (no mock/local telemetry required for production path).
 - [ ] Local telemetry simulator remains available as a dev tool (flagged or clearly separated from the prod path).
 
 ### Extension
@@ -66,7 +67,7 @@ Ship M1 by implementing:
 
 ### Tests
 
-- [ ] API tests cover `GET /dashboard/today|week|heatmap` for basic correctness.
+- [ ] API tests cover `GET /api/dashboard/today|week|heatmap` for basic correctness.
 - [ ] API tests cover `GET /events/export` response format and ownership rules.
 
 ## Notes

@@ -9,6 +9,7 @@ export type ApiErrorCode =
 	| 'VALIDATION_ERROR'
 	| 'INVALID_JSON'
 	| 'PAYLOAD_TOO_LARGE'
+	| 'RANGE_TOO_LARGE'
 	| 'UNAUTHORIZED'
 	| 'FORBIDDEN'
 	| 'ORIGIN_FORBIDDEN' // Origin validation failed (preview env only)
