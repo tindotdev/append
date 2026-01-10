@@ -178,17 +178,25 @@ Precedence (highest → lowest):
 
 ### Dashboard queries
 
-- `GET /dashboard/today?tz=Asia/Bangkok` (example; if omitted, default to the user’s configured timezone)
+- `GET /api/dashboard/today?tz=Asia/Bangkok` (example; if omitted, default to the user’s configured timezone)
   - Returns: today minutes, 7-day average, streak, today breakdown (topics + sources), today captures, top topic/source.
-- `GET /dashboard/week?start=YYYY-MM-DD&tz=...`
+- `GET /api/dashboard/week?start=YYYY-MM-DD&tz=...`
   - Returns: 7-day series + per-topic/per-source totals + top cards.
-- `GET /dashboard/heatmap?year=YYYY&tz=...`
+- `GET /api/dashboard/heatmap?year=YYYY&tz=...`
   - Returns: per-day minutes for the year + stats (total, avg/day, active days).
+
+Guardrails (MVP):
+
+- Range limits: endpoints may return **413** with error code `RANGE_TOO_LARGE` if the requested range would scan too many events.
+  - Details: `{ max_events_scanned: 250000 }`
+- Timezones: `tz` must be a valid IANA timezone string (400 `VALIDATION_ERROR` if invalid).
 
 ### Export (MVP “don’t die” requirement)
 
 - `GET /events/export?from=YYYY-MM-DD&to=YYYY-MM-DD&format=ndjson`
   - User-owned export of raw events (portable, append-only).
+  - Date semantics (default): `from`/`to` are interpreted as **UTC dates inclusive**.
+  - Ordering: stable chronological order by `(emitted_at, device_id, event_id)`.
 
 ## Data model (events-first; Cloudflare D1)
 
@@ -236,7 +244,7 @@ Key cards (MVP):
 UX prototyping note:
 
 - The current web UX prototype includes a local telemetry simulator to drive these dashboards without any backend/API dependencies.
-- Production replaces this with the real `/dashboard/*` queries backed by ingested events.
+- Production replaces this with the real `/api/dashboard/*` queries backed by ingested events.
 
 ## Browser extension (emitter)
 
