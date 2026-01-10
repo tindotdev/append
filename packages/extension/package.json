@@ -1,0 +1,21 @@
+{
+	"name": "@append/extension",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite --port 5174",
+		"build": "vite build --mode development",
+		"build:prod": "vite build --mode production",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@append/contracts": "workspace:*"
+	},
+	"devDependencies": {
+		"@crxjs/vite-plugin": "^2.3.0",
+		"@types/chrome": "^0.1.32",
+		"typescript": "^5.7.2",
+		"vite": "^7.1.7",
+		"vite-plugin-zip-pack": "^1.2.4"
+	}
+}

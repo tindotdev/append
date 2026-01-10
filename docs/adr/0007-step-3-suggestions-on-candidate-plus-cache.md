@@ -1,7 +1,8 @@
 # ADR 0007 — Step 3 suggestions stored on `candidate` + per-term cache
 
-Status: Accepted
+Status: Superseded by ADR 0020
 Date: 2025-12-23
+Superseded: 2026-01-08
 
 ## Context
 

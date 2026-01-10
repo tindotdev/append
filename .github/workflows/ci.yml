@@ -102,3 +102,9 @@ jobs:
 
       - name: Run tests
         run: pnpm test
+
+      - name: Run preview tests
+        run: pnpm --filter @append/api test:preview
+
+      - name: Run extension tests
+        run: pnpm --filter @append/api test:extension

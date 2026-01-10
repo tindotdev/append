@@ -8,6 +8,9 @@ export type Bindings = {
 	// R2 Object Storage
 	IMPORT_FILES: R2Bucket;
 
+	// Rate Limiting (distributed via CF Rate Limiting API)
+	INGEST_RATE_LIMITER: RateLimit;
+
 	// AI Gateway
 	CF_ACCOUNT_ID: string;
 	AI_GATEWAY_ID: string;
@@ -35,6 +38,9 @@ export type Bindings = {
 	E2E_AUTH_SECRET?: string;
 	E2E_AUTH_SECRET_OLD?: string; // For zero-downtime secret rotation
 	E2E_AUTH_EMAIL?: string;
+
+	// Extension Security - Allowlist of Chrome extension IDs that can access /events/* endpoints
+	ALLOWED_EXTENSION_IDS?: string; // Comma-separated list of 32-char extension IDs
 };
 
 export type Variables = {

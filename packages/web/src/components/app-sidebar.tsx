@@ -1,6 +1,20 @@
 import { Link, useLocation } from '@tanstack/react-router';
-import { Archive, FileDown, FileUp, FolderOpen, LogOut, Plus, Search, Settings } from 'lucide-react';
+import {
+	Archive,
+	ChevronDown,
+	FileDown,
+	FileUp,
+	FolderOpen,
+	LayoutDashboard,
+	LogOut,
+	PenSquare,
+	Plus,
+	Search,
+	Settings,
+} from 'lucide-react';
+import * as React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -17,14 +31,17 @@ import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
+	SidebarMenuSub,
+	SidebarMenuSubButton,
+	SidebarMenuSubItem,
 	SidebarRail,
-	SidebarSeparator,
 	useSidebar,
 } from '@/components/ui/sidebar';
 import { signOut, useAuth } from '@/features/auth';
 import { useUserBuckets } from '@/features/settings';
 
 const NAV_ITEMS = [
+	{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, shortcut: undefined },
 	{ to: '/search', label: 'Search', icon: Search, shortcut: '/' },
 	{ to: '/batch/new', label: 'Capture', icon: Plus, shortcut: 'C' },
 	{ to: '/batch', label: 'Batches', icon: Archive, shortcut: 'G B' },
@@ -41,6 +58,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const { data: bucketsData } = useUserBuckets({ enabled: !!session });
 	const buckets = bucketsData?.buckets ?? [];
 	const { isMobile } = useSidebar();
+	const [bucketsOpen, setBucketsOpen] = React.useState(true);
 
 	const user = session?.user;
 	const userInitials =
@@ -55,54 +73,72 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
 	return (
 		<Sidebar collapsible="icon" {...props}>
-			{/* User Menu Header (Linear-style) */}
-			<SidebarHeader>
-				<SidebarMenu>
-					<SidebarMenuItem>
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
-									<Avatar className="h-8 w-8 rounded-lg">
-										<AvatarImage src={user?.image ?? undefined} alt={user?.name ?? 'User'} />
-										<AvatarFallback className="rounded-lg">{userInitials}</AvatarFallback>
-									</Avatar>
-									<div className="grid flex-1 text-left text-sm leading-tight">
-										<span className="truncate font-medium">{user?.name ?? 'User'}</span>
+			{/* Header with user menu and action icons (Linear-style) */}
+			<SidebarHeader className="pb-0">
+				<div className="flex items-center justify-between">
+					<SidebarMenu>
+						<SidebarMenuItem>
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<SidebarMenuButton size="lg" className="h-9 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+										<Avatar className="h-6 w-6 rounded-md">
+											<AvatarImage src={user?.image ?? undefined} alt={user?.name ?? 'User'} />
+											<AvatarFallback className="rounded-md text-[10px]">{userInitials}</AvatarFallback>
+										</Avatar>
+										<span className="truncate text-[13px] font-medium">{user?.name ?? 'User'}</span>
+										<ChevronDown className="ml-auto size-3.5 opacity-50" />
+									</SidebarMenuButton>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent
+									className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+									side={isMobile ? 'bottom' : 'right'}
+									align="start"
+									sideOffset={4}
+								>
+									<div className="flex items-center gap-2 px-2 py-1.5 text-left text-sm">
+										<Avatar className="h-8 w-8 rounded-lg">
+											<AvatarImage src={user?.image ?? undefined} alt={user?.name ?? 'User'} />
+											<AvatarFallback className="rounded-lg">{userInitials}</AvatarFallback>
+										</Avatar>
+										<div className="grid flex-1 text-left text-sm leading-tight">
+											<span className="truncate font-medium">{user?.name ?? 'User'}</span>
+											<span className="truncate text-xs text-muted-foreground">{user?.email}</span>
+										</div>
 									</div>
-								</SidebarMenuButton>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent
-								className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-								side={isMobile ? 'bottom' : 'right'}
-								align="start"
-								sideOffset={4}
-							>
-								<div className="flex items-center gap-2 px-2 py-1.5 text-left text-sm">
-									<Avatar className="h-8 w-8 rounded-lg">
-										<AvatarImage src={user?.image ?? undefined} alt={user?.name ?? 'User'} />
-										<AvatarFallback className="rounded-lg">{userInitials}</AvatarFallback>
-									</Avatar>
-									<div className="grid flex-1 text-left text-sm leading-tight">
-										<span className="truncate font-medium">{user?.name ?? 'User'}</span>
-										<span className="truncate text-xs text-muted-foreground">{user?.email}</span>
-									</div>
-								</div>
-								<DropdownMenuSeparator />
-								<DropdownMenuItem asChild>
-									<Link to="/settings">
-										<Settings />
-										Settings
-									</Link>
-								</DropdownMenuItem>
-								<DropdownMenuSeparator />
-								<DropdownMenuItem onClick={() => signOut()}>
-									<LogOut />
-									Sign out
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</SidebarMenuItem>
-				</SidebarMenu>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem asChild>
+										<Link to="/settings">
+											<Settings />
+											Settings
+										</Link>
+									</DropdownMenuItem>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem onClick={() => signOut()}>
+										<LogOut />
+										Sign out
+									</DropdownMenuItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
+						</SidebarMenuItem>
+					</SidebarMenu>
+					{/* Quick action icons (Linear-style) */}
+					<div className="flex items-center gap-0.5 pr-2 group-data-[collapsible=icon]:hidden">
+						<button
+							type="button"
+							className="flex size-7 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+							title="Search"
+						>
+							<Search className="size-4" />
+						</button>
+						<button
+							type="button"
+							className="flex size-7 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+							title="Quick capture"
+						>
+							<PenSquare className="size-4" />
+						</button>
+					</div>
+				</div>
 			</SidebarHeader>
 
 			<SidebarContent>
@@ -117,7 +153,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 									tooltip={item.label}
 								>
 									<Link to={item.to}>
-										<item.icon />
+										<item.icon className="size-4" />
 										<span>{item.label}</span>
 									</Link>
 								</SidebarMenuButton>
@@ -126,44 +162,50 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 					</SidebarMenu>
 				</SidebarGroup>
 
-				<SidebarSeparator />
-
-				{/* Buckets */}
+				{/* Buckets - Collapsible section (Linear-style) */}
 				<SidebarGroup className="group-data-[collapsible=icon]:hidden">
-					<SidebarGroupLabel>Buckets</SidebarGroupLabel>
-					<SidebarMenu>
-						{buckets.length > 0 ? (
-							buckets.map((bucket) => (
-								<SidebarMenuItem key={bucket.id}>
-									<SidebarMenuButton asChild isActive={location.pathname === `/bucket/${bucket.slug}`}>
-										<Link to="/bucket/$slug" params={{ slug: bucket.slug }} search={{ term: undefined }}>
-											<FolderOpen />
-											<span>{bucket.name}</span>
-										</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							))
-						) : (
-							<SidebarMenuItem>
-								<SidebarMenuButton disabled className="text-sidebar-foreground/50">
-									<FolderOpen />
-									<span>No buckets yet</span>
-								</SidebarMenuButton>
-							</SidebarMenuItem>
-						)}
-					</SidebarMenu>
+					<Collapsible open={bucketsOpen} onOpenChange={setBucketsOpen}>
+						<CollapsibleTrigger asChild>
+							<SidebarGroupLabel className="cursor-pointer hover:text-sidebar-foreground/70">
+								<ChevronDown className={`mr-1 size-3 transition-transform duration-200 ${bucketsOpen ? '' : '-rotate-90'}`} />
+								Buckets
+							</SidebarGroupLabel>
+						</CollapsibleTrigger>
+						<CollapsibleContent>
+							<SidebarMenu>
+								{buckets.length > 0 ? (
+									buckets.map((bucket) => (
+										<SidebarMenuItem key={bucket.id}>
+											<SidebarMenuButton asChild isActive={location.pathname === `/bucket/${bucket.slug}`}>
+												<Link to="/bucket/$slug" params={{ slug: bucket.slug }} search={{ term: undefined }}>
+													<FolderOpen className="size-4" />
+													<span>{bucket.name}</span>
+												</Link>
+											</SidebarMenuButton>
+										</SidebarMenuItem>
+									))
+								) : (
+									<SidebarMenuItem>
+										<SidebarMenuButton disabled className="text-sidebar-foreground/50">
+											<FolderOpen className="size-4" />
+											<span>No buckets yet</span>
+										</SidebarMenuButton>
+									</SidebarMenuItem>
+								)}
+							</SidebarMenu>
+						</CollapsibleContent>
+					</Collapsible>
 				</SidebarGroup>
 
-				<SidebarSeparator className="group-data-[collapsible=icon]:hidden" />
-
-				{/* Utilities */}
-				<SidebarGroup>
+				{/* Utilities - Collapsible section */}
+				<SidebarGroup className="group-data-[collapsible=icon]:hidden">
+					<SidebarGroupLabel>Tools</SidebarGroupLabel>
 					<SidebarMenu>
 						{UTILITY_ITEMS.map((item) => (
 							<SidebarMenuItem key={item.to}>
 								<SidebarMenuButton asChild isActive={location.pathname === item.to} tooltip={item.label}>
 									<Link to={item.to}>
-										<item.icon />
+										<item.icon className="size-4" />
 										<span>{item.label}</span>
 									</Link>
 								</SidebarMenuButton>

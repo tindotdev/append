@@ -1,0 +1,5 @@
+# Doppler project configuration
+# This file tells Doppler which project and config to use when running commands
+setup:
+  project: apps
+  config: dev_append

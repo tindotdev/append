@@ -1,7 +1,8 @@
 # ADR 0012 — Custom User Buckets
 
-Status: Accepted
+Status: Superseded by ADR 0020
 Date: 2025-12-31
+Superseded: 2026-01-08
 
 ## Context
 

@@ -21,6 +21,6 @@ Everything else should be deleted or moved into:
 - `AGENTS.md`
 - Everything under `docs/`
 - `docs/runbook.md`
-- ENG-LOG legacy format reference: <https://github.com/tindotdev/eng-log> (import/export contract; see `docs/design.md`).
+- Legacy ENG-LOG reference: <https://github.com/tindotdev/eng-log> (historical context only; see `docs/design.md` appendix).
 
 If the code changes behavior, update docs in the same change (or immediately after).

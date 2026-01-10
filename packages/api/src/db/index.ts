@@ -6,4 +6,5 @@ export { schema };
 // Re-export individual tables for drizzle-kit
 export * from './auth.schema';
 export * from './domain.schema';
+export * from './events.schema';
 export * from './schema';
