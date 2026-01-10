@@ -11,6 +11,20 @@ just dev    # Start development servers
 
 See `justfile` for available commands.
 
+### Testing the Chrome extension locally
+
+**IMPORTANT**: To test the Chrome extension locally, you **must** configure `ALLOWED_EXTENSION_IDS` in Doppler before running `just setup`:
+
+```bash
+# Required for extension development
+doppler secrets set ALLOWED_EXTENSION_IDS="nnhipglpoenbcdonkbnfdcmfcfaggjle" --project apps --config dev_append
+just sync-secrets
+```
+
+Without this configuration, the extension's requests to `/events/*` will be **blocked by CORS** (secure by default per ADR 0021).
+
+See [Extension security configuration](#extension-security-configuration) for details.
+
 ## Secrets management
 
 Secrets are managed via **Doppler** (local) and Cloudflare (production):
@@ -47,13 +61,19 @@ The API restricts `/events/*` access from Chrome extensions using two security m
 1. **Extension ID allowlist**: Only specific extension IDs can make CORS requests
 2. **Required bearer auth**: Extensions must use device tokens; cookie auth is rejected
 
+**Secure by default**: If `ALLOWED_EXTENSION_IDS` is not set or empty, **all** chrome-extension:// origins are rejected by CORS. This prevents unauthorized extensions from accessing the API.
+
+**Test coverage**: The CORS behavior is verified by integration tests:
+- `packages/api/test/cors.spec.ts` — Tests rejection when `ALLOWED_EXTENSION_IDS` is not set
+- `packages/api/test/cors.extension.spec.ts` — Tests acceptance when configured (run via `pnpm test:extension`)
+
 #### Local development setup
 
 The local development extension has a stable ID: **`nnhipglpoenbcdonkbnfdcmfcfaggjle`**
 
 This ID is deterministic (generated from the public key in `packages/extension/src/manifest.ts`).
 
-Configure for local dev:
+**Required for local extension development**. Configure for local dev:
 
 ```bash
 # Option 1: Via Doppler (recommended)
@@ -492,6 +512,19 @@ pnpm test
 ```
 
 API tests live under `packages/api/test/` and run via `pnpm test:api`.
+
+### Running all test suites
+
+```bash
+# Default tests (includes CORS tests without ALLOWED_EXTENSION_IDS)
+pnpm --filter @append/api test
+
+# Preview environment tests (APP_ENV=preview)
+pnpm --filter @append/api test:preview
+
+# Extension tests (ALLOWED_EXTENSION_IDS set)
+pnpm --filter @append/api test:extension
+```
 
 ### Test environment variables
 

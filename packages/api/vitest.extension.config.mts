@@ -13,14 +13,15 @@ const migrations = await readD1Migrations(migrationsPath);
 
 export default defineWorkersConfig({
 	test: {
-		exclude: ['**/*.preview.spec.ts', '**/*.extension.spec.ts', '**/node_modules/**'],
+		include: ['test/**/*.extension.spec.ts'],
+		exclude: ['**/node_modules/**'],
 		poolOptions: {
 			workers: {
 				wrangler: {
 					configPath: './wrangler.jsonc',
-					environment: 'test', // Use test environment with email/password auth (§5.2)
+					environment: 'test',
 				},
-				// Override .dev.vars with test-specific values
+				// Override .dev.vars with extension-focused values
 				miniflare: {
 					bindings: {
 						// Test environment variables (override .dev.vars)
@@ -35,9 +36,8 @@ export default defineWorkersConfig({
 						// E2E Auth Bootstrap (ADR 0019)
 						E2E_AUTH_SECRET: 'test-e2e-secret-min-32-chars-for-hmac',
 						E2E_AUTH_EMAIL: 'test-a@example.com',
-						// Extension allowlist (ADR 0021) - explicitly empty to test secure-by-default behavior
-						ALLOWED_EXTENSION_IDS: '',
-						// AI binding not needed for tests since we use stub provider
+						// Extension allowlist (ADR 0021)
+						ALLOWED_EXTENSION_IDS: 'nnhipglpoenbcdonkbnfdcmfcfaggjle',
 						// D1 migrations read in Node.js context, passed to Workers runtime
 						TEST_MIGRATIONS: migrations,
 					},
