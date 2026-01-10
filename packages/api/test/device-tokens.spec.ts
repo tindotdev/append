@@ -93,4 +93,124 @@ describe('Device tokens', () => {
 
 		expect(ingestRes.status).toBe(401);
 	});
+
+	it('updates last_used_at when token is used for authentication', async () => {
+		// Mint a new token
+		const mintRes = await SELF.fetch('https://example.com/api/device-tokens', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ label: 'test token' }),
+		});
+		const mintBody = (await mintRes.json()) as any;
+		const tokenId = mintBody.token_id;
+		const token = mintBody.token;
+
+		// Verify initial state: last_used_at should be null
+		const [initialRow] = await db.select().from(deviceToken).where(eq(deviceToken.id, tokenId));
+		expect(initialRow).toBeDefined();
+		expect(initialRow.lastUsedAt).toBeNull();
+
+		// Use the token for authentication
+		const beforeUse = Date.now();
+		const deviceId = generateUUID();
+		const ingestRes = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+			body: JSON.stringify({ events: [heartbeatEvent({ deviceId, eventId: generateUUID(), emittedAtMs: beforeUse })] }),
+		});
+		const afterUse = Date.now();
+		expect(ingestRes.status).toBe(200);
+
+		// Verify last_used_at was updated
+		const [updatedRow] = await db.select().from(deviceToken).where(eq(deviceToken.id, tokenId));
+		expect(updatedRow.lastUsedAt).not.toBeNull();
+		const lastUsedMs = updatedRow.lastUsedAt!.getTime();
+		expect(lastUsedMs).toBeGreaterThanOrEqual(beforeUse);
+		expect(lastUsedMs).toBeLessThanOrEqual(afterUse);
+	});
+
+	it('returns last_used_at_ms in GET /api/device-tokens after token usage', async () => {
+		// Mint a new token
+		const mintRes = await SELF.fetch('https://example.com/api/device-tokens', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ label: 'api test token' }),
+		});
+		const mintBody = (await mintRes.json()) as any;
+		const tokenId = mintBody.token_id;
+		const token = mintBody.token;
+
+		// List tokens before usage - last_used_at_ms should be null
+		const listBefore = await SELF.fetch('https://example.com/api/device-tokens', {
+			headers: { cookie: authCookie },
+		});
+		const listBeforeBody = (await listBefore.json()) as any;
+		const tokenBefore = listBeforeBody.tokens.find((t: any) => t.id === tokenId);
+		expect(tokenBefore).toBeDefined();
+		expect(tokenBefore.last_used_at_ms).toBeNull();
+
+		// Use the token
+		const beforeUse = Date.now();
+		const deviceId = generateUUID();
+		const ingestRes = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+			body: JSON.stringify({ events: [heartbeatEvent({ deviceId, eventId: generateUUID(), emittedAtMs: beforeUse })] }),
+		});
+		const afterUse = Date.now();
+		expect(ingestRes.status).toBe(200);
+
+		// List tokens after usage - last_used_at_ms should be populated
+		const listAfter = await SELF.fetch('https://example.com/api/device-tokens', {
+			headers: { cookie: authCookie },
+		});
+		const listAfterBody = (await listAfter.json()) as any;
+		const tokenAfter = listAfterBody.tokens.find((t: any) => t.id === tokenId);
+		expect(tokenAfter).toBeDefined();
+		expect(tokenAfter.last_used_at_ms).not.toBeNull();
+		expect(tokenAfter.last_used_at_ms).toBeGreaterThanOrEqual(beforeUse);
+		expect(tokenAfter.last_used_at_ms).toBeLessThanOrEqual(afterUse);
+	});
+
+	it('updates last_used_at on subsequent token uses', async () => {
+		// Mint a token and use it once
+		const mintRes = await SELF.fetch('https://example.com/api/device-tokens', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ label: 'reuse test' }),
+		});
+		const mintBody = (await mintRes.json()) as any;
+		const tokenId = mintBody.token_id;
+		const token = mintBody.token;
+
+		// First use
+		const deviceId = generateUUID();
+		await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+			body: JSON.stringify({ events: [heartbeatEvent({ deviceId, eventId: generateUUID(), emittedAtMs: Date.now() })] }),
+		});
+
+		const [firstUseRow] = await db.select().from(deviceToken).where(eq(deviceToken.id, tokenId));
+		const firstUseTime = firstUseRow.lastUsedAt!.getTime();
+
+		// Wait a bit to ensure timestamp will be different
+		await new Promise((resolve) => setTimeout(resolve, 10));
+
+		// Second use
+		const beforeSecondUse = Date.now();
+		await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+			body: JSON.stringify({ events: [heartbeatEvent({ deviceId, eventId: generateUUID(), emittedAtMs: Date.now() })] }),
+		});
+		const afterSecondUse = Date.now();
+
+		// Verify last_used_at was updated to a later time
+		const [secondUseRow] = await db.select().from(deviceToken).where(eq(deviceToken.id, tokenId));
+		const secondUseTime = secondUseRow.lastUsedAt!.getTime();
+		expect(secondUseTime).toBeGreaterThan(firstUseTime);
+		expect(secondUseTime).toBeGreaterThanOrEqual(beforeSecondUse);
+		expect(secondUseTime).toBeLessThanOrEqual(afterSecondUse);
+	});
 });
