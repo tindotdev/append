@@ -1,7 +1,8 @@
 # ADR 0008 — Accept-all idempotency via candidate materialization pointers
 
-Status: Accepted
+Status: Superseded by ADR 0020
 Date: 2025-12-23
+Superseded: 2026-01-08
 
 ## Context
 
@@ -34,4 +35,3 @@ Idempotency posture:
 
 - Rely only on idempotency keys: insufficient if the client retries with a different key or the first request partially succeeded before failing.
 - Add a unique constraint on `term_sense`: rejected because senses are intentionally append-only and duplicates (including near-duplicates) are permitted by design (ADR 0002).
-

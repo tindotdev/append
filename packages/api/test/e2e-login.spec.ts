@@ -80,7 +80,7 @@ describe('POST /auth/e2e/login', () => {
 		// Verify user was created in database
 		const users = await db.select().from(user);
 		expect(users.length).toBe(1);
-		expect(users[0].email).toBe('test-a@example.com');
+		expect(users[0].email).toBe('test+a@example.com');
 		expect(users[0].name).toBe('E2E Test User');
 
 		// Verify session was created in database
@@ -204,10 +204,10 @@ describe('E2E Login Production Guards', () => {
 // =============================================================================
 
 describe('E2E Login Allowlist Guards', () => {
-	it('E2E_AUTH_EMAIL matches ALLOWED_EMAIL (exact match in test env)', async () => {
-		// Test environment uses exact match (wildcard patterns for preview)
-		expect(env.ALLOWED_EMAIL).toBe('test-a@example.com');
-		expect(env.E2E_AUTH_EMAIL).toBe('test-a@example.com');
+	it('E2E_AUTH_EMAIL matches ALLOWED_EMAIL (wildcard pattern in test env)', async () => {
+		// Test environment uses wildcard pattern for plus-addressing
+		expect(env.ALLOWED_EMAIL).toBe('test+*@example.com');
+		expect(env.E2E_AUTH_EMAIL).toBe('test+a@example.com');
 
 		const res = await SELF.fetch('https://example.com/auth/e2e/login', {
 			method: 'POST',

@@ -1,6 +1,8 @@
 .pnpm
 .pnpm-store
 node_modules
+dist/
+**/.vite/
 
 # Local secrets (Cloudflare Workers)
 .dev.vars
@@ -8,6 +10,7 @@ node_modules
 # Temporary dir
 tmp/
 TMP_pull-*.md
+SUMMARY_*.md
 
 # Playwright
 packages/web/e2e/.auth/

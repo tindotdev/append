@@ -12,6 +12,7 @@
 		"start": "wrangler dev",
 		"test": "vitest",
 		"test:preview": "vitest run --config vitest.preview.config.mts",
+		"test:extension": "vitest run --config vitest.extension.config.mts",
 		"typecheck": "tsc --noEmit",
 		"lint:boundaries": "eslint src --no-warn-ignored",
 		"cf-typegen": "wrangler types",

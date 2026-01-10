@@ -3,6 +3,7 @@ import { type AnyRoute, createRoute, redirect } from '@tanstack/react-router';
 import { AppShell } from '@/components/layouts/AppShell';
 import { BatchDetailPage, BatchListPage, BatchNewPage, SearchPage } from '@/features/batch';
 import { BucketFeedPage } from '@/features/bucket';
+import { DashboardPage } from '@/features/dashboard';
 import { ExportPage } from '@/features/export';
 import { ImportPage } from '@/features/import';
 import { SettingsPage } from '@/features/settings';
@@ -23,7 +24,7 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 		getParentRoute: () => protectedRoute,
 		path: '/',
 		beforeLoad: () => {
-			throw redirect({ to: '/batch/new' });
+			throw redirect({ to: '/dashboard' });
 		},
 	});
 
@@ -78,6 +79,12 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 		component: SettingsPage,
 	});
 
+	const dashboardRoute = createRoute({
+		getParentRoute: () => protectedRoute,
+		path: '/dashboard',
+		component: DashboardPage,
+	});
+
 	const protectedRouteWithChildren = protectedRoute.addChildren([
 		indexRoute,
 		batchListRoute,
@@ -88,6 +95,7 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 		importRoute,
 		searchRoute,
 		settingsRoute,
+		dashboardRoute,
 	]);
 
 	return { protectedRoute: protectedRouteWithChildren };

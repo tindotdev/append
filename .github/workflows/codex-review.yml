@@ -9,6 +9,8 @@ on:
 
 jobs:
   codex:
+    # Skip review for draft PRs to save resources during rapid iteration
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
       contents: read

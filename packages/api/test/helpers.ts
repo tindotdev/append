@@ -1,7 +1,7 @@
 import { SELF } from 'cloudflare:test';
 import { expect } from 'vitest';
 
-const DEFAULT_EMAIL = 'test-a@example.com';
+const DEFAULT_EMAIL = 'test+a@example.com';
 const DEFAULT_PASSWORD = 'test-password-123';
 const DEFAULT_NAME = 'Test User';
 

@@ -135,5 +135,75 @@ describe('CORS headers', () => {
 	// verify the wildcard matching logic works correctly.
 });
 
+describe('Chrome extension CORS (ADR 0021)', () => {
+	const validExtensionId = 'nnhipglpoenbcdonkbnfdcmfcfaggjle';
+	const validExtensionOrigin = `chrome-extension://${validExtensionId}`;
+
+	it('rejects chrome-extension origin when ALLOWED_EXTENSION_IDS is not set', async () => {
+		// Test environment has no ALLOWED_EXTENSION_IDS configured (secure by default)
+		const res = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'OPTIONS',
+			headers: {
+				origin: validExtensionOrigin,
+			},
+		});
+
+		expect(res.status).toBe(204);
+		// Extension origin should be rejected when allowlist is not configured
+		expect(res.headers.get('access-control-allow-origin')).toBeNull();
+	});
+
+	it('rejects chrome-extension origin for non-OPTIONS requests when ALLOWED_EXTENSION_IDS is not set', async () => {
+		const res = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: {
+				origin: validExtensionOrigin,
+				'content-type': 'application/json',
+			},
+			body: JSON.stringify({ events: [] }),
+		});
+
+		// CORS should block the request (no access-control-allow-origin header)
+		// The request reaches auth middleware which returns 401
+		expect(res.status).toBe(401);
+		expect(res.headers.get('access-control-allow-origin')).toBeNull();
+	});
+
+	it('rejects malformed chrome-extension origins', async () => {
+		const malformedOrigins = [
+			'chrome-extension://short',
+			'chrome-extension://toolongextensionidthatexceedsthe32charlimit',
+			'chrome-extension://nnhipglpoenbcdonkbnfdcmfcfaggj1e', // invalid chars (1 instead of l)
+			'chrome-extension://',
+		];
+
+		for (const origin of malformedOrigins) {
+			const res = await SELF.fetch('https://example.com/events/ingest', {
+				method: 'OPTIONS',
+				headers: { origin },
+			});
+
+			expect(res.status).toBe(204);
+			expect(res.headers.get('access-control-allow-origin')).toBeNull();
+		}
+	});
+
+	it('allows localhost origin for /events/* even when extension origins are blocked', async () => {
+		// Verify that standard allowed origins still work
+		const res = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'OPTIONS',
+			headers: {
+				origin: 'http://localhost:5173',
+			},
+		});
+
+		expect(res.status).toBe(204);
+		expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:5173');
+	});
+});
+
 // Note: Preview-only origin validation middleware is covered by
 // `packages/api/test/cors.preview.spec.ts` and runs via `pnpm --filter @append/api test:preview`.
+//
+// Note: Tests for ALLOWED_EXTENSION_IDS when SET are in `cors.extension.spec.ts`
+// and run via `pnpm --filter @append/api test:extension`.
