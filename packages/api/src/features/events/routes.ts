@@ -145,10 +145,16 @@ export const eventsRoutes = app.post('/ingest', async (c) => {
 		statements.push(rawDb.prepare(stmt.sql).bind(...stmt.params));
 	}
 
-	await rawDb.batch(statements);
+	const results = await rawDb.batch(statements);
+
+	// Count actual event inserts (skip device upserts at the start)
+	const deviceStatementCount = safeDeviceIds.length;
+	const eventResults = results.slice(deviceStatementCount);
+	const inserted = eventResults.filter((r) => r.meta.rows_written > 0).length;
 
 	return c.json({
 		accepted: events.length - rejected.length,
+		inserted,
 		rejected,
 		server_time_ms: serverTimeMs,
 	});

@@ -119,10 +119,29 @@ async function updateBadge(outboxCount: number, hasAuthError = false): Promise<v
 export async function enqueueEvent(event: TelemetryEvent): Promise<void> {
 	const outbox = await getOutbox();
 	outbox.push(event);
-	const trimmed = outbox.length > MAX_OUTBOX_EVENTS ? outbox.slice(-MAX_OUTBOX_EVENTS) : outbox;
-	await setOutbox(trimmed);
-	const authErrorState = await getAuthErrorState();
-	await updateBadge(trimmed.length, authErrorState.hasAuthError);
+
+	if (outbox.length > MAX_OUTBOX_EVENTS) {
+		const overflowCount = outbox.length - MAX_OUTBOX_EVENTS;
+		const dropped = outbox.slice(0, overflowCount);
+		const trimmed = outbox.slice(overflowCount);
+
+		await appendDeadletter(
+			dropped.map((e) => ({
+				at_ms: Date.now(),
+				reason: 'outbox_overflow',
+				event: e,
+			}))
+		);
+		console.warn(`[append][outbox] overflow: ${overflowCount} oldest event(s) moved to deadletter (max: ${MAX_OUTBOX_EVENTS})`);
+
+		await setOutbox(trimmed);
+		const authErrorState = await getAuthErrorState();
+		await updateBadge(trimmed.length, authErrorState.hasAuthError);
+	} else {
+		await setOutbox(outbox);
+		const authErrorState = await getAuthErrorState();
+		await updateBadge(outbox.length, authErrorState.hasAuthError);
+	}
 }
 
 export async function getOutboxCount(): Promise<number> {

@@ -143,7 +143,7 @@ export function DeviceTokenManager() {
 			</CardHeader>
 			<CardContent className="space-y-4">
 				<div className="flex flex-wrap items-center gap-2">
-					<Dialog open={createOpen} onOpenChange={setCreateOpen}>
+					<Dialog open={createOpen} onOpenChange={(open) => (open ? setCreateOpen(true) : closeCreate())}>
 						<DialogTrigger asChild>
 							<Button type="button">
 								<Plus className="mr-2 size-4" />

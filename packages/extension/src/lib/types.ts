@@ -29,6 +29,7 @@ export type TelemetryEvent = ArtifactActiveEvent;
 export type IngestResponse =
 	| {
 			accepted: number;
+			inserted: number;
 			rejected: Array<{ index: number; event_id?: string; reason: string }>;
 			server_time_ms: number;
 	  }
