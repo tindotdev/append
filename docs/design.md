@@ -174,7 +174,7 @@ Precedence (highest → lowest):
     - event-level dedupe is canonical: ignore duplicates by `(user_id, device_id, event_id)`
     - `client_batch_id` is optional "batch retry sugar" (not required if event-level dedupe is correct)
   - Rate limiting: per-user batch limiting via Cloudflare Rate Limiting API (100 batches/min); goal is abuse prevention, not precise metering.
-  - Response: `{ accepted, rejected, server_time_ms }`
+  - Response: `{ validated, inserted, rejected, server_time_ms }`
 
 ### Dashboard queries
 
