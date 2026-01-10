@@ -1,11 +1,31 @@
 # Runbook
 
+## Developer setup
+
+New machine setup:
+```bash
+just setup  # Install deps, sync secrets from Doppler, run migrations
+just dev    # Start development servers
+```
+
+See `justfile` for available commands.
+
 ## Secrets management
 
-Secrets are managed via Cloudflare's native tooling (no external tools like Doppler):
+Secrets are managed via **Doppler** (local) and Cloudflare (production):
 
-- **Local dev**: `.dev.vars` in `packages/api/` (gitignored)
+- **Local dev**: `.dev.vars` in `packages/api/` (gitignored, synced via `just sync-secrets`)
 - **Production**: `wrangler secret put <NAME>` (stored in Cloudflare)
+
+### Local secrets (Doppler)
+
+Project: `apps`, Config: `dev_append`
+
+Update and sync:
+```bash
+doppler secrets set BETTER_AUTH_URL="http://localhost:8787" --project apps --config dev_append
+just sync-secrets
+```
 
 ### Setting production secrets
 

@@ -2,52 +2,15 @@
 
 `append` is the concept that builds on top of eng-log.
 
-## Development Setup
-
-First-time setup (including git worktrees):
+## Quick Start
 
 ```bash
-pnpm setup
+just setup  # First-time setup: deps, secrets, migrations
+just dev    # Start development servers
+just help   # Show all available commands
 ```
 
-This will:
-1. Install dependencies
-2. Initialize the local D1 database with migrations
-
-Then start the development servers:
-
-```bash
-pnpm dev
-```
-
-This runs both the API (http://localhost:8787) and Web (http://localhost:5173) servers in parallel.
-
-## Deployment (Cloudflare)
-
-- API (Workers): `pnpm deploy:api`
-- Web (SPA): deploy `packages/web` to Cloudflare Pages (ADR `docs/adr/0004-spa-hono-workers.md`)
-  - Git-based Pages build: build output is `packages/web/dist`
-  - CLI upload: `pnpm --filter @append/web build` then `wrangler pages deploy packages/web/dist --project-name @append/web`
-
-## Secrets management
-
-Secrets are managed via Cloudflare's native tooling:
-
-- **Local dev**: `.dev.vars` in `packages/api/` (gitignored)
-- **Production**: `wrangler secret put <NAME>` (stored in Cloudflare)
-
-Required secrets for auth:
-
-```bash
-cd packages/api
-pnpm wrangler secret put GOOGLE_CLIENT_ID
-pnpm wrangler secret put GOOGLE_CLIENT_SECRET
-pnpm wrangler secret put BETTER_AUTH_SECRET
-pnpm wrangler secret put BETTER_AUTH_URL      # https://api.append.tindev.dev
-pnpm wrangler secret put ALLOWED_SUB          # or ALLOWED_EMAIL for bootstrap
-```
-
-See `docs/runbook.md` for detailed auth setup.
+See `docs/runbook.md` for detailed setup and operations.
 
 ## Status
 

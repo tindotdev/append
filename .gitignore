@@ -10,6 +10,7 @@ dist/
 # Temporary dir
 tmp/
 TMP_pull-*.md
+SUMMARY_*.md
 
 # Playwright
 packages/web/e2e/.auth/
