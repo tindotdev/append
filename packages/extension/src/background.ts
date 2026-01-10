@@ -1,5 +1,6 @@
 import { ensureDeviceId } from './lib/device';
 import { enqueueEvent, flushOutbox } from './lib/outbox';
+import { getSettings } from './lib/settings';
 import { computeUrlHash, normalizeUrlForHash } from './lib/url';
 
 const HEARTBEAT_ALARM_NAME = 'append_heartbeat';
@@ -27,7 +28,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.alarms.onAlarm.addListener(async (alarm) => {
 	if (alarm.name !== HEARTBEAT_ALARM_NAME) return;
 
-	const deviceId = await ensureDeviceId();
+	const [deviceId, settings] = await Promise.all([ensureDeviceId(), getSettings()]);
 
 	const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
 	const idleState = await chrome.idle.queryState(60);
@@ -59,8 +60,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 		artifact: {
 			url_hash: await computeUrlHash(normalizedUrl),
 			host: normalizedUrl.host,
-			path_hint: normalizedUrl.pathname,
-			title_hint: activeTab.title ?? undefined,
+			// Only include path/title hints if explicitly opted in (privacy-first default)
+			...(settings.includeHints && {
+				path_hint: normalizedUrl.pathname,
+				title_hint: activeTab.title ?? undefined,
+			}),
 		},
 		payload: {
 			interval_ms: HEARTBEAT_INTERVAL_MS,

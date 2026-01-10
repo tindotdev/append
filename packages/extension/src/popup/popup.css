@@ -69,6 +69,26 @@
 	opacity: 0.85;
 }
 
+.checkbox-field {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 8px;
+}
+
+.checkbox-field input[type="checkbox"] {
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	padding: 0;
+}
+
+.hint {
+	font-size: 11px;
+	opacity: 0.6;
+	margin: 0 0 10px 0;
+}
+
 input {
 	font: inherit;
 	font-size: 12px;

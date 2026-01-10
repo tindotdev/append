@@ -43,6 +43,11 @@ async function main() {
 					<span>Device token</span>
 					<input id="deviceToken" type="password" placeholder="apdt_…" />
 				</label>
+				<label class="field checkbox-field">
+					<input id="includeHints" type="checkbox" />
+					<span>Include path and title hints</span>
+				</label>
+				<p class="hint">When enabled, sends page path and title with heartbeats. Off by default for privacy.</p>
 				<div class="actions">
 					<button id="save">Save</button>
 					<button id="flush" class="secondary">Flush outbox</button>
@@ -80,11 +85,13 @@ async function main() {
 
 	const apiBaseUrlInput = root.querySelector<HTMLInputElement>('#apiBaseUrl');
 	const deviceTokenInput = root.querySelector<HTMLInputElement>('#deviceToken');
+	const includeHintsInput = root.querySelector<HTMLInputElement>('#includeHints');
 	const statusEl = root.querySelector<HTMLParagraphElement>('#status');
 
-	if (!apiBaseUrlInput || !deviceTokenInput || !statusEl) return;
+	if (!apiBaseUrlInput || !deviceTokenInput || !includeHintsInput || !statusEl) return;
 	apiBaseUrlInput.value = settings.apiBaseUrl;
 	deviceTokenInput.value = settings.deviceToken ?? '';
+	includeHintsInput.checked = settings.includeHints;
 
 	const setStatus = (text: string) => {
 		statusEl.textContent = text;
@@ -95,6 +102,7 @@ async function main() {
 		const next = await setSettings({
 			apiBaseUrl: apiBaseUrlInput.value,
 			deviceToken: deviceTokenInput.value,
+			includeHints: includeHintsInput.checked,
 		});
 		setStatus(`Saved. Targeting ${next.apiBaseUrl}`);
 	});
