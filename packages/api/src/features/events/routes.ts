@@ -63,7 +63,7 @@ export const eventsRoutes = app.post('/ingest', async (c) => {
 			.values({
 				id: deviceId,
 				userId,
-				type: 'unknown',
+				type: 'chrome_extension',
 				installedAt: receivedAt,
 				lastSeenAt: receivedAt,
 			})

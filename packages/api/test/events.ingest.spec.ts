@@ -123,4 +123,70 @@ describe('POST /events/ingest', () => {
 		const [row] = await db.select({ count: count() }).from(event).where(eq(event.userId, testUserId));
 		expect(row?.count).toBe(1);
 	});
+
+	it('creates device with type "chrome_extension"', async () => {
+		const deviceId = generateUUID();
+		const now = Date.now();
+
+		const res = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({
+				events: [heartbeatEvent({ deviceId, eventId: generateUUID(), emittedAtMs: now })],
+			}),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+		expect(body.accepted).toBe(1);
+
+		const [deviceRow] = await db.select().from(device).where(eq(device.id, deviceId));
+		expect(deviceRow?.type).toBe('chrome_extension');
+		expect(deviceRow?.userId).toBe(testUserId);
+	});
+
+	it('handles maximum batch size (exactly 500 events)', async () => {
+		const deviceId = generateUUID();
+		const now = Date.now();
+		const batchSize = 500;
+
+		const events = Array.from({ length: batchSize }, (_, i) =>
+			heartbeatEvent({ deviceId, eventId: generateUUID(), emittedAtMs: now + i * 1000 })
+		);
+
+		const res = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ events }),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+		expect(body.accepted).toBe(batchSize);
+		expect(body.rejected).toEqual([]);
+
+		const [row] = await db.select({ count: count() }).from(event).where(eq(event.userId, testUserId));
+		expect(row?.count).toBe(batchSize);
+	});
+
+	it('rejects batches exceeding 500 events', async () => {
+		const deviceId = generateUUID();
+		const now = Date.now();
+		const batchSize = 501;
+
+		const events = Array.from({ length: batchSize }, (_, i) =>
+			heartbeatEvent({ deviceId, eventId: generateUUID(), emittedAtMs: now + i * 1000 })
+		);
+
+		const res = await SELF.fetch('https://example.com/events/ingest', {
+			method: 'POST',
+			headers: { cookie: authCookie, 'content-type': 'application/json' },
+			body: JSON.stringify({ events }),
+		});
+
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+		expect(body.error.message).toContain('events must be <= 500');
+	});
 });

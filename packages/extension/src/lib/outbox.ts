@@ -6,6 +6,7 @@ const DEADLETTER_KEY = 'append_outbox_deadletter_v1';
 
 const MAX_OUTBOX_EVENTS = 5000;
 const BATCH_SIZE = 200;
+const OUTBOX_WARNING_THRESHOLD = 1000;
 
 type DeadletterItem = {
 	at_ms: number;
@@ -29,11 +30,37 @@ async function appendDeadletter(items: DeadletterItem[]): Promise<void> {
 	await chrome.storage.local.set({ [DEADLETTER_KEY]: existing.concat(items).slice(-500) });
 }
 
+async function updateBadge(outboxCount: number): Promise<void> {
+	if (outboxCount === 0) {
+		await chrome.action.setBadgeText({ text: '' });
+		await chrome.action.setBadgeBackgroundColor({ color: '#6366f1' });
+		return;
+	}
+
+	if (outboxCount >= OUTBOX_WARNING_THRESHOLD) {
+		await chrome.action.setBadgeText({ text: `${Math.floor(outboxCount / 100)}k` });
+		await chrome.action.setBadgeBackgroundColor({ color: '#dc2626' });
+		console.warn(`[append][outbox] WARNING: ${outboxCount} events queued (threshold: ${OUTBOX_WARNING_THRESHOLD})`);
+	} else if (outboxCount >= 100) {
+		await chrome.action.setBadgeText({ text: `${Math.floor(outboxCount / 100)}00` });
+		await chrome.action.setBadgeBackgroundColor({ color: '#f59e0b' });
+	} else {
+		await chrome.action.setBadgeText({ text: String(outboxCount) });
+		await chrome.action.setBadgeBackgroundColor({ color: '#6366f1' });
+	}
+}
+
 export async function enqueueEvent(event: TelemetryEvent): Promise<void> {
 	const outbox = await getOutbox();
 	outbox.push(event);
 	const trimmed = outbox.length > MAX_OUTBOX_EVENTS ? outbox.slice(-MAX_OUTBOX_EVENTS) : outbox;
 	await setOutbox(trimmed);
+	await updateBadge(trimmed.length);
+}
+
+export async function getOutboxCount(): Promise<number> {
+	const outbox = await getOutbox();
+	return outbox.length;
 }
 
 export async function flushOutbox(): Promise<void> {
@@ -107,6 +134,8 @@ export async function flushOutbox(): Promise<void> {
 	}
 
 	await setOutbox(remaining);
+	await updateBadge(remaining.length);
+
 	if (deadletter.length > 0) {
 		await appendDeadletter(deadletter);
 		console.warn(

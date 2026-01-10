@@ -1,6 +1,6 @@
 import './popup.css';
 import { ensureDeviceId } from '../lib/device';
-import { flushOutbox } from '../lib/outbox';
+import { flushOutbox, getOutboxCount } from '../lib/outbox';
 import { getSettings, setSettings } from '../lib/settings';
 
 async function main() {
@@ -21,6 +21,10 @@ async function main() {
 				<div class="row">
 					<div class="label">Device</div>
 					<div class="value" id="deviceId">…</div>
+				</div>
+				<div class="row">
+					<div class="label">Outbox</div>
+					<div class="value" id="outboxCount">…</div>
 				</div>
 			</section>
 
@@ -44,9 +48,21 @@ async function main() {
 
 	const deviceId = await ensureDeviceId();
 	const settings = await getSettings();
+	const outboxCount = await getOutboxCount();
 
 	const deviceIdEl = root.querySelector<HTMLDivElement>('#deviceId');
 	if (deviceIdEl) deviceIdEl.textContent = deviceId;
+
+	const outboxCountEl = root.querySelector<HTMLDivElement>('#outboxCount');
+	if (outboxCountEl) {
+		outboxCountEl.textContent = `${outboxCount} event${outboxCount !== 1 ? 's' : ''}`;
+		if (outboxCount >= 1000) {
+			outboxCountEl.style.color = '#dc2626';
+			outboxCountEl.style.fontWeight = 'bold';
+		} else if (outboxCount >= 100) {
+			outboxCountEl.style.color = '#f59e0b';
+		}
+	}
 
 	const apiBaseUrlInput = root.querySelector<HTMLInputElement>('#apiBaseUrl');
 	const deviceTokenInput = root.querySelector<HTMLInputElement>('#deviceToken');
@@ -73,6 +89,19 @@ async function main() {
 	flushButton?.addEventListener('click', async () => {
 		setStatus('Flushing…');
 		await flushOutbox();
+		const newCount = await getOutboxCount();
+		if (outboxCountEl) {
+			outboxCountEl.textContent = `${newCount} event${newCount !== 1 ? 's' : ''}`;
+			if (newCount >= 1000) {
+				outboxCountEl.style.color = '#dc2626';
+				outboxCountEl.style.fontWeight = 'bold';
+			} else if (newCount >= 100) {
+				outboxCountEl.style.color = '#f59e0b';
+			} else {
+				outboxCountEl.style.color = '';
+				outboxCountEl.style.fontWeight = '';
+			}
+		}
 		setStatus('Flush complete (check Service Worker logs).');
 	});
 }
