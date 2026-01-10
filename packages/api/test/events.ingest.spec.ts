@@ -69,7 +69,7 @@ describe('POST /events/ingest', () => {
 
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as any;
-		expect(body.accepted).toBe(2);
+		expect(body.validated).toBe(2);
 		expect(body.rejected).toEqual([]);
 		expect(typeof body.server_time_ms).toBe('number');
 
@@ -94,7 +94,7 @@ describe('POST /events/ingest', () => {
 
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as any;
-		expect(body.accepted).toBe(1);
+		expect(body.validated).toBe(1);
 		expect(body.rejected).toHaveLength(1);
 		expect(body.rejected[0].index).toBe(1);
 		expect(typeof body.rejected[0].reason).toBe('string');
@@ -118,7 +118,7 @@ describe('POST /events/ingest', () => {
 
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as any;
-		expect(body.accepted).toBe(2);
+		expect(body.validated).toBe(2);
 		expect(body.rejected).toEqual([]);
 
 		const [row] = await db.select({ count: count() }).from(event).where(eq(event.userId, testUserId));
@@ -139,7 +139,7 @@ describe('POST /events/ingest', () => {
 
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as any;
-		expect(body.accepted).toBe(1);
+		expect(body.validated).toBe(1);
 
 		const [deviceRow] = await db.select().from(device).where(eq(device.id, deviceId));
 		expect(deviceRow?.type).toBe('chrome_extension');
@@ -163,7 +163,7 @@ describe('POST /events/ingest', () => {
 
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as any;
-		expect(body.accepted).toBe(batchSize);
+		expect(body.validated).toBe(batchSize);
 		expect(body.rejected).toEqual([]);
 
 		const [row] = await db.select({ count: count() }).from(event).where(eq(event.userId, testUserId));
@@ -219,7 +219,7 @@ describe('POST /events/ingest', () => {
 
 		expect(res1.status).toBe(200);
 		const body1 = (await res1.json()) as any;
-		expect(body1.accepted).toBe(1);
+		expect(body1.validated).toBe(1);
 
 		// Verify device is owned by first user
 		const [deviceRow] = await db.select().from(device).where(eq(device.id, deviceId));
@@ -238,7 +238,7 @@ describe('POST /events/ingest', () => {
 		// The request should succeed but reject the event
 		expect(res2.status).toBe(200);
 		const body2 = (await res2.json()) as any;
-		expect(body2.accepted).toBe(0);
+		expect(body2.validated).toBe(0);
 		expect(body2.rejected).toHaveLength(1);
 		expect(body2.rejected[0].event_id).toBe(maliciousEventId);
 		expect(body2.rejected[0].reason).toBe('Device belongs to another user');
@@ -277,7 +277,7 @@ describe('POST /events/ingest', () => {
 
 		expect(res1.status).toBe(200);
 		const body1 = (await res1.json()) as any;
-		expect(body1.accepted).toBe(1);
+		expect(body1.validated).toBe(1);
 
 		// Second user sends a batch with both a foreign device and their own new device
 		const foreignEventId = generateUUID();
@@ -295,7 +295,7 @@ describe('POST /events/ingest', () => {
 
 		expect(res2.status).toBe(200);
 		const body2 = (await res2.json()) as any;
-		expect(body2.accepted).toBe(1);
+		expect(body2.validated).toBe(1);
 		expect(body2.rejected).toHaveLength(1);
 		expect(body2.rejected[0].event_id).toBe(foreignEventId);
 		expect(body2.rejected[0].reason).toBe('Device belongs to another user');
@@ -304,7 +304,7 @@ describe('POST /events/ingest', () => {
 		const [secondUserEvents] = await db.select({ count: count() }).from(event).where(eq(event.userId, secondUserId));
 		expect(secondUserEvents?.count).toBe(1);
 
-		// Verify the accepted event is for the own device
+		// Verify the validated event is for the own device
 		const [acceptedEvent] = await db.select().from(event).where(eq(event.userId, secondUserId));
 		expect(acceptedEvent?.deviceId).toBe(ownDeviceId);
 		expect(acceptedEvent?.eventId).toBe(ownEventId);

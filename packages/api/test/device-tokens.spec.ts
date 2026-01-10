@@ -62,7 +62,7 @@ describe('Device tokens', () => {
 
 		expect(ingestRes.status).toBe(200);
 		const ingestBody = (await ingestRes.json()) as any;
-		expect(ingestBody.accepted).toBe(1);
+		expect(ingestBody.validated).toBe(1);
 		expect(ingestBody.rejected).toEqual([]);
 
 		const [row] = await db.select({ count: count() }).from(event).where(eq(event.userId, testUserId));
@@ -297,7 +297,7 @@ describe('Device tokens', () => {
 
 		expect(ingestRes.status).toBe(200);
 		const ingestBody = (await ingestRes.json()) as any;
-		expect(ingestBody.accepted).toBe(1);
+		expect(ingestBody.validated).toBe(1);
 	});
 
 	it('GET /api/device-tokens includes expires_at_ms', async () => {

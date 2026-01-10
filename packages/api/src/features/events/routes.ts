@@ -58,7 +58,7 @@ export const eventsRoutes = app.post('/ingest', async (c) => {
 	}
 
 	if (validEvents.length === 0) {
-		return c.json({ accepted: 0, rejected, server_time_ms: serverTimeMs });
+		return c.json({ validated: 0, inserted: 0, rejected, server_time_ms: serverTimeMs });
 	}
 
 	const uniqueDeviceIds = Array.from(new Set(validEvents.map((e) => e.device_id)));
@@ -94,7 +94,7 @@ export const eventsRoutes = app.post('/ingest', async (c) => {
 	const safeEvents = validEvents.filter((e) => !rejectedEventIds.has(e.event_id));
 
 	if (safeEvents.length === 0) {
-		return c.json({ accepted: 0, rejected, server_time_ms: serverTimeMs });
+		return c.json({ validated: 0, inserted: 0, rejected, server_time_ms: serverTimeMs });
 	}
 
 	// Only process devices that passed ownership check
@@ -153,7 +153,7 @@ export const eventsRoutes = app.post('/ingest', async (c) => {
 	const inserted = eventResults.filter((r) => r.meta.rows_written > 0).length;
 
 	return c.json({
-		accepted: events.length - rejected.length,
+		validated: events.length - rejected.length,
 		inserted,
 		rejected,
 		server_time_ms: serverTimeMs,
