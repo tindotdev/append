@@ -28,7 +28,7 @@
 		"cf-typegen": "pnpm -r --if-present wrangler types"
 	},
 	"license": "MIT",
-	"packageManager": "pnpm@10.27.0",
+	"packageManager": "pnpm@10.28.0",
 	"volta": {
 		"node": "24.12.0"
 	},
