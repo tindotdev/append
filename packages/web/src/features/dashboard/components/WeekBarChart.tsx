@@ -80,15 +80,13 @@ export function WeekBarChart() {
 				<CardTitle className="text-lg tabular-nums">{formatTime(totalMinutes)}</CardTitle>
 			</CardHeader>
 			<CardContent className="px-4">
-				<div className="h-[100px]">
-					<ResponsiveContainer width="100%" height="100%">
-						<BarChart data={data.days} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-							<XAxis dataKey="dayLabel" axisLine={false} tickLine={false} tick={{ fill: 'rgb(113 113 122)', fontSize: 11 }} dy={8} />
-							<Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-							<Bar dataKey="minutes" fill="rgba(52,211,153,0.7)" radius={[3, 3, 0, 0]} maxBarSize={28} />
-						</BarChart>
-					</ResponsiveContainer>
-				</div>
+				<ResponsiveContainer width="100%" height={100}>
+					<BarChart data={data.days} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+						<XAxis dataKey="dayLabel" axisLine={false} tickLine={false} tick={{ fill: 'rgb(113 113 122)', fontSize: 11 }} dy={8} />
+						<Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+						<Bar dataKey="minutes" fill="rgba(52,211,153,0.7)" radius={[3, 3, 0, 0]} maxBarSize={28} />
+					</BarChart>
+				</ResponsiveContainer>
 			</CardContent>
 		</Card>
 	);
