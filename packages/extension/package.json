@@ -4,7 +4,8 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite --port 5174",
-		"build": "vite build",
+		"build": "vite build --mode development",
+		"build:prod": "vite build --mode production",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {

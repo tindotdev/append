@@ -64,13 +64,30 @@ export function isOriginAllowed(origin: string, allowedOrigins: string[]): boole
 	return false;
 }
 
-function isChromeExtensionOrigin(origin: string | undefined | null): boolean {
+/**
+ * Check if origin is from an allowed Chrome extension.
+ * Returns true only if:
+ * 1. Origin is a valid chrome-extension:// URL with a 32-char ID
+ * 2. The extension ID is in the allowlist (if allowlist is configured)
+ *
+ * @param origin - The origin header value
+ * @param allowedIds - Comma-separated list of allowed extension IDs (or undefined to allow none)
+ */
+function isChromeExtensionOrigin(origin: string | undefined | null, allowedIds: string | undefined): boolean {
 	if (!origin) return false;
 	if (!origin.startsWith('chrome-extension://')) return false;
+
 	// chrome-extension://<32-char-id>
 	const id = origin.slice('chrome-extension://'.length);
 	if (id.length !== 32) return false;
-	return /^[a-p]{32}$/.test(id);
+	if (!/^[a-p]{32}$/.test(id)) return false;
+
+	// If no allowlist configured, reject all extensions (secure by default)
+	if (!allowedIds) return false;
+
+	// Check if this extension ID is in the allowlist
+	const allowed = allowedIds.split(',').map((s) => s.trim());
+	return allowed.includes(id);
 }
 
 type Variables = BaseVariables & {
@@ -143,7 +160,8 @@ app.use('/api/*', async (c, next) => {
 app.use('/events/*', async (c, next) => {
 	const allowedOrigins = getAllowedOrigins(c.env);
 	return cors({
-		origin: (origin) => (isChromeExtensionOrigin(origin) || isOriginAllowed(origin, allowedOrigins) ? origin : null),
+		origin: (origin) =>
+			isChromeExtensionOrigin(origin, c.env.ALLOWED_EXTENSION_IDS) || isOriginAllowed(origin, allowedOrigins) ? origin : null,
 		allowMethods: ['POST', 'GET', 'PUT', 'DELETE', 'OPTIONS'],
 		allowHeaders: ['Content-Type', 'Authorization', 'X-Import-Id'],
 		credentials: true,
@@ -279,6 +297,13 @@ app.use('/events/*', async (c, next) => {
 		c.set('userId', row.userId);
 		await db.update(deviceToken).set({ lastUsedAt: new Date() }).where(eq(deviceToken.id, row.id));
 		return next();
+	}
+
+	// Security: Extension origins MUST use bearer token auth, not cookie sessions
+	// This prevents arbitrary extensions from piggybacking the user's SSO cookies
+	const origin = c.req.header('origin');
+	if (isChromeExtensionOrigin(origin, c.env.ALLOWED_EXTENSION_IDS)) {
+		return apiError(c, 401, 'UNAUTHORIZED', 'Bearer token required for extension requests');
 	}
 
 	const auth = c.get('auth');

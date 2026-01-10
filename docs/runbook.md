@@ -3,6 +3,7 @@
 ## Developer setup
 
 New machine setup:
+
 ```bash
 just setup  # Install deps, sync secrets from Doppler, run migrations
 just dev    # Start development servers
@@ -22,6 +23,7 @@ Secrets are managed via **Doppler** (local) and Cloudflare (production):
 Project: `apps`, Config: `dev_append`
 
 Update and sync:
+
 ```bash
 doppler secrets set BETTER_AUTH_URL="http://localhost:8787" --project apps --config dev_append
 just sync-secrets
@@ -37,6 +39,84 @@ pnpm wrangler secret put BETTER_AUTH_SECRET
 pnpm wrangler secret put BETTER_AUTH_URL      # https://api.append.tindev.dev
 pnpm wrangler secret put ALLOWED_SUB          # or ALLOWED_EMAIL for bootstrap
 ```
+
+### Extension security configuration
+
+The API restricts `/events/*` access from Chrome extensions using two security measures (ADR 0021):
+
+1. **Extension ID allowlist**: Only specific extension IDs can make CORS requests
+2. **Required bearer auth**: Extensions must use device tokens; cookie auth is rejected
+
+#### Local development setup
+
+The local development extension has a stable ID: **`nnhipglpoenbcdonkbnfdcmfcfaggjle`**
+
+This ID is deterministic (generated from the public key in `packages/extension/src/manifest.ts`).
+
+Configure for local dev:
+
+```bash
+# Option 1: Via Doppler (recommended)
+doppler secrets set ALLOWED_EXTENSION_IDS="nnhipglpoenbcdonkbnfdcmfcfaggjle" --project apps --config dev_append
+just sync-secrets
+
+# Option 2: Manually add to packages/api/.dev.vars
+echo 'ALLOWED_EXTENSION_IDS=nnhipglpoenbcdonkbnfdcmfcfaggjle' >> packages/api/.dev.vars
+```
+
+#### Production setup (one-time)
+
+When you publish the extension to Chrome Web Store, it gets a **permanent ID** that never changes.
+
+**After first Chrome Web Store publish:**
+
+1. Get the production extension ID from Chrome Web Store developer dashboard or from `chrome://extensions/` after installing the published version
+
+2. Set it in Cloudflare (one-time):
+
+   ```bash
+   cd packages/api
+   pnpm wrangler secret put ALLOWED_EXTENSION_IDS
+   # Enter the production extension ID when prompted
+   ```
+
+3. Document the production ID in this runbook for reference:
+
+   ```bash
+   # Production extension ID: <paste-here-after-publishing>
+   ```
+
+**Important**: The production ID only needs to be set **once** when you first publish. It never changes after that, so you don't need to update it on every deploy.
+
+#### Preview environment
+
+For PR previews, use the local dev ID (same stable key):
+
+```bash
+cd packages/api
+pnpm wrangler secret put ALLOWED_EXTENSION_IDS --env preview
+# Enter: nnhipglpoenbcdonkbnfdcmfcfaggjle
+```
+
+#### Verifying the extension ID
+
+To confirm your extension ID:
+
+1. Open `chrome://extensions/` in Chrome
+2. Enable "Developer mode" (toggle in top right)
+3. Look for the 32-character ID under the extension name
+
+For the local dev extension, it should always show: `nnhipglpoenbcdonkbnfdcmfcfaggjle`
+
+#### Multiple extensions (if needed)
+
+If you need to allow multiple extensions (e.g., local dev + production):
+
+```bash
+ALLOWED_EXTENSION_IDS=nnhipglpoenbcdonkbnfdcmfcfaggjle,<production-id>
+```
+
+If unset or empty, all extension requests are rejected (secure by default).
 
 ### Listing/verifying secrets
 
@@ -116,6 +196,63 @@ pnpm --filter @append/api run deploy -- --config packages/api/wrangler.jsonc
 pnpm --filter @append/web run build
 pnpm --filter @append/web exec wrangler pages deploy packages/web/dist --project-name "$CF_PAGES_PROJECT"
 ```
+
+## Publishing Chrome Extension
+
+When publishing the extension to Chrome Web Store for the first time, follow this checklist:
+
+### Pre-publish checklist
+
+1. **Build the production extension** (strips dev key automatically):
+
+   ```bash
+   cd packages/extension
+   pnpm build:prod
+   # Creates release/release.zip ready for upload to Chrome Web Store
+   ```
+
+   The `build:prod` command automatically:
+   - Runs Vite in production mode (`--mode production`)
+   - Excludes the dev `key` field from the manifest via `defineManifest()`
+   - Creates a production-ready build that Chrome Web Store will accept
+
+   **Important:** Always use `build:prod` for publishing, not `build` (which includes the dev key for local testing).
+
+### Publishing steps
+
+1. Upload to [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
+
+2. **After first publish approval**, get the production extension ID:
+   - Install the published extension from Chrome Web Store
+   - Open `chrome://extensions/`
+   - Copy the 32-character extension ID
+
+3. **Set the extension ID in Cloudflare** (one-time):
+
+   ```bash
+   cd packages/api
+   pnpm wrangler secret put ALLOWED_EXTENSION_IDS
+   # Enter the production ID when prompted
+   ```
+
+4. **Document the production ID** in this runbook:
+
+   ```bash
+   # Production extension ID: <paste-production-id-here>
+   # (Set on: YYYY-MM-DD)
+   ```
+
+5. **Test the published extension**:
+   - Install from Chrome Web Store
+   - Verify it can connect to production API (`https://api.append.tindev.dev`)
+   - Check that event ingestion works
+
+### Important notes
+
+- **The production extension ID never changes** after first publish
+- You only need to set `ALLOWED_EXTENSION_IDS` once in Cloudflare
+- No need to update it on every deploy or extension update
+- For local development, continue using the stable dev ID: `nnhipglpoenbcdonkbnfdcmfcfaggjle`
 
 ## Preview deployments (PR environments)
 
@@ -241,15 +378,21 @@ Note: `E2E_AUTH_EMAIL` is set automatically by the preview workflow — no manua
 2. Run:
 
    ```js
-   await fetch('https://append-api-preview.tindotdev.workers.dev/auth/e2e/login', {
-     method: 'POST',
-     headers: { 'x-e2e-secret': '<preview E2E_AUTH_SECRET>' },
-     credentials: 'include',
-   });
+   await fetch(
+    "https://append-api-preview.tindotdev.workers.dev/auth/e2e/login",
+    {
+     method: "POST",
+     headers: { "x-e2e-secret": "<preview E2E_AUTH_SECRET>" },
+     credentials: "include",
+    },
+   );
 
-   await fetch('https://append-api-preview.tindotdev.workers.dev/api/batch?limit=1', {
-     credentials: 'include',
-   });
+   await fetch(
+    "https://append-api-preview.tindotdev.workers.dev/api/batch?limit=1",
+    {
+     credentials: "include",
+    },
+   );
    ```
 
 3. Confirm the second request returns 200 and includes batches (or an empty list).

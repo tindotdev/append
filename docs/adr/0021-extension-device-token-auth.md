@@ -50,3 +50,16 @@ Cons:
 - Ingest accepts bearer token on `/events/*` and derives `user_id` from the token.
 - CORS for `/events/*` allows `chrome-extension://...` origin and `Authorization` header.
 
+### Security: Extension allowlist + required bearer auth
+
+To prevent arbitrary Chrome extensions from using the user's SSO cookies:
+
+1. **Extension ID allowlist**: CORS only accepts `chrome-extension://<id>` origins where `<id>` is in the `ALLOWED_EXTENSION_IDS` environment variable (comma-separated list).
+2. **Bearer token required**: Extension-origin requests MUST provide a valid bearer token; cookie-based session auth is rejected for extension origins.
+
+This defense-in-depth ensures only authorized extensions can access `/events/*`, and they must use proper device tokens rather than piggybacking browser cookies.
+
+Environment variable:
+- `ALLOWED_EXTENSION_IDS` — Comma-separated list of 32-char extension IDs (e.g., `abcdefghijklmnopabcdefghijklmnop,bcdefghijklmnopabcdefghijklmnopq`)
+- If unset or empty, all extension origins are rejected (secure by default).
+
