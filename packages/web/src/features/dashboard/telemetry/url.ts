@@ -1,10 +1,4 @@
-function stripFragment(url: URL) {
-	url.hash = '';
-}
-
-function stripQuery(url: URL) {
-	url.search = '';
-}
+import { IDENTITY_PARAMS_SET } from '@append/contracts/url-normalization';
 
 export function isHttpUrl(url: string): boolean {
 	try {
@@ -15,12 +9,32 @@ export function isHttpUrl(url: string): boolean {
 	}
 }
 
+/**
+ * Normalize URL for artifact identity hashing.
+ *
+ * Hybrid approach (per PR feedback):
+ * - Preserves common identity parameters (id, slug, sku, etc.) to distinguish different content
+ * - Strips tracking/analytics parameters (utm_*, fbclid, etc.) to reduce cardinality
+ * - Groups related content (e.g., different sorts/views of the same item)
+ *
+ * IMPORTANT: Must match extension implementation for consistent hashing across clients.
+ * Identity params are defined in @append/contracts/url-normalization.
+ */
 export function normalizeUrlForHash(url: string): string {
 	const parsed = new URL(url);
-	stripFragment(parsed);
-	stripQuery(parsed);
+	parsed.hash = '';
+
+	// Preserve only identity parameters, strip tracking/analytics params
+	const identityParams = new URLSearchParams();
+	for (const [key, value] of parsed.searchParams) {
+		if (IDENTITY_PARAMS_SET.has(key.toLowerCase())) {
+			identityParams.set(key, value);
+		}
+	}
+	const queryString = identityParams.toString();
+
 	parsed.hostname = parsed.hostname.toLowerCase();
-	return `${parsed.protocol}//${parsed.hostname}${parsed.pathname}`;
+	return `${parsed.protocol}//${parsed.hostname}${parsed.pathname}${queryString ? `?${queryString}` : ''}`;
 }
 
 export async function sha256Hex(input: string): Promise<string> {

@@ -1,27 +1,39 @@
+import { IDENTITY_PARAMS_SET } from '@append/contracts/url-normalization';
+
 /**
  * Normalize URL for artifact identity hashing.
  *
- * IMPORTANT: Query strings are intentionally stripped (per design.md) to reduce
- * artifact cardinality in the MVP. This means different articles on the same path
- * (e.g., /blog/post?id=1 vs /blog/post?id=2) will be treated as the SAME artifact.
+ * Hybrid approach (per PR feedback):
+ * - Preserves common identity parameters (id, slug, sku, etc.) to distinguish different content
+ * - Strips tracking/analytics parameters (utm_*, fbclid, etc.) to reduce cardinality
+ * - Groups related content (e.g., different sorts/views of the same item)
  *
  * Trade-offs:
- * - ✅ Reduces database/storage overhead (fewer unique artifacts)
- * - ✅ Groups related content (e.g., different Reddit comment sorts on same post)
- * - ❌ Loses granularity for query-driven content (blog posts, product pages, search results)
+ * - ✅ Preserves granularity for query-driven content (blog posts, product pages, search results)
+ * - ✅ Reduces tracking noise (utm params, click IDs, etc.)
+ * - ⚠️ Identity param list is a heuristic and may need domain-specific tuning
  *
- * Future consideration: Make query string inclusion configurable per-domain or per-user.
+ * Future consideration: Make identity param list configurable per-domain or per-user.
  *
  * Normalization rules:
  * - Strip fragment (#...)
- * - Strip query string (?...)
+ * - Preserve only identity query parameters (see @append/contracts/url-normalization)
  * - Lowercase hostname
  * - Preserve path
  */
 export function normalizeUrlForHash(url: URL): URL {
 	const normalized = new URL(url.toString());
 	normalized.hash = '';
-	normalized.search = '';
+
+	// Preserve only identity parameters, strip tracking/analytics params
+	const identityParams = new URLSearchParams();
+	for (const [key, value] of url.searchParams) {
+		if (IDENTITY_PARAMS_SET.has(key.toLowerCase())) {
+			identityParams.set(key, value);
+		}
+	}
+	normalized.search = identityParams.toString();
+
 	normalized.hostname = normalized.hostname.toLowerCase();
 	return normalized;
 }

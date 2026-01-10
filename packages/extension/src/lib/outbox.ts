@@ -95,7 +95,7 @@ async function updateBadge(outboxCount: number, hasAuthError = false): Promise<v
 	}
 
 	if (outboxCount >= OUTBOX_WARNING_THRESHOLD) {
-		await chrome.action.setBadgeText({ text: `${Math.floor(outboxCount / 100)}k` });
+		await chrome.action.setBadgeText({ text: `${Math.floor(outboxCount / 1000)}k` });
 		await chrome.action.setBadgeBackgroundColor({ color: '#dc2626' });
 		console.warn(`[append][outbox] WARNING: ${outboxCount} events queued (threshold: ${OUTBOX_WARNING_THRESHOLD})`);
 	} else if (outboxCount >= 100) {
