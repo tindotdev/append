@@ -1,7 +1,13 @@
 import './popup.css';
 import { ensureDeviceId } from '../lib/device';
-import { flushOutbox, getOutboxCount } from '../lib/outbox';
+import { clearDeadletter, type DeadletterItem, flushOutbox, getDeadletterItems, getOutboxCount } from '../lib/outbox';
 import { getSettings, setSettings } from '../lib/settings';
+
+function formatDeadletterItem(item: DeadletterItem): string {
+	const date = new Date(item.at_ms).toLocaleString();
+	const eventId = item.event.event_id.slice(0, 8);
+	return `[${date}] ${eventId}… — ${item.reason}`;
+}
 
 async function main() {
 	const root = document.querySelector<HTMLDivElement>('#root');
@@ -43,6 +49,14 @@ async function main() {
 				</div>
 				<p id="status" class="status muted"></p>
 			</section>
+
+			<details class="section debug-section">
+				<summary class="debug-toggle">Debug: Rejected events <span id="deadletterCount" class="badge">0</span></summary>
+				<div class="debug-content">
+					<pre id="deadletterList" class="deadletter-list"></pre>
+					<button id="clearDeadletter" class="secondary small">Clear rejected</button>
+				</div>
+			</details>
 		</main>
 	`;
 
@@ -103,6 +117,35 @@ async function main() {
 			}
 		}
 		setStatus('Flush complete (check Service Worker logs).');
+		// Refresh dead letter display after flush
+		await refreshDeadletter();
+	});
+
+	// Dead letter queue display
+	const deadletterCountEl = root.querySelector<HTMLSpanElement>('#deadletterCount');
+	const deadletterListEl = root.querySelector<HTMLPreElement>('#deadletterList');
+	const clearDeadletterBtn = root.querySelector<HTMLButtonElement>('#clearDeadletter');
+
+	async function refreshDeadletter() {
+		const items = await getDeadletterItems();
+		if (deadletterCountEl) {
+			deadletterCountEl.textContent = String(items.length);
+		}
+		if (deadletterListEl) {
+			if (items.length === 0) {
+				deadletterListEl.textContent = 'No rejected events.';
+			} else {
+				deadletterListEl.textContent = items.map(formatDeadletterItem).join('\n');
+			}
+		}
+	}
+
+	await refreshDeadletter();
+
+	clearDeadletterBtn?.addEventListener('click', async () => {
+		await clearDeadletter();
+		await refreshDeadletter();
+		setStatus('Rejected events cleared.');
 	});
 }
 

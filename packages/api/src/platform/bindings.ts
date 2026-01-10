@@ -8,6 +8,9 @@ export type Bindings = {
 	// R2 Object Storage
 	IMPORT_FILES: R2Bucket;
 
+	// Rate Limiting (distributed via CF Rate Limiting API)
+	INGEST_RATE_LIMITER: RateLimit;
+
 	// AI Gateway
 	CF_ACCOUNT_ID: string;
 	AI_GATEWAY_ID: string;

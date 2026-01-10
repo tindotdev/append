@@ -27,5 +27,7 @@ export function parseBearerToken(authHeader: string | undefined | null): string 
 	if (!match) return null;
 	const token = match[1]?.trim();
 	if (!token) return null;
+	// Validate token prefix for defense-in-depth
+	if (!token.startsWith(DEVICE_TOKEN_PREFIX)) return null;
 	return token;
 }

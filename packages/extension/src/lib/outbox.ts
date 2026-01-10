@@ -24,7 +24,7 @@ type AuthErrorState = {
 	lastAuthErrorAt: number;
 };
 
-type DeadletterItem = {
+export type DeadletterItem = {
 	at_ms: number;
 	reason: string;
 	event: TelemetryEvent;
@@ -44,6 +44,15 @@ async function appendDeadletter(items: DeadletterItem[]): Promise<void> {
 	const raw = await chrome.storage.local.get(DEADLETTER_KEY);
 	const existing = Array.isArray(raw[DEADLETTER_KEY]) ? (raw[DEADLETTER_KEY] as DeadletterItem[]) : [];
 	await chrome.storage.local.set({ [DEADLETTER_KEY]: existing.concat(items).slice(-500) });
+}
+
+export async function getDeadletterItems(): Promise<DeadletterItem[]> {
+	const raw = await chrome.storage.local.get(DEADLETTER_KEY);
+	return Array.isArray(raw[DEADLETTER_KEY]) ? (raw[DEADLETTER_KEY] as DeadletterItem[]) : [];
+}
+
+export async function clearDeadletter(): Promise<void> {
+	await chrome.storage.local.remove(DEADLETTER_KEY);
 }
 
 async function getBackoffState(): Promise<BackoffState> {
@@ -193,12 +202,35 @@ export async function flushOutbox(): Promise<void> {
 	try {
 		body = (await res.json()) as IngestResponse;
 	} catch (err) {
-		console.warn('[append][outbox] invalid response', err);
+		// Invalid JSON (e.g., HTML error page) - apply backoff
+		const failures = backoffState.consecutiveFailures + 1;
+		const backoffMs = calculateBackoffMs(failures);
+		await setBackoffState({
+			consecutiveFailures: failures,
+			nextRetryAt: Date.now() + backoffMs,
+		});
+		console.warn('[append][outbox] invalid response, backoff applied', {
+			error: err,
+			failures,
+			nextRetryInSec: Math.round(backoffMs / 1000),
+		});
 		return;
 	}
 
 	if (!res.ok) {
-		console.warn('[append][outbox] server error', { status: res.status, body });
+		// Server error (429, 500, etc.) - apply backoff to avoid hot-loop retries
+		const failures = backoffState.consecutiveFailures + 1;
+		const backoffMs = calculateBackoffMs(failures);
+		await setBackoffState({
+			consecutiveFailures: failures,
+			nextRetryAt: Date.now() + backoffMs,
+		});
+		console.warn('[append][outbox] server error, backoff applied', {
+			status: res.status,
+			body,
+			failures,
+			nextRetryInSec: Math.round(backoffMs / 1000),
+		});
 		return;
 	}
 

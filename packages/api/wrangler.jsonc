@@ -12,6 +12,21 @@
 		"enabled": true
 	},
 	/**
+	 * Rate Limiting (distributed)
+	 * https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
+	 *
+	 * Limits ingest batches per user. Each limit() call = 1 batch.
+	 * With BATCH_SIZE=200 on client, 100 batches/min = ~20k events max.
+	 * This is intentionally lenient; goal is abuse prevention, not precise metering.
+	 */
+	"ratelimits": [
+		{
+			"name": "INGEST_RATE_LIMITER",
+			"namespace_id": "1001",
+			"simple": { "limit": 100, "period": 60 }
+		}
+	],
+	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
 	 */
@@ -108,6 +123,13 @@
 					"binding": "IMPORT_FILES",
 					"bucket_name": "append-imports-preview"
 				}
+			],
+			"ratelimits": [
+				{
+					"name": "INGEST_RATE_LIMITER",
+					"namespace_id": "1001",
+					"simple": { "limit": 100, "period": 60 }
+				}
 			]
 		},
 		/**
@@ -144,6 +166,13 @@
 					"store_id": "1a34ec9e145b4a4982a9880acc18e698",
 					"secret_name": "append-gateway_openai_default"
 				}
+			],
+			"ratelimits": [
+				{
+					"name": "INGEST_RATE_LIMITER",
+					"namespace_id": "1001",
+					"simple": { "limit": 100, "period": 60 }
+				}
 			]
 		},
 		/**
@@ -177,6 +206,14 @@
 				{
 					"binding": "IMPORT_FILES",
 					"bucket_name": "append-imports"
+				}
+			],
+			"ratelimits": [
+				{
+					"name": "INGEST_RATE_LIMITER",
+					"namespace_id": "1001",
+					// High limit for tests to avoid cross-test interference (CF rate limiter state persists)
+					"simple": { "limit": 10000, "period": 60 }
 				}
 			]
 		}

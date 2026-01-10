@@ -34,10 +34,10 @@ export const eventsRoutes = app.post('/ingest', async (c) => {
 
 	const events = base.output.events as unknown[];
 
-	// Rate limiting: max 1000 events per minute per user
-	const rateLimit = checkRateLimit(userId, events.length);
+	// Rate limiting: distributed via CF Rate Limiting API (per-batch, not per-event)
+	const rateLimit = await checkRateLimit(c.env.INGEST_RATE_LIMITER, userId);
 	if (!rateLimit.allowed) {
-		return apiError(c, 429, 'RATE_LIMIT_EXCEEDED', `Rate limit exceeded. Max 1000 events per minute. ${rateLimit.remaining} remaining.`);
+		return apiError(c, 429, 'RATE_LIMIT_EXCEEDED', 'Rate limit exceeded. Please wait before sending more events.');
 	}
 	const rejected: Array<{ index: number; event_id?: string; reason: string }> = [];
 	const validEvents: TelemetryEventInput[] = [];
