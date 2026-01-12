@@ -8,7 +8,7 @@
 
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { event as eventTable, type schema } from '../../../db';
+import { type EventType, event as eventTable, type schema } from '../../../db';
 import { computeCreditIndex, IDLE_CUTOFF_MS, msToMinutes } from '../rollups/credit';
 import { addDays, parseDayKeyToTzRange, weekdayLabel } from '../rollups/time';
 import { TOPIC_LABELS } from '../rollups/topics';
@@ -30,7 +30,7 @@ async function fetchEventsPaged(
 	userId: string,
 	fromMs: number,
 	toMs: number,
-	types: string[],
+	types: readonly EventType[],
 	maxScan: number
 ): Promise<FetchEventsResult> {
 	const rows: DbEventRow[] = [];
@@ -46,7 +46,7 @@ async function fetchEventsPaged(
 			.where(
 				and(
 					eq(eventTable.userId, userId),
-					inArray(eventTable.type, types as any),
+					inArray(eventTable.type, types),
 					gte(eventTable.emittedAt, new Date(fromMs)),
 					lte(eventTable.emittedAt, new Date(toMs))
 				)
@@ -61,7 +61,7 @@ async function fetchEventsPaged(
 				.where(
 					and(
 						eq(eventTable.userId, userId),
-						inArray(eventTable.type, types as any),
+						inArray(eventTable.type, types),
 						gte(eventTable.emittedAt, new Date(fromMs)),
 						lte(eventTable.emittedAt, new Date(toMs)),
 						gte(eventTable.emittedAt, cursor.emittedAt)
