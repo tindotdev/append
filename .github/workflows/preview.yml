@@ -61,22 +61,17 @@ jobs:
           # This makes Doppler the canonical source of truth for secrets
           set -euo pipefail
 
-          TMP_SECRETS_FILE="$(mktemp)"
-          trap 'rm -f "$TMP_SECRETS_FILE"' EXIT
-
-          doppler secrets download --no-file --format json > "$TMP_SECRETS_FILE"
-
           set +e
-          SYNC_OUTPUT="$(pnpm exec wrangler secret bulk --env preview --config wrangler.jsonc < "$TMP_SECRETS_FILE" 2>&1)"
+          doppler secrets download --no-file --format json | \
+            pnpm exec wrangler secret bulk --env preview --config wrangler.jsonc
           SYNC_EXIT_CODE=$?
           set -e
 
-          echo "$SYNC_OUTPUT"
-
           if [ $SYNC_EXIT_CODE -ne 0 ]; then
             echo "::warning::Secret sync failed (preview Worker may not exist yet). Deploying once to create the Worker, then retrying secret sync."
-            pnpm exec wrangler deploy -e preview --config wrangler.jsonc
-            pnpm exec wrangler secret bulk --env preview --config wrangler.jsonc < "$TMP_SECRETS_FILE"
+            pnpm exec wrangler deploy --env preview --config wrangler.jsonc
+            doppler secrets download --no-file --format json | \
+              pnpm exec wrangler secret bulk --env preview --config wrangler.jsonc
           fi
 
       - name: Set PR-specific E2E auth email
@@ -86,7 +81,7 @@ jobs:
           # This is the canonical place where preview E2E_AUTH_EMAIL is set.
           # This matches the wildcard pattern in ALLOWED_EMAIL (e2e-bot+*@append.test)
           echo "e2e-bot+pr-${{ github.event.pull_request.number }}@append.test" | \
-            pnpm exec wrangler secret put E2E_AUTH_EMAIL -e preview --config wrangler.jsonc
+            pnpm exec wrangler secret put E2E_AUTH_EMAIL --env preview --config wrangler.jsonc
 
       - name: Verify required Worker secrets exist (no values)
         working-directory: packages/api
@@ -125,7 +120,7 @@ jobs:
         working-directory: packages/api
         run: |
           set +e  # Don't exit on error yet
-          DEPLOYMENT_OUTPUT=$(pnpm exec wrangler deploy -e preview --config wrangler.jsonc 2>&1)
+          DEPLOYMENT_OUTPUT=$(pnpm exec wrangler deploy --env preview --config wrangler.jsonc 2>&1)
           EXIT_CODE=$?
           echo "$DEPLOYMENT_OUTPUT"
 

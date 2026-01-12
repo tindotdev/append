@@ -227,7 +227,7 @@ Manual equivalent (from repo root):
 # pnpm --filter @append/api exec wrangler secret bulk --env production --config packages/api/wrangler.jsonc < /tmp/append-secrets.json
 
 pnpm --filter @append/api exec wrangler d1 migrations apply append-db --remote --env production --config packages/api/wrangler.jsonc
-pnpm --filter @append/api run deploy -- --config packages/api/wrangler.jsonc
+pnpm --filter @append/api run deploy -- --env production --config packages/api/wrangler.jsonc
 
 # Web (build + deploy)
 pnpm --filter @append/web run build
@@ -348,7 +348,7 @@ To deploy manually to preview environments:
 ```bash
 # API preview
 pnpm --filter @append/api exec wrangler d1 migrations apply append-db-preview --remote --env preview
-pnpm --filter @append/api exec wrangler deploy -e preview --config wrangler.jsonc
+pnpm --filter @append/api exec wrangler deploy --env preview --config wrangler.jsonc
 
 # Web preview (branch-specific)
 VITE_API_URL=https://append-api-preview.tindotdev.workers.dev pnpm --filter @append/web run build

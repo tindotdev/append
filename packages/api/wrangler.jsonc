@@ -97,7 +97,7 @@
 		 * - Used for PR preview deployments
 		 * - Uses separate preview database and R2 bucket
 		 * - Uses stub AI provider to avoid costs
-		 * - Deploy with: wrangler deploy -e preview
+		 * - Deploy with: wrangler deploy --env preview
 		 */
 		"preview": {
 			"name": "append-api-preview",
@@ -135,7 +135,7 @@
 		/**
 		 * Production environment
 		 * - Secrets synced from Doppler at deploy time
-		 * - Deploy with: wrangler deploy -e production
+		 * - Deploy with: wrangler deploy --env production
 		 */
 		"production": {
 			"name": "append-api",
