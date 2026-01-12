@@ -22,6 +22,7 @@ const MAX_EVENTS_PER_REQUEST = 250_000;
 const PAGE_SIZE = 10_000;
 const STREAK_PAGE_DAYS = 7;
 const MAX_STREAK_DAYS = 365;
+const MAX_OVERRIDES = 1_000;
 
 interface FetchEventsResult {
 	rows: DbEventRow[];
@@ -146,14 +147,42 @@ async function fetchEventsPaged(
 }
 
 /**
+ * Fetch all topic_override events for a user without date filter.
+ * Used to ensure persistent overrides apply regardless of when they were emitted.
+ * Bounded by MAX_OVERRIDES to prevent unbounded queries.
+ */
+async function fetchAllOverrides(db: DrizzleD1Database<typeof schema>, userId: string): Promise<DbEventRow[]> {
+	return db
+		.select()
+		.from(eventTable)
+		.where(and(eq(eventTable.userId, userId), eq(eventTable.type, 'topic_override')))
+		.orderBy(eventTable.emittedAt)
+		.limit(MAX_OVERRIDES);
+}
+
+/**
+ * Merge overrides with other events, ensuring sorted order by emittedAt.
+ */
+function mergeWithOverrides(events: DbEventRow[], overrides: DbEventRow[]): DbEventRow[] {
+	// Dedupe overrides that might already be in events (within the time window)
+	const eventIds = new Set(events.map((e) => e.eventId));
+	const uniqueOverrides = overrides.filter((o) => !eventIds.has(o.eventId));
+
+	// Merge and sort by emittedAt
+	return [...events, ...uniqueOverrides].sort((a, b) => a.emittedAt.getTime() - b.emittedAt.getTime());
+}
+
+/**
  * Compute streak by paging backwards until first inactive day.
+ * Receives pre-fetched overrides to ensure persistent overrides apply.
  */
 async function computeStreak(
 	db: DrizzleD1Database<typeof schema>,
 	userId: string,
 	timezone: string,
 	todayKey: string,
-	maxScanTotal: number
+	maxScanTotal: number,
+	allOverrides: DbEventRow[]
 ): Promise<{ ok: true; streak: number; scanned: number } | { ok: false; error: 'RANGE_TOO_LARGE' }> {
 	let streak = 0;
 	let dayOffset = 0;
@@ -173,17 +202,13 @@ async function computeStreak(
 		// Pad the query for correct credit computation
 		const queryFromMs = rangeStartMs - IDLE_CUTOFF_MS;
 
-		const { rows, scanned } = await fetchEventsPaged(
-			db,
-			userId,
-			queryFromMs,
-			rangeEndMs,
-			['artifact_active', 'topic_override'],
-			remainingScan
-		);
+		const { rows: windowEvents, scanned } = await fetchEventsPaged(db, userId, queryFromMs, rangeEndMs, ['artifact_active'], remainingScan);
 
 		scannedTotal += scanned;
 		if (scannedTotal >= maxScanTotal) return { ok: false, error: 'RANGE_TOO_LARGE' };
+
+		// Merge with pre-fetched overrides
+		const rows = mergeWithOverrides(windowEvents, allOverrides);
 
 		const creditIndex = computeCreditIndex(rows, timezone, rangeStartMs, rangeEndMs);
 
@@ -240,18 +265,19 @@ export async function getDashboardToday(
 	// Pad query for correct credit computation
 	const queryFromMs = sevenDayStartMs - IDLE_CUTOFF_MS;
 
-	const { rows, scanned } = await fetchEventsPaged(
-		db,
-		userId,
-		queryFromMs,
-		todayEndMs,
-		['artifact_active', 'capture', 'topic_override'],
-		MAX_EVENTS_PER_REQUEST
-	);
+	// Fetch heartbeats/captures and all overrides in parallel
+	// Overrides are fetched without date filter so persistent overrides always apply
+	const [{ rows: windowEvents, scanned }, allOverrides] = await Promise.all([
+		fetchEventsPaged(db, userId, queryFromMs, todayEndMs, ['artifact_active', 'capture'], MAX_EVENTS_PER_REQUEST),
+		fetchAllOverrides(db, userId),
+	]);
 
 	if (scanned >= MAX_EVENTS_PER_REQUEST) {
 		return { ok: false, error: 'RANGE_TOO_LARGE' };
 	}
+
+	// Merge overrides with window events (deduped and sorted)
+	const rows = mergeWithOverrides(windowEvents, allOverrides);
 
 	// Compute credit index for the 7-day window
 	const creditIndex = computeCreditIndex(rows, timezone, sevenDayStartMs, todayEndMs);
@@ -334,9 +360,9 @@ export async function getDashboardToday(
 		items: captures.map(({ emitted_at: _, ...rest }) => rest),
 	};
 
-	// Streak (computed separately with paging)
+	// Streak (computed separately with paging, reuses pre-fetched overrides)
 	const streakScanBudget = MAX_EVENTS_PER_REQUEST - scanned;
-	const streakResult = await computeStreak(db, userId, timezone, todayKey, streakScanBudget);
+	const streakResult = await computeStreak(db, userId, timezone, todayKey, streakScanBudget, allOverrides);
 	if (!streakResult.ok) return { ok: false, error: 'RANGE_TOO_LARGE' };
 	const currentStreak = streakResult.streak;
 
