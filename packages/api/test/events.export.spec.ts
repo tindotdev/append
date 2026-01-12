@@ -385,4 +385,77 @@ describe('GET /events/export', () => {
 			expect(timestamps[i]).toBeGreaterThanOrEqual(timestamps[i - 1]);
 		}
 	});
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Truncation header behavior
+	// ─────────────────────────────────────────────────────────────────────────
+
+	it('does not set X-Export-Truncated header when all data is exported', async () => {
+		const deviceId = generateUUID();
+		const baseTime = Date.UTC(2026, 0, 5, 12, 0, 0);
+
+		// Create a moderate number of events (well under the 100k limit)
+		const events = [];
+		for (let i = 0; i < 100; i++) {
+			events.push(
+				heartbeatEvent({
+					deviceId,
+					eventId: generateUUID(),
+					emittedAtMs: baseTime + i * 1000,
+				})
+			);
+		}
+
+		await ingestEvents(authCookie, events);
+
+		const res = await authFetch('/events/export?from=2026-01-05&to=2026-01-05&format=ndjson', { cookie: authCookie });
+
+		// All events should be exported
+		const exportedEvents = await parseNdjson(res);
+		expect(exportedEvents).toHaveLength(100);
+
+		// Truncation header should NOT be set since all data was exported
+		expect(res.headers.get('X-Export-Truncated')).toBeNull();
+	});
+
+	it('does not set X-Export-Truncated header when result size equals PAGE_SIZE exactly', async () => {
+		// This test validates the fix for the false positive truncation issue.
+		// Previously, when the last page was exactly full (PAGE_SIZE rows),
+		// the code assumed there might be more data. Now we over-fetch by 1
+		// to accurately detect if more data exists.
+		//
+		// PAGE_SIZE in routes.ts is 1000, so we create exactly 1000 events.
+		// We must batch ingests because the API limits batches to 500 events.
+		const deviceId = generateUUID();
+		const baseTime = Date.UTC(2026, 0, 5, 12, 0, 0);
+
+		const PAGE_SIZE = 1000;
+		const BATCH_SIZE = 500;
+
+		// Ingest events in batches
+		for (let batch = 0; batch < PAGE_SIZE / BATCH_SIZE; batch++) {
+			const events = [];
+			for (let i = 0; i < BATCH_SIZE; i++) {
+				const eventIndex = batch * BATCH_SIZE + i;
+				events.push(
+					heartbeatEvent({
+						deviceId,
+						eventId: generateUUID(),
+						emittedAtMs: baseTime + eventIndex * 1000,
+					})
+				);
+			}
+			await ingestEvents(authCookie, events);
+		}
+
+		const res = await authFetch('/events/export?from=2026-01-05&to=2026-01-05&format=ndjson', { cookie: authCookie });
+
+		// All events should be exported
+		const exportedEvents = await parseNdjson(res);
+		expect(exportedEvents).toHaveLength(PAGE_SIZE);
+
+		// Truncation header should NOT be set since all data was exported
+		// (even though the result count equals PAGE_SIZE)
+		expect(res.headers.get('X-Export-Truncated')).toBeNull();
+	});
 });

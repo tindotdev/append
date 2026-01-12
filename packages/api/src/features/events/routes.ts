@@ -240,24 +240,31 @@ export const eventsRoutes = app
 							)
 						: baseWhere;
 
+					// Fetch one extra row to accurately detect if more data exists
 					const rows: EventRow[] = await db
 						.select()
 						.from(eventTable)
 						.where(cursorWhere)
 						.orderBy(eventTable.emittedAt, eventTable.deviceId, eventTable.eventId)
-						.limit(PAGE_SIZE);
+						.limit(PAGE_SIZE + 1);
 
 					if (rows.length === 0) {
 						hasMore = false;
 						break;
 					}
 
+					// Check if there's more data beyond this page
+					const hasMoreInDb = rows.length > PAGE_SIZE;
+					const pageRows = hasMoreInDb ? rows.slice(0, PAGE_SIZE) : rows;
+
 					// Determine how many rows we can process without exceeding the limit
 					const remainingCapacity = MAX_TOTAL_ROWS - totalExported;
-					const toProcess: EventRow[] = rows.slice(0, remainingCapacity);
+					const toProcess: EventRow[] = pageRows.slice(0, remainingCapacity);
 
-					// Check if we're truncating due to hitting the limit
-					if (rows.length > remainingCapacity && !headerSet) {
+					// Check if we're truncating: either we fetched more than capacity,
+					// or we're at capacity and there's confirmed more data in DB
+					const wouldTruncate = pageRows.length > remainingCapacity || (toProcess.length === remainingCapacity && hasMoreInDb);
+					if (wouldTruncate && !headerSet) {
 						c.header('X-Export-Truncated', 'true');
 						headerSet = true;
 					}
@@ -297,15 +304,11 @@ export const eventsRoutes = app
 					}
 
 					// Update cursor for next page
-					if (toProcess.length < PAGE_SIZE) {
+					if (!hasMoreInDb || toProcess.length < pageRows.length) {
+						// No more data in DB, or we couldn't process the full page (hit limit)
 						hasMore = false;
 					} else if (totalExported >= MAX_TOTAL_ROWS) {
-						// Reached max export limit - stop gracefully
-						// Check if there might be more data (if we got a full page, assume there's more)
-						if (rows.length === PAGE_SIZE && !headerSet) {
-							c.header('X-Export-Truncated', 'true');
-							headerSet = true;
-						}
+						// Reached max export limit - truncation header already set above if needed
 						hasMore = false;
 					} else {
 						const last: EventRow = toProcess[toProcess.length - 1]!;

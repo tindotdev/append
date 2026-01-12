@@ -28,10 +28,12 @@ export interface TopicOverride {
 	topic: TopicSlug;
 	starts_at?: number;
 	ends_at?: number;
+	emitted_at: number; // Track when override was created for precedence
 }
 
 /**
  * Build an index of topic overrides by artifact key (host:url_hash).
+ * Overrides are sorted by emitted_at DESC so the latest override is checked first.
  */
 export function buildTopicOverrideIndex(rows: DbEventRow[]): Map<string, TopicOverride[]> {
 	const byArtifact = new Map<string, TopicOverride[]>();
@@ -48,8 +50,14 @@ export function buildTopicOverrideIndex(rows: DbEventRow[]): Map<string, TopicOv
 			topic: payload.topic_slug,
 			starts_at: payload.starts_at,
 			ends_at: payload.ends_at,
+			emitted_at: row.emittedAt.getTime(),
 		});
 		byArtifact.set(key, list);
+	}
+
+	// Sort each artifact's overrides by emitted_at DESC so latest override wins
+	for (const overrides of byArtifact.values()) {
+		overrides.sort((a, b) => b.emitted_at - a.emitted_at);
 	}
 
 	return byArtifact;
