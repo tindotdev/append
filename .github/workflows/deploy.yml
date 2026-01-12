@@ -99,6 +99,9 @@ jobs:
               "OPENAI_API_KEY",
           ]
 
+          # At least one allowlist mechanism must be configured
+          allowlist = ["ALLOWED_SUB", "ALLOWED_EMAIL"]
+
           secrets = json.loads(os.environ["SECRETS_JSON"])
           names = {s.get("name") for s in secrets if isinstance(s, dict)}
 
@@ -107,7 +110,14 @@ jobs:
               print(f"::error::Missing Worker secrets (names only): {', '.join(missing)}")
               sys.exit(1)
 
+          # Check that at least one allowlist secret exists
+          allowlist_present = [name for name in allowlist if name in names]
+          if not allowlist_present:
+              print(f"::error::Missing allowlist configuration: at least one of {', '.join(allowlist)} must be present")
+              sys.exit(1)
+
           print("✓ Required Worker secrets present")
+          print(f"✓ Allowlist configured: {', '.join(allowlist_present)}")
           PY
 
       - name: Apply D1 migrations
