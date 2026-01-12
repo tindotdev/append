@@ -219,7 +219,7 @@ export const eventsRoutes = app
 			let cursor: { emittedAt: Date; deviceId: string; eventId: string } | null = null;
 			let hasMore = true;
 			let totalExported = 0;
-			let truncated = false;
+			let headerSet = false;
 
 			try {
 				while (hasMore && totalExported < MAX_TOTAL_ROWS) {
@@ -257,9 +257,9 @@ export const eventsRoutes = app
 					const toProcess: EventRow[] = rows.slice(0, remainingCapacity);
 
 					// Check if we're truncating due to hitting the limit
-					if (rows.length > remainingCapacity) {
-						truncated = true;
+					if (rows.length > remainingCapacity && !headerSet) {
 						c.header('X-Export-Truncated', 'true');
+						headerSet = true;
 					}
 
 					for (const row of toProcess) {
@@ -302,9 +302,9 @@ export const eventsRoutes = app
 					} else if (totalExported >= MAX_TOTAL_ROWS) {
 						// Reached max export limit - stop gracefully
 						// Check if there might be more data (if we got a full page, assume there's more)
-						if (rows.length === PAGE_SIZE && !truncated) {
-							truncated = true;
+						if (rows.length === PAGE_SIZE && !headerSet) {
 							c.header('X-Export-Truncated', 'true');
+							headerSet = true;
 						}
 						hasMore = false;
 					} else {
