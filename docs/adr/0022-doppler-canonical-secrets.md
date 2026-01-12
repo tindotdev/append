@@ -24,8 +24,9 @@ Make **Doppler the single source of truth** for all secrets across all environme
 
 Secrets are synced from Doppler to Cloudflare Workers using (env-scoped):
 ```bash
-doppler secrets download --no-file --format json > /tmp/worker-secrets.json
-wrangler secret bulk --env <env> < /tmp/worker-secrets.json
+doppler secrets download --no-file --format json | \
+  jq -c 'with_entries(.value = .value.computed)' | \
+  wrangler secret bulk --env <env>
 ```
 
 Remove Cloudflare Secrets Store binding for `OPENAI_API_KEY` — it becomes a regular Worker secret synced from Doppler like all others.

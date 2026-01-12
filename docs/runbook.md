@@ -223,8 +223,9 @@ Manual equivalent (from repo root):
 # Note: In CI/CD, secrets sync is handled automatically via Doppler service tokens.
 # Manual sync is only needed for break-glass deploys or rotation verification.
 #
-# DOPPLER_TOKEN=... doppler secrets download --no-file --format json > /tmp/append-secrets.json
-# pnpm --filter @append/api exec wrangler secret bulk --env production --config packages/api/wrangler.jsonc < /tmp/append-secrets.json
+# DOPPLER_TOKEN=... doppler secrets download --no-file --format json | \
+#   jq -c 'with_entries(.value = .value.computed)' | \
+#   pnpm --filter @append/api exec wrangler secret bulk --env production --config packages/api/wrangler.jsonc
 
 pnpm --filter @append/api exec wrangler d1 migrations apply append-db --remote --env production --config packages/api/wrangler.jsonc
 pnpm --filter @append/api run deploy -- --env production --config packages/api/wrangler.jsonc

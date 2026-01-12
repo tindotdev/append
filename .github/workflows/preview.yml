@@ -63,6 +63,7 @@ jobs:
 
           set +e
           doppler secrets download --no-file --format json | \
+            jq -c 'with_entries(.value = .value.computed)' | \
             pnpm exec wrangler secret bulk --env preview --config wrangler.jsonc
           SYNC_EXIT_CODE=$?
           set -e
@@ -71,6 +72,7 @@ jobs:
             echo "::warning::Secret sync failed (preview Worker may not exist yet). Deploying once to create the Worker, then retrying secret sync."
             pnpm exec wrangler deploy --env preview --config wrangler.jsonc
             doppler secrets download --no-file --format json | \
+              jq -c 'with_entries(.value = .value.computed)' | \
               pnpm exec wrangler secret bulk --env preview --config wrangler.jsonc
           fi
 
