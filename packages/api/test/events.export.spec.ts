@@ -464,4 +464,95 @@ describe('GET /events/export', () => {
 		// (even though the result count equals PAGE_SIZE)
 		expect(res.headers.get('X-Export-Truncated')).toBeNull();
 	});
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Cursor continuation support
+	// ─────────────────────────────────────────────────────────────────────────
+
+	it('returns 400 for invalid cursor format', async () => {
+		const res = await authFetch('/events/export?from=2026-01-01&to=2026-01-31&format=ndjson&cursor=invalid', {
+			cookie: authCookie,
+		});
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+		expect(body.error.message).toContain('Invalid cursor');
+	});
+
+	it('resumes export from cursor position', async () => {
+		const deviceId = generateUUID();
+		const baseTime = Date.UTC(2026, 0, 5, 12, 0, 0);
+
+		// Create 5 events with distinct timestamps
+		const eventIds: string[] = [];
+		const events = [];
+		for (let i = 0; i < 5; i++) {
+			const eventId = generateUUID();
+			eventIds.push(eventId);
+			events.push(
+				heartbeatEvent({
+					deviceId,
+					eventId,
+					emittedAtMs: baseTime + i * 1000,
+				})
+			);
+		}
+		await ingestEvents(authCookie, events);
+
+		// First export without cursor - get all 5 events
+		const res1 = await authFetch('/events/export?from=2026-01-05&to=2026-01-05&format=ndjson', { cookie: authCookie });
+		const events1 = (await parseNdjson(res1)) as any[];
+		expect(events1).toHaveLength(5);
+
+		// Create a cursor pointing to the 2nd event (index 1)
+		// Events after this cursor should be events 3, 4, 5 (indices 2, 3, 4)
+		const secondEvent = events1[1];
+		const cursorData = {
+			emittedAt: secondEvent.emitted_at,
+			deviceId: secondEvent.device_id,
+			eventId: secondEvent.event_id,
+		};
+		const cursor = btoa(JSON.stringify(cursorData)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+		// Export with cursor - should get events after the 2nd one
+		const res2 = await authFetch(`/events/export?from=2026-01-05&to=2026-01-05&format=ndjson&cursor=${cursor}`, {
+			cookie: authCookie,
+		});
+		const events2 = (await parseNdjson(res2)) as any[];
+
+		// Should get the last 3 events (indices 2, 3, 4)
+		expect(events2).toHaveLength(3);
+		expect(events2[0].event_id).toBe(eventIds[2]);
+		expect(events2[1].event_id).toBe(eventIds[3]);
+		expect(events2[2].event_id).toBe(eventIds[4]);
+	});
+
+	it('returns empty result when cursor is at the last event', async () => {
+		const deviceId = generateUUID();
+		const eventId = generateUUID();
+		const baseTime = Date.UTC(2026, 0, 5, 12, 0, 0);
+
+		await ingestEvents(authCookie, [heartbeatEvent({ deviceId, eventId, emittedAtMs: baseTime })]);
+
+		// Export to get the event
+		const res1 = await authFetch('/events/export?from=2026-01-05&to=2026-01-05&format=ndjson', { cookie: authCookie });
+		const events1 = (await parseNdjson(res1)) as any[];
+		expect(events1).toHaveLength(1);
+
+		// Create cursor at the last event
+		const lastEvent = events1[0];
+		const cursorData = {
+			emittedAt: lastEvent.emitted_at,
+			deviceId: lastEvent.device_id,
+			eventId: lastEvent.event_id,
+		};
+		const cursor = btoa(JSON.stringify(cursorData)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+		// Export with cursor - should get no events
+		const res2 = await authFetch(`/events/export?from=2026-01-05&to=2026-01-05&format=ndjson&cursor=${cursor}`, {
+			cookie: authCookie,
+		});
+		const events2 = await parseNdjson(res2);
+		expect(events2).toHaveLength(0);
+	});
 });

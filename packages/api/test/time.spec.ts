@@ -290,5 +290,48 @@ describe('time utilities', () => {
 				expect(isValidDayKey(fallKey)).toBe(true);
 			});
 		});
+
+		describe('Fractional DST offset zones (Australia/Lord_Howe)', () => {
+			// Australia/Lord_Howe uses UTC+10:30 in winter and UTC+11 in summer (DST).
+			// The DST transition is only ±30 minutes, which can require iterative convergence.
+
+			it('handles Lord_Howe standard time (winter)', () => {
+				// July 15, 2026 in Australia/Lord_Howe (LHST, UTC+10:30)
+				// Midnight LHST = previous day 13:30 UTC
+				const { startMs, endMs } = parseDayKeyToTzRange('2026-07-15', 'Australia/Lord_Howe');
+				expect(new Date(startMs).toISOString()).toBe('2026-07-14T13:30:00.000Z');
+				// 23:59:59.999 LHST = same day 13:29:59.999 UTC
+				expect(new Date(endMs).toISOString()).toBe('2026-07-15T13:29:59.999Z');
+			});
+
+			it('handles Lord_Howe daylight saving time (summer)', () => {
+				// January 15, 2026 in Australia/Lord_Howe (LHDT, UTC+11)
+				// Midnight LHDT = previous day 13:00 UTC
+				const { startMs, endMs } = parseDayKeyToTzRange('2026-01-15', 'Australia/Lord_Howe');
+				expect(new Date(startMs).toISOString()).toBe('2026-01-14T13:00:00.000Z');
+				// 23:59:59.999 LHDT = same day 12:59:59.999 UTC
+				expect(new Date(endMs).toISOString()).toBe('2026-01-15T12:59:59.999Z');
+			});
+
+			it('handles Lord_Howe DST transition day (spring forward, first Sunday in October)', () => {
+				// In 2026, DST starts first Sunday in October = October 4
+				// At 2:00am LHST (UTC+10:30), clocks move forward to 2:30am LHDT (UTC+11)
+				const { startMs, endMs } = parseDayKeyToTzRange('2026-10-04', 'Australia/Lord_Howe');
+				// Day starts at midnight LHST (UTC+10:30) = Oct 3 13:30 UTC
+				expect(new Date(startMs).toISOString()).toBe('2026-10-03T13:30:00.000Z');
+				// Day ends at 23:59:59.999 LHDT (UTC+11) = Oct 4 12:59:59.999 UTC
+				expect(new Date(endMs).toISOString()).toBe('2026-10-04T12:59:59.999Z');
+			});
+
+			it('handles Lord_Howe DST transition day (fall back, first Sunday in April)', () => {
+				// In 2026, DST ends first Sunday in April = April 5
+				// At 2:00am LHDT (UTC+11), clocks move back to 1:30am LHST (UTC+10:30)
+				const { startMs, endMs } = parseDayKeyToTzRange('2026-04-05', 'Australia/Lord_Howe');
+				// Day starts at midnight LHDT (UTC+11) = Apr 4 13:00 UTC
+				expect(new Date(startMs).toISOString()).toBe('2026-04-04T13:00:00.000Z');
+				// Day ends at 23:59:59.999 LHST (UTC+10:30) = Apr 5 13:29:59.999 UTC
+				expect(new Date(endMs).toISOString()).toBe('2026-04-05T13:29:59.999Z');
+			});
+		});
 	});
 });

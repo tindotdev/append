@@ -75,11 +75,8 @@ export function parseDayKeyToTzRange(dayKey: string, timezone: string): { startM
 	// Helper to convert local date components (at midnight) in the given timezone to UTC milliseconds.
 	// We use an iterative approach: start with a guess (the UTC date), then format it in the target
 	// timezone to see what local time it represents, and adjust until we converge.
+	// Iteration handles zones with fractional DST shifts (e.g., Australia/Lord_Howe's ±30 min).
 	const getUtcMsForLocalMidnight = (year: number, month: number, day: number): number => {
-		// Start with initial guess: if local date is Y-M-D, assume UTC Y-M-D midnight
-		const guessUtc = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
-
-		// Format this UTC timestamp in the target timezone to see what local date/time it represents
 		const formatter = new Intl.DateTimeFormat('en-US', {
 			timeZone: timezone,
 			year: 'numeric',
@@ -91,23 +88,48 @@ export function parseDayKeyToTzRange(dayKey: string, timezone: string): { startM
 			hour12: false,
 		});
 
-		const parts = formatter.formatToParts(new Date(guessUtc));
-		const formatted = {
-			year: Number(parts.find((p) => p.type === 'year')?.value),
-			month: Number(parts.find((p) => p.type === 'month')?.value),
-			day: Number(parts.find((p) => p.type === 'day')?.value),
-			hour: Number(parts.find((p) => p.type === 'hour')?.value),
-			minute: Number(parts.find((p) => p.type === 'minute')?.value),
-			second: Number(parts.find((p) => p.type === 'second')?.value),
+		const extractLocal = (utcMs: number) => {
+			const parts = formatter.formatToParts(new Date(utcMs));
+			return {
+				year: Number(parts.find((p) => p.type === 'year')?.value),
+				month: Number(parts.find((p) => p.type === 'month')?.value),
+				day: Number(parts.find((p) => p.type === 'day')?.value),
+				hour: Number(parts.find((p) => p.type === 'hour')?.value),
+				minute: Number(parts.find((p) => p.type === 'minute')?.value),
+				second: Number(parts.find((p) => p.type === 'second')?.value),
+			};
 		};
 
-		// Compute the difference between what we want (Y-M-D 00:00:00) and what we got
-		const wantedUtc = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
-		const gotUtc = Date.UTC(formatted.year, formatted.month - 1, formatted.day, formatted.hour, formatted.minute, formatted.second, 0);
-		const offsetMs = wantedUtc - gotUtc;
+		// Start with initial guess: if local date is Y-M-D, assume UTC Y-M-D midnight
+		let guessUtc = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
 
-		// Adjust our guess by the offset to get the correct UTC timestamp for local midnight
-		return guessUtc + offsetMs;
+		// Iterate until the formatted local date/time matches the target (max 3 iterations for safety)
+		const MAX_ITERATIONS = 3;
+		for (let i = 0; i < MAX_ITERATIONS; i++) {
+			const formatted = extractLocal(guessUtc);
+
+			// Check if we've converged: local time at guessUtc is Y-M-D 00:00:00
+			if (
+				formatted.year === year &&
+				formatted.month === month &&
+				formatted.day === day &&
+				formatted.hour === 0 &&
+				formatted.minute === 0 &&
+				formatted.second === 0
+			) {
+				return guessUtc;
+			}
+
+			// Compute the difference between what we want and what we got
+			const wantedUtc = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+			const gotUtc = Date.UTC(formatted.year, formatted.month - 1, formatted.day, formatted.hour, formatted.minute, formatted.second, 0);
+			const offsetMs = wantedUtc - gotUtc;
+
+			// Adjust our guess by the offset
+			guessUtc = guessUtc + offsetMs;
+		}
+
+		return guessUtc;
 	};
 
 	const startMs = getUtcMsForLocalMidnight(y, m, d);
