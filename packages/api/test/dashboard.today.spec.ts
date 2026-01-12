@@ -382,6 +382,56 @@ describe('GET /api/dashboard/today', () => {
 	});
 
 	// ─────────────────────────────────────────────────────────────────────────
+	// Topic override precedence (latest override should win)
+	// ─────────────────────────────────────────────────────────────────────────
+
+	it('applies latest topic override when multiple overrides exist for same artifact', async () => {
+		const deviceId = generateUUID();
+		const now = Date.now();
+		const urlHash = 'test-override-hash';
+		const host = 'docs.example.com';
+
+		// Create heartbeat events for the artifact
+		await ingestEvents([
+			heartbeatEvent({ deviceId, eventId: generateUUID(), emittedAtMs: now, host, urlHash }),
+			heartbeatEvent({ deviceId, eventId: generateUUID(), emittedAtMs: now - 30_000, host, urlHash }),
+		]);
+
+		// Create two topic overrides for the same artifact at different times:
+		// - Earlier override (1 hour ago): sets topic to 'frontend'
+		// - Later override (now): sets topic to 'backend'
+		// The latest override (backend) should win
+		await ingestEvents([
+			{
+				schema_version: 1,
+				event_id: generateUUID(),
+				device_id: deviceId,
+				emitted_at: now - 60 * 60 * 1000, // 1 hour ago
+				type: 'topic_override',
+				artifact: { host, url_hash: urlHash },
+				payload: { topic_slug: 'frontend', scope: 'artifact' },
+			},
+			{
+				schema_version: 1,
+				event_id: generateUUID(),
+				device_id: deviceId,
+				emitted_at: now, // now (most recent)
+				type: 'topic_override',
+				artifact: { host, url_hash: urlHash },
+				payload: { topic_slug: 'backend', scope: 'artifact' },
+			},
+		]);
+
+		const res = await authFetch('/api/dashboard/today?tz=UTC', { cookie: authCookie });
+		const body = (await res.json()) as DashboardTodayResponse;
+
+		// The breakdown should show 'backend' (latest override), not 'frontend'
+		const topicIds = body.todayBreakdown.topics.map((t) => t.id);
+		expect(topicIds).toContain('backend');
+		expect(topicIds).not.toContain('frontend');
+	});
+
+	// ─────────────────────────────────────────────────────────────────────────
 	// 7-day average
 	// ─────────────────────────────────────────────────────────────────────────
 

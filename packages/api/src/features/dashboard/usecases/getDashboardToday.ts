@@ -10,7 +10,7 @@
  * - todayCaptures: { count, items }
  */
 
-import { and, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type EventType, event as eventTable, type schema } from '../../../db';
 import { computeCreditIndex, IDLE_CUTOFF_MS, MIN_ACTIVE_MINUTES_FOR_STREAK, msToMinutes } from '../rollups/credit';
@@ -152,11 +152,13 @@ async function fetchEventsPaged(
  * Bounded by MAX_OVERRIDES to prevent unbounded queries.
  */
 async function fetchAllOverrides(db: DrizzleD1Database<typeof schema>, userId: string): Promise<DbEventRow[]> {
+	// Order DESC so newest overrides are fetched first and kept when hitting the limit.
+	// This ensures the latest override wins when resolving topics.
 	return db
 		.select()
 		.from(eventTable)
 		.where(and(eq(eventTable.userId, userId), eq(eventTable.type, 'topic_override')))
-		.orderBy(eventTable.emittedAt)
+		.orderBy(desc(eventTable.emittedAt))
 		.limit(MAX_OVERRIDES);
 }
 
