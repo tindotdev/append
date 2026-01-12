@@ -16,6 +16,7 @@ import type { BreakdownItem, DashboardWeekResponse, DbEventRow, TopicSlug } from
 
 const MAX_EVENTS_PER_REQUEST = 250_000;
 const PAGE_SIZE = 10_000;
+const MAX_OVERRIDES = 1_000;
 
 interface FetchEventsResult {
 	rows: DbEventRow[];
@@ -103,6 +104,28 @@ async function fetchEventsPaged(
 }
 
 /**
+ * Fetch all topic_override events for a user without date filter.
+ * Used to ensure persistent overrides apply regardless of when they were emitted.
+ */
+async function fetchAllOverrides(db: DrizzleD1Database<typeof schema>, userId: string): Promise<DbEventRow[]> {
+	return db
+		.select()
+		.from(eventTable)
+		.where(and(eq(eventTable.userId, userId), eq(eventTable.type, 'topic_override')))
+		.orderBy(eventTable.emittedAt)
+		.limit(MAX_OVERRIDES);
+}
+
+/**
+ * Merge overrides with other events, ensuring sorted order by emittedAt.
+ */
+function mergeWithOverrides(events: DbEventRow[], overrides: DbEventRow[]): DbEventRow[] {
+	const eventIds = new Set(events.map((e) => e.eventId));
+	const uniqueOverrides = overrides.filter((o) => !eventIds.has(o.eventId));
+	return [...events, ...uniqueOverrides].sort((a, b) => a.emittedAt.getTime() - b.emittedAt.getTime());
+}
+
+/**
  * Build breakdown items from credit index across all days.
  */
 function buildWeekBreakdown(
@@ -145,18 +168,19 @@ export async function getDashboardWeek(
 	// Pad query for correct credit computation
 	const queryFromMs = weekStartMs - IDLE_CUTOFF_MS;
 
-	const { rows, scanned } = await fetchEventsPaged(
-		db,
-		userId,
-		queryFromMs,
-		weekEndMs,
-		['artifact_active', 'topic_override'],
-		MAX_EVENTS_PER_REQUEST
-	);
+	// Fetch heartbeats and all overrides in parallel
+	// Overrides are fetched without date filter so persistent overrides always apply
+	const [{ rows: windowEvents, scanned }, allOverrides] = await Promise.all([
+		fetchEventsPaged(db, userId, queryFromMs, weekEndMs, ['artifact_active'], MAX_EVENTS_PER_REQUEST),
+		fetchAllOverrides(db, userId),
+	]);
 
 	if (scanned >= MAX_EVENTS_PER_REQUEST) {
 		return { ok: false, error: 'RANGE_TOO_LARGE' };
 	}
+
+	// Merge overrides with window events (deduped and sorted)
+	const rows = mergeWithOverrides(windowEvents, allOverrides);
 
 	const creditIndex = computeCreditIndex(rows, timezone, weekStartMs, weekEndMs);
 
