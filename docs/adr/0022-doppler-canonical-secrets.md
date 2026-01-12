@@ -22,9 +22,10 @@ Make **Doppler the single source of truth** for all secrets across all environme
 - **Preview**: `apps/prv_append` → synced at deploy time via GitHub Actions
 - **Production**: `apps/prd_append` → synced at deploy time via GitHub Actions
 
-Secrets are synced from Doppler to Cloudflare Workers using:
+Secrets are synced from Doppler to Cloudflare Workers using (env-scoped):
 ```bash
-doppler secrets download --no-file --format json | wrangler secret bulk
+doppler secrets download --no-file --format json > /tmp/worker-secrets.json
+wrangler secret bulk --env <env> < /tmp/worker-secrets.json
 ```
 
 Remove Cloudflare Secrets Store binding for `OPENAI_API_KEY` — it becomes a regular Worker secret synced from Doppler like all others.

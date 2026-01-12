@@ -18,6 +18,7 @@
 		"check:unsafe": "biome check --write --unsafe .",
 		"ci:lint": "biome ci .",
 		"lint:boundaries": "pnpm --filter @append/web --filter @append/api lint:boundaries",
+		"lint:actions": "node scripts/actionlint.mjs",
 		"test": "pnpm -r --if-present test",
 		"test:api": "pnpm --filter @append/api test",
 		"deploy:api": "pnpm --filter @append/api run deploy",
@@ -62,7 +63,7 @@
 		"simple-git-hooks": "^2.13.1"
 	},
 	"simple-git-hooks": {
-		"pre-commit": "pnpm nano-staged && pnpm lint:boundaries && pnpm docs:policy"
+		"pre-commit": "pnpm nano-staged && pnpm lint:boundaries && pnpm docs:policy && pnpm lint:actions"
 	},
 	"nano-staged": {
 		"*.{ts,tsx,js,jsx,json,jsonc,css}": [

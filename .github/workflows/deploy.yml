@@ -43,7 +43,7 @@ jobs:
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - uses: actions/cache@v5
         with:
@@ -55,10 +55,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Deploy Worker API
-        working-directory: packages/api
-        run: pnpm run deploy -- --config wrangler.jsonc
-
       - name: Install Doppler CLI
         uses: dopplerhq/cli-action@v3
 
@@ -69,13 +65,52 @@ jobs:
         run: |
           # Sync all secrets from Doppler to Cloudflare Worker (production)
           # This makes Doppler the canonical source of truth for secrets
-          # Worker must be deployed first before secrets can be attached
-          doppler secrets download --no-file --format json | \
-            pnpm exec wrangler secret bulk --config wrangler.jsonc
+          set -euo pipefail
+
+          TMP_SECRETS_FILE="$(mktemp)"
+          trap 'rm -f "$TMP_SECRETS_FILE"' EXIT
+
+          doppler secrets download --no-file --format json > "$TMP_SECRETS_FILE"
+          pnpm exec wrangler secret bulk --env production --config wrangler.jsonc < "$TMP_SECRETS_FILE"
+
+      - name: Verify critical Worker secrets exist (no values)
+        working-directory: packages/api
+        run: |
+          set -euo pipefail
+
+          SECRETS_JSON="$(pnpm exec wrangler secret list --format json --env production --config wrangler.jsonc)"
+          export SECRETS_JSON
+
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          required = [
+              "GOOGLE_CLIENT_ID",
+              "GOOGLE_CLIENT_SECRET",
+              "BETTER_AUTH_SECRET",
+              "OPENAI_API_KEY",
+          ]
+
+          secrets = json.loads(os.environ["SECRETS_JSON"])
+          names = {s.get("name") for s in secrets if isinstance(s, dict)}
+
+          missing = [name for name in required if name not in names]
+          if missing:
+              print(f"::error::Missing Worker secrets (names only): {', '.join(missing)}")
+              sys.exit(1)
+
+          print("✓ Required Worker secrets present")
+          PY
 
       - name: Apply D1 migrations
         working-directory: packages/api
-        run: pnpm exec wrangler d1 migrations apply append-db --remote --config wrangler.jsonc
+        run: pnpm exec wrangler d1 migrations apply append-db --remote --env production --config wrangler.jsonc
+
+      - name: Deploy Worker API
+        working-directory: packages/api
+        run: pnpm run deploy -- --config wrangler.jsonc
 
   deploy-web:
     runs-on: ubuntu-latest
@@ -98,7 +133,7 @@ jobs:
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - uses: actions/cache@v5
         with:

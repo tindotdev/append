@@ -18,15 +18,3 @@ export type { Bindings, SecretsStoreSecret, Variables } from './bindings';
 export function isSecretsStoreBinding(value: unknown): value is SecretsStoreSecret {
 	return typeof value === 'object' && value !== null && 'get' in value && typeof (value as SecretsStoreSecret).get === 'function';
 }
-
-/**
- * Get a secret value, handling both:
- * - Plain strings (all environments, synced from Doppler)
- * - SecretsStoreSecret objects (legacy, for future use if needed)
- */
-export async function getSecretValue(secret: string | SecretsStoreSecret | undefined): Promise<string | undefined> {
-	if (!secret) return undefined;
-	if (typeof secret === 'string') return secret;
-	if (isSecretsStoreBinding(secret)) return secret.get();
-	return undefined;
-}

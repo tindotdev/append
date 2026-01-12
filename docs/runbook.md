@@ -209,16 +209,24 @@ Required GitHub secrets:
 
 Deploy order (automated):
 
-1. Apply D1 migrations (remote).
-2. Deploy the Worker API (Hono) to Cloudflare Workers.
-3. Build and deploy the SPA to Cloudflare Pages.
-4. Verify auth sign-in flow and basic API health.
+1. Sync Worker secrets from Doppler (production).
+2. Apply D1 migrations (remote).
+3. Deploy the Worker API (Hono) to Cloudflare Workers.
+4. Build and deploy the SPA to Cloudflare Pages.
+5. Verify auth sign-in flow and basic API health.
 
 Manual equivalent (from repo root):
 
 ```bash
-# API (migrations + deploy)
-pnpm --filter @append/api exec wrangler d1 migrations apply append-db --remote --config packages/api/wrangler.jsonc
+# API (secrets + migrations + deploy)
+#
+# Note: In CI/CD, secrets sync is handled automatically via Doppler service tokens.
+# Manual sync is only needed for break-glass deploys or rotation verification.
+#
+# DOPPLER_TOKEN=... doppler secrets download --no-file --format json > /tmp/append-secrets.json
+# pnpm --filter @append/api exec wrangler secret bulk --env production --config packages/api/wrangler.jsonc < /tmp/append-secrets.json
+
+pnpm --filter @append/api exec wrangler d1 migrations apply append-db --remote --env production --config packages/api/wrangler.jsonc
 pnpm --filter @append/api run deploy -- --config packages/api/wrangler.jsonc
 
 # Web (build + deploy)
@@ -319,11 +327,13 @@ These steps create the isolated preview infrastructure (already completed):
 When a PR is opened against `main`:
 
 1. GitHub Actions runs `.github/workflows/preview.yml`
-2. Migrations are applied to the preview database
-3. API deploys to the preview environment: `https://append-api-preview.tindotdev.workers.dev`
-4. Web builds with `VITE_API_URL` set to preview API
-5. Web deploys to Cloudflare Pages with branch-specific URL: `https://<branch>.<project>.pages.dev`
-6. Both URLs are posted as a comment on the PR (updated on subsequent pushes)
+2. Preview API tests run
+3. Migrations are applied to the preview database
+4. Secrets are synced from Doppler and `E2E_AUTH_EMAIL` is set for the PR
+5. API deploys to the preview environment: `https://append-api-preview.tindotdev.workers.dev`
+6. Web builds with `VITE_API_URL` set to preview API
+7. Web deploys to Cloudflare Pages with branch-specific URL: `https://<branch>.<project>.pages.dev`
+8. Both URLs are posted as a comment on the PR (updated on subsequent pushes)
 
 **API URL configuration:**
 
