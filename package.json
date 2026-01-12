@@ -25,7 +25,7 @@
 		"deploy": "pnpm deploy:api && pnpm deploy:web",
 		"lab": "pnpm --filter @append/ai-gateway-lab lab",
 		"prepare": "simple-git-hooks",
-		"cf-typegen": "pnpm -r --if-present wrangler types"
+		"cf-typegen": "pnpm -r --if-present cf-typegen"
 	},
 	"license": "MIT",
 	"packageManager": "pnpm@10.28.0",
@@ -67,7 +67,7 @@
 	"nano-staged": {
 		"*.{ts,tsx,js,jsx,json,jsonc,css}": [
 			"biome check --write --files-ignore-unknown=true --no-errors-on-unmatched",
-			"biome format --write --files-ignore-unknown=true"
+			"biome format --write --files-ignore-unknown=true --no-errors-on-unmatched"
 		]
 	}
 }

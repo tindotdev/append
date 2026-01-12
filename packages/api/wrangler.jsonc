@@ -47,9 +47,9 @@
 	 * Note: Use secrets to store sensitive data.
 	 * https://developers.cloudflare.com/workers/configuration/secrets/
 	 */
-	// Secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET, CF_AIG_TOKEN) are set via:
-	// - Local: .dev.vars file (git-ignored)
-	// - Production: `wrangler secret put <NAME>` or Doppler integration
+	// Secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, BETTER_AUTH_SECRET, CF_AIG_TOKEN, OPENAI_API_KEY) are set via:
+	// - Local: .dev.vars file (synced from Doppler via `just sync-secrets`)
+	// - Preview/Production: Synced from Doppler at deploy time (see .github/workflows/)
 	"vars": {
 		"APP_ENV": "production",
 		"BETTER_AUTH_URL": "https://api.append.tindev.dev",
@@ -86,8 +86,8 @@
 			"bucket_name": "append-imports"
 		}
 	],
-	// Note: Secrets Store binding is in "production" env only.
-	// Local dev uses OPENAI_API_KEY from .dev.vars (plain string).
+	// Note: All secrets (including OPENAI_API_KEY) are synced from Doppler at deploy time.
+	// Local dev uses .dev.vars (synced via `just sync-secrets`).
 	/**
 	 * Environments
 	 */
@@ -97,7 +97,7 @@
 		 * - Used for PR preview deployments
 		 * - Uses separate preview database and R2 bucket
 		 * - Uses stub AI provider to avoid costs
-		 * - Deploy with: wrangler deploy -e preview
+		 * - Deploy with: wrangler deploy --env preview
 		 */
 		"preview": {
 			"name": "append-api-preview",
@@ -134,8 +134,8 @@
 		},
 		/**
 		 * Production environment
-		 * - Uses Secrets Store for OPENAI_API_KEY
-		 * - Deploy with: wrangler deploy -e production
+		 * - Secrets synced from Doppler at deploy time
+		 * - Deploy with: wrangler deploy --env production
 		 */
 		"production": {
 			"name": "append-api",
@@ -158,13 +158,6 @@
 				{
 					"binding": "IMPORT_FILES",
 					"bucket_name": "append-imports"
-				}
-			],
-			"secrets_store_secrets": [
-				{
-					"binding": "OPENAI_API_KEY",
-					"store_id": "1a34ec9e145b4a4982a9880acc18e698",
-					"secret_name": "append-gateway_openai_default"
 				}
 			],
 			"ratelimits": [

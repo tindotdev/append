@@ -14,14 +14,20 @@ export type Bindings = {
 	// AI Gateway
 	CF_ACCOUNT_ID: string;
 	AI_GATEWAY_ID: string;
+	/** Optional AI Gateway token for unified billing (deprecated in favor of direct OpenAI API key) */
 	CF_AIG_TOKEN?: string;
 
-	// OpenAI API key - either:
-	// - Plain string from .dev.vars (local development)
-	// - SecretsStoreSecret from Secrets Store (production)
-	OPENAI_API_KEY?: string | SecretsStoreSecret;
+	/**
+	 * OpenAI API key (synced from Doppler at deploy time).
+	 *
+	 * REQUIRED when SUGGESTIONS_PROVIDER='openai' (production).
+	 * Optional when SUGGESTIONS_PROVIDER='stub' (preview/test).
+	 *
+	 * CI validates this is present in production deployments.
+	 */
+	OPENAI_API_KEY?: string;
 
-	// Suggestion provider: 'openai' | 'stub' | 'disabled'
+	/** Suggestion provider: 'openai' | 'stub' | 'disabled' */
 	SUGGESTIONS_PROVIDER?: string;
 
 	// Auth
@@ -47,7 +53,3 @@ export type Variables = {
 	userId: string;
 	db: DrizzleD1Database<typeof schema>;
 };
-
-export interface SecretsStoreSecret {
-	get(): Promise<string>;
-}

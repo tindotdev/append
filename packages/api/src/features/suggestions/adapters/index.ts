@@ -4,7 +4,7 @@
  * Creates the appropriate LLM client based on the configured provider.
  */
 
-import { type Bindings, getSecretValue } from '../../../platform/env';
+import type { Bindings } from '../../../platform/env';
 import type { LlmClient, SuggestionProvider } from '../ports/llm';
 import { makeLlmClient as makeAIGatewayClient } from './llm.aigateway';
 import { makeStubLlmClient } from './llm.stub';
@@ -12,9 +12,7 @@ import { makeStubLlmClient } from './llm.stub';
 /**
  * Create an LLM client based on environment configuration.
  *
- * Supports both:
- * - Plain string API keys from .dev.vars (local development)
- * - Cloudflare Secrets Store bindings (production)
+ * API keys are synced from Doppler at deploy time (all environments).
  *
  * @param env - Cloudflare Worker bindings
  * @returns LLM client instance, or null if suggestions are disabled
@@ -31,11 +29,15 @@ export async function createLlmClient(env: Bindings): Promise<LlmClient | null> 
 			return makeStubLlmClient();
 
 		case 'openai': {
-			// Get API key - works with both plain strings (.dev.vars) and Secrets Store (production)
-			const openaiApiKey = await getSecretValue(env.OPENAI_API_KEY);
+			// Get API key (synced from Doppler)
+			const openaiApiKey = env.OPENAI_API_KEY;
 
 			if (!env.CF_ACCOUNT_ID || !env.AI_GATEWAY_ID || !openaiApiKey) {
-				throw new Error('OpenAI provider requires CF_ACCOUNT_ID, AI_GATEWAY_ID, and OPENAI_API_KEY');
+				throw new Error(
+					'OpenAI provider requires CF_ACCOUNT_ID, AI_GATEWAY_ID, and OPENAI_API_KEY. ' +
+						'OPENAI_API_KEY should be synced from Doppler at deploy time. ' +
+						'Check your deployment workflow and Doppler configuration (apps/prd_append or apps/prv_append).'
+				);
 			}
 
 			return makeAIGatewayClient({
