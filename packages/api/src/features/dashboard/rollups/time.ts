@@ -65,30 +65,63 @@ export function parseDayKeyToUtcRange(dayKey: string): { startMs: number; endMs:
 /**
  * Parse a day key (YYYY-MM-DD) into start/end timestamps in a given timezone.
  * Used for dashboard queries where the user's timezone matters.
+ *
+ * This properly handles DST transitions by using Intl.DateTimeFormat to convert
+ * local date components to UTC timestamps.
  */
 export function parseDayKeyToTzRange(dayKey: string, timezone: string): { startMs: number; endMs: number } {
 	const [y, m, d] = dayKey.split('-').map((n) => Number(n));
-	// Create a date at noon in the target timezone to get the offset
-	const noonDate = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-	const tzFormatter = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'longOffset' });
-	const parts = tzFormatter.formatToParts(noonDate);
-	const offsetPart = parts.find((p) => p.type === 'timeZoneName');
 
-	// Parse offset like "GMT+07:00" or "GMT-05:00" or "GMT"
-	let offsetMs = 0;
-	if (offsetPart?.value) {
-		const match = offsetPart.value.match(/GMT([+-])(\d{2}):(\d{2})/);
-		if (match) {
-			const sign = match[1] === '+' ? 1 : -1;
-			const hours = Number(match[2]);
-			const minutes = Number(match[3]);
-			offsetMs = sign * (hours * 60 + minutes) * 60 * 1000;
-		}
-	}
+	// Helper to convert local date components (at midnight) in the given timezone to UTC milliseconds.
+	// We use an iterative approach: start with a guess (the UTC date), then format it in the target
+	// timezone to see what local time it represents, and adjust until we converge.
+	const getUtcMsForLocalMidnight = (year: number, month: number, day: number): number => {
+		// Start with initial guess: if local date is Y-M-D, assume UTC Y-M-D midnight
+		const guessUtc = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
 
-	// Start of day in the timezone = midnight in timezone = midnight UTC - offset
-	const startMs = Date.UTC(y, m - 1, d, 0, 0, 0, 0) - offsetMs;
-	const endMs = Date.UTC(y, m - 1, d, 23, 59, 59, 999) - offsetMs;
+		// Format this UTC timestamp in the target timezone to see what local date/time it represents
+		const formatter = new Intl.DateTimeFormat('en-US', {
+			timeZone: timezone,
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit',
+			second: '2-digit',
+			hour12: false,
+		});
+
+		const parts = formatter.formatToParts(new Date(guessUtc));
+		const formatted = {
+			year: Number(parts.find((p) => p.type === 'year')?.value),
+			month: Number(parts.find((p) => p.type === 'month')?.value),
+			day: Number(parts.find((p) => p.type === 'day')?.value),
+			hour: Number(parts.find((p) => p.type === 'hour')?.value),
+			minute: Number(parts.find((p) => p.type === 'minute')?.value),
+			second: Number(parts.find((p) => p.type === 'second')?.value),
+		};
+
+		// Compute the difference between what we want (Y-M-D 00:00:00) and what we got
+		const wantedUtc = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+		const gotUtc = Date.UTC(formatted.year, formatted.month - 1, formatted.day, formatted.hour, formatted.minute, formatted.second, 0);
+		const offsetMs = wantedUtc - gotUtc;
+
+		// Adjust our guess by the offset to get the correct UTC timestamp for local midnight
+		return guessUtc + offsetMs;
+	};
+
+	const startMs = getUtcMsForLocalMidnight(y, m, d);
+
+	// End time is midnight of the next day minus 1 millisecond
+	// First, find the next day's date
+	const nextDayDate = new Date(Date.UTC(y, m - 1, d + 1, 12, 0, 0)); // Use noon to avoid edge cases
+	const nextY = nextDayDate.getUTCFullYear();
+	const nextM = nextDayDate.getUTCMonth() + 1;
+	const nextD = nextDayDate.getUTCDate();
+
+	const nextDayStartMs = getUtcMsForLocalMidnight(nextY, nextM, nextD);
+	const endMs = nextDayStartMs - 1;
+
 	return { startMs, endMs };
 }
 
