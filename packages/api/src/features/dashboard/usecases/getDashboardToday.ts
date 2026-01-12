@@ -30,6 +30,30 @@ interface FetchEventsResult {
 
 /**
  * Fetch events with pagination, respecting scan limit.
+ *
+ * PAGINATION STRATEGY:
+ *
+ * This function uses cursor-based pagination with an over-fetch approach to handle
+ * composite key pagination correctly in SQLite/D1.
+ *
+ * 1. CURSOR-BASED PAGINATION:
+ *    - The cursor is a composite key: (emittedAt, deviceId, eventId)
+ *    - This ensures stable, deterministic ordering across pages
+ *    - For each page after the first, we continue from where the previous page ended
+ *
+ * 2. WHY OVER-FETCH:
+ *    - SQLite doesn't support tuple comparison (WHERE (a,b,c) > (cursor_a, cursor_b, cursor_c))
+ *    - We approximate with gte(emittedAt, cursor.emittedAt), which may return rows
+ *      we've already seen (when emittedAt equals cursor.emittedAt)
+ *    - We over-fetch by 100 rows to ensure we get enough NEW rows after filtering
+ *    - The filter step removes duplicates, then we slice to the exact page size
+ *
+ * 3. SCAN LIMIT vs PAGE_SIZE:
+ *    - PAGE_SIZE (10,000): Controls how many rows we fetch per database query
+ *    - maxScan: Global limit across all pages to prevent unbounded queries
+ *    - remaining = min(PAGE_SIZE, maxScan - scanned): Ensures we don't exceed maxScan
+ *    - The over-fetch (+100) may cause us to fetch slightly more, but scanned only
+ *      counts rows we actually return (after filtering and slicing)
  */
 async function fetchEventsPaged(
 	db: DrizzleD1Database<typeof schema>,
@@ -44,6 +68,7 @@ async function fetchEventsPaged(
 	let scanned = 0;
 
 	while (scanned < maxScan) {
+		// Calculate how many more rows we're allowed to scan
 		const remaining = Math.min(PAGE_SIZE, maxScan - scanned);
 
 		let query = db
@@ -62,7 +87,7 @@ async function fetchEventsPaged(
 
 		if (cursor) {
 			// Continue from cursor (composite key pagination)
-			// SQLite doesn't have row comparison, so we use OR logic
+			// SQLite doesn't have row comparison, so we approximate with gte on the first component
 			query = db
 				.select()
 				.from(eventTable)
@@ -73,23 +98,26 @@ async function fetchEventsPaged(
 						gte(eventTable.emittedAt, new Date(fromMs)),
 						lte(eventTable.emittedAt, new Date(toMs)),
 						// Composite cursor: (emittedAt, deviceId, eventId) > cursor
-						// (emittedAt > cursor.emittedAt) OR
-						// (emittedAt = cursor.emittedAt AND deviceId > cursor.deviceId) OR
-						// (emittedAt = cursor.emittedAt AND deviceId = cursor.deviceId AND eventId > cursor.eventId)
+						// We approximate with gte(emittedAt) because SQLite lacks tuple comparison.
+						// This means we may get rows where emittedAt = cursor.emittedAt that we've
+						// already seen, which we'll filter out below.
 						gte(eventTable.emittedAt, cursor.emittedAt)
 					)
 				)
 				.orderBy(eventTable.emittedAt, eventTable.deviceId, eventTable.eventId)
-				.limit(remaining + 100); // Fetch extra to skip duplicates
+				// Over-fetch to compensate for duplicates we'll filter out
+				// +100 is a heuristic buffer to ensure we get enough new rows
+				.limit(remaining + 100);
 		}
 
 		const page = await query;
 		if (page.length === 0) break;
 
-		// Filter out rows at or before cursor
+		// Filter out rows at or before cursor (removes duplicates from over-fetch)
 		let filtered = page;
 		if (cursor) {
 			filtered = page.filter((r) => {
+				// Implement lexicographic comparison: (emittedAt, deviceId, eventId) > cursor
 				const rMs = r.emittedAt.getTime();
 				const cMs = cursor!.emittedAt.getTime();
 				if (rMs > cMs) return true;
@@ -102,13 +130,14 @@ async function fetchEventsPaged(
 
 		if (filtered.length === 0) break;
 
-		// Only take up to remaining
+		// Take exactly the number of rows we need (respecting the scan limit)
 		const toTake = filtered.slice(0, remaining);
 		rows.push(...toTake);
 		scanned += toTake.length;
 
-		if (toTake.length < remaining) break; // No more data
+		if (toTake.length < remaining) break; // No more data available
 
+		// Set cursor to the last row we took for the next iteration
 		const last = toTake[toTake.length - 1];
 		cursor = { emittedAt: last.emittedAt, deviceId: last.deviceId, eventId: last.eventId };
 	}
