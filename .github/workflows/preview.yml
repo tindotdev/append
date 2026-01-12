@@ -42,40 +42,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Doppler CLI
-        uses: dopplerhq/cli-action@v3
-
-      - name: Sync secrets from Doppler to Cloudflare
-        working-directory: packages/api
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PREVIEW_APPEND }}
-        run: |
-          # Sync all secrets from Doppler to Cloudflare Worker (preview environment)
-          # This makes Doppler the canonical source of truth for secrets
-          doppler secrets download --no-file --format json | \
-            pnpm exec wrangler secret bulk --env preview --config wrangler.jsonc
-
-      - name: Run preview tests
-        run: pnpm --filter @append/api test:preview
-
-      - name: Apply D1 migrations to preview
-        working-directory: packages/api
-        run: pnpm exec wrangler d1 migrations apply append-db-preview --remote --config wrangler.jsonc --env preview
-
-      - name: Set PR-specific E2E auth email
-        working-directory: packages/api
-        run: |
-          # Set E2E_AUTH_EMAIL with PR-specific suffix for environment isolation
-          # This is the canonical place where preview E2E_AUTH_EMAIL is set.
-          # This matches the wildcard pattern in ALLOWED_EMAIL (e2e-bot+*@append.test)
-          echo "e2e-bot+pr-${{ github.event.pull_request.number }}@append.test" | \
-            pnpm exec wrangler secret put E2E_AUTH_EMAIL -e preview --config wrangler.jsonc
-
-      - name: Deploy Worker API Preview
+      - name: Deploy Worker API Preview (initial)
         id: deploy
         working-directory: packages/api
         run: |
-          # Deploy to preview environment
+          # Deploy to preview environment first (worker must exist before setting secrets)
           set +e  # Don't exit on error yet
           DEPLOYMENT_OUTPUT=$(pnpm exec wrangler deploy -e preview --config wrangler.jsonc 2>&1)
           EXIT_CODE=$?
@@ -89,6 +60,36 @@ jobs:
           # Extract deployment URL from output (strip ANSI codes first)
           DEPLOYMENT_URL=$(echo "$DEPLOYMENT_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' | grep -oP 'https://[^\s]+\.workers\.dev' | head -1)
           echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@v3
+
+      - name: Sync secrets from Doppler to Cloudflare
+        working-directory: packages/api
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PREVIEW_APPEND }}
+        run: |
+          # Sync all secrets from Doppler to Cloudflare Worker (preview environment)
+          # This makes Doppler the canonical source of truth for secrets
+          # Worker must be deployed first before secrets can be attached
+          doppler secrets download --no-file --format json | \
+            pnpm exec wrangler secret bulk --env preview --config wrangler.jsonc
+
+      - name: Set PR-specific E2E auth email
+        working-directory: packages/api
+        run: |
+          # Set E2E_AUTH_EMAIL with PR-specific suffix for environment isolation
+          # This is the canonical place where preview E2E_AUTH_EMAIL is set.
+          # This matches the wildcard pattern in ALLOWED_EMAIL (e2e-bot+*@append.test)
+          echo "e2e-bot+pr-${{ github.event.pull_request.number }}@append.test" | \
+            pnpm exec wrangler secret put E2E_AUTH_EMAIL -e preview --config wrangler.jsonc
+
+      - name: Apply D1 migrations to preview
+        working-directory: packages/api
+        run: pnpm exec wrangler d1 migrations apply append-db-preview --remote --config wrangler.jsonc --env preview
+
+      - name: Run preview tests
+        run: pnpm --filter @append/api test:preview
 
   preview-web:
     runs-on: ubuntu-latest
