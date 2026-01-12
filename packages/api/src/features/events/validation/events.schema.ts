@@ -108,10 +108,44 @@ const DayKeySchema = v.pipe(
 	v.check((s) => isValidDayKey(s), 'Invalid date. Must be a valid calendar date in YYYY-MM-DD format.')
 );
 
+/**
+ * Base64url-encoded cursor for resumable exports.
+ * Decodes to JSON: { emittedAt: number, deviceId: string, eventId: string }
+ */
+const CursorSchema = v.optional(
+	v.pipe(
+		v.string(),
+		v.check((s) => {
+			try {
+				const decoded = JSON.parse(atob(s.replace(/-/g, '+').replace(/_/g, '/')));
+				return typeof decoded.emittedAt === 'number' && typeof decoded.deviceId === 'string' && typeof decoded.eventId === 'string';
+			} catch {
+				return false;
+			}
+		}, 'Invalid cursor format')
+	)
+);
+
 export const ExportEventsQuerySchema = v.object({
 	from: DayKeySchema,
 	to: DayKeySchema,
 	format: v.literal('ndjson'),
+	cursor: CursorSchema,
 });
 
 export type ExportEventsQuery = v.InferOutput<typeof ExportEventsQuerySchema>;
+
+/**
+ * Decode a cursor string to its components.
+ */
+export function decodeCursor(cursor: string): { emittedAt: number; deviceId: string; eventId: string } {
+	return JSON.parse(atob(cursor.replace(/-/g, '+').replace(/_/g, '/')));
+}
+
+/**
+ * Encode cursor components to a base64url string.
+ */
+export function encodeCursor(emittedAt: number, deviceId: string, eventId: string): string {
+	const json = JSON.stringify({ emittedAt, deviceId, eventId });
+	return btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}

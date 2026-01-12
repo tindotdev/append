@@ -14,7 +14,9 @@ import type { Bindings, Variables } from '../../platform/env';
 import { apiError } from '../../shared/api-error';
 import { checkRateLimit } from '../../shared/rate-limit';
 import {
+	decodeCursor,
 	ExportEventsQuerySchema,
+	encodeCursor,
 	IngestEventsRequestSchema,
 	type TelemetryEventInput,
 	TelemetryEventSchema,
@@ -177,13 +179,17 @@ export const eventsRoutes = app
 	 * - from: YYYY-MM-DD (UTC date, inclusive)
 	 * - to: YYYY-MM-DD (UTC date, inclusive)
 	 * - format: 'ndjson' (required)
+	 * - cursor: base64url-encoded cursor for resuming truncated exports (optional)
 	 *
 	 * Streams events ordered by (emitted_at ASC, device_id ASC, event_id ASC).
 	 * Uses composite cursor for pagination.
 	 *
 	 * Limits:
 	 * - Max 100,000 events per export request
-	 * - Future: pagination token support for resumable exports
+	 *
+	 * Response headers (when truncated):
+	 * - X-Export-Truncated: 'true' - indicates more data exists
+	 * - X-Export-Cursor: cursor token for resuming from last exported event
 	 */
 	.get('/export', async (c) => {
 		const userId = c.get('userId');
@@ -196,7 +202,7 @@ export const eventsRoutes = app
 			return apiError(c, 400, 'VALIDATION_ERROR', firstIssueMessage(parsed.issues));
 		}
 
-		const { from, to } = parsed.output;
+		const { from, to, cursor: cursorParam } = parsed.output;
 
 		// Parse from/to as UTC dates (inclusive)
 		const [fromY, fromM, fromD] = from.split('-').map(Number);
@@ -209,6 +215,17 @@ export const eventsRoutes = app
 			return apiError(c, 400, 'VALIDATION_ERROR', "'from' date must be before or equal to 'to' date");
 		}
 
+		// Parse incoming cursor for resumable exports
+		let initialCursor: { emittedAt: Date; deviceId: string; eventId: string } | null = null;
+		if (cursorParam) {
+			const decoded = decodeCursor(cursorParam);
+			initialCursor = {
+				emittedAt: new Date(decoded.emittedAt),
+				deviceId: decoded.deviceId,
+				eventId: decoded.eventId,
+			};
+		}
+
 		const PAGE_SIZE = 1000;
 		const MAX_TOTAL_ROWS = 100_000;
 
@@ -216,7 +233,7 @@ export const eventsRoutes = app
 			// Set content type for NDJSON
 			c.header('Content-Type', 'application/x-ndjson');
 
-			let cursor: { emittedAt: Date; deviceId: string; eventId: string } | null = null;
+			let cursor: { emittedAt: Date; deviceId: string; eventId: string } | null = initialCursor;
 			let hasMore = true;
 			let totalExported = 0;
 			let headerSet = false;
@@ -266,6 +283,11 @@ export const eventsRoutes = app
 					const wouldTruncate = pageRows.length > remainingCapacity || (toProcess.length === remainingCapacity && hasMoreInDb);
 					if (wouldTruncate && !headerSet) {
 						c.header('X-Export-Truncated', 'true');
+						// Set continuation cursor to last row we'll process, so client can resume
+						const lastRow = toProcess[toProcess.length - 1];
+						if (lastRow) {
+							c.header('X-Export-Cursor', encodeCursor(lastRow.emittedAt.getTime(), lastRow.deviceId, lastRow.eventId));
+						}
 						headerSet = true;
 					}
 
