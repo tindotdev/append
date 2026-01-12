@@ -18,4 +18,3 @@ if (version.status !== 0) {
 
 const res = spawnSync('actionlint', ['-color'], { stdio: 'inherit' });
 process.exit(res.status ?? 1);
-
