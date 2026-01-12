@@ -11,7 +11,12 @@ help:
 sync-secrets:
   @echo "Syncing secrets from Doppler (project: apps, config: dev_append)..."
   @doppler secrets download --project apps --config dev_append --no-file --format env > packages/api/.dev.vars
-  @echo "✓ Secrets synced to packages/api/.dev.vars"
+  @echo "Adding local dev configuration overrides..."
+  @echo '' >> packages/api/.dev.vars
+  @echo '# Local development configuration (not secrets, managed in justfile)' >> packages/api/.dev.vars
+  @echo 'APP_ENV="dev"' >> packages/api/.dev.vars
+  @echo 'BETTER_AUTH_URL="http://localhost:8787"' >> packages/api/.dev.vars
+  @echo "✓ Secrets synced and local dev config applied"
 
 # First-time setup: install deps, sync secrets, run migrations
 # Run this on a new machine after cloning the repo
