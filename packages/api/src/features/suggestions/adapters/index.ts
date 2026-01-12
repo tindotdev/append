@@ -33,7 +33,11 @@ export async function createLlmClient(env: Bindings): Promise<LlmClient | null> 
 			const openaiApiKey = env.OPENAI_API_KEY;
 
 			if (!env.CF_ACCOUNT_ID || !env.AI_GATEWAY_ID || !openaiApiKey) {
-				throw new Error('OpenAI provider requires CF_ACCOUNT_ID, AI_GATEWAY_ID, and OPENAI_API_KEY');
+				throw new Error(
+					'OpenAI provider requires CF_ACCOUNT_ID, AI_GATEWAY_ID, and OPENAI_API_KEY. ' +
+						'OPENAI_API_KEY should be synced from Doppler at deploy time. ' +
+						'Check your deployment workflow and Doppler configuration (apps/prd_append or apps/prv_append).'
+				);
 			}
 
 			return makeAIGatewayClient({

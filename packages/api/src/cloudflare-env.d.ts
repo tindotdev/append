@@ -8,7 +8,15 @@
 
 declare namespace Cloudflare {
 	interface Env {
+		/**
+		 * OpenAI API key (synced from Doppler at deploy time).
+		 *
+		 * REQUIRED when SUGGESTIONS_PROVIDER='openai' (production).
+		 * Optional when SUGGESTIONS_PROVIDER='stub' (preview/test).
+		 */
 		OPENAI_API_KEY?: string;
+
+		/** Optional AI Gateway token for unified billing (deprecated) */
 		CF_AIG_TOKEN?: string;
 	}
 }
