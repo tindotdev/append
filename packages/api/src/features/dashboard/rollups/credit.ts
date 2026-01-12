@@ -97,7 +97,7 @@ export function computeCreditIndex(rows: DbEventRow[], timezone: string, windowS
 		const prevEmittedAt = lastEmittedAtByArtifact.get(artifactKey);
 		const payload = JSON.parse(hb.payloadJson) as ArtifactActivePayload;
 
-		const creditMs = computeHeartbeatCreditMs({
+		let creditMs = computeHeartbeatCreditMs({
 			emitted_at: emittedAtMs,
 			prev_emitted_at: prevEmittedAt,
 			interval_ms: payload.interval_ms,
@@ -105,6 +105,13 @@ export function computeCreditIndex(rows: DbEventRow[], timezone: string, windowS
 		});
 
 		lastEmittedAtByArtifact.set(artifactKey, emittedAtMs);
+
+		// Clamp credit to window boundary when previous heartbeat was before window.
+		// This prevents time from prior periods bleeding into current window totals.
+		if (windowStartMs != null && prevEmittedAt != null && prevEmittedAt < windowStartMs) {
+			const maxCreditInWindow = emittedAtMs - windowStartMs;
+			creditMs = Math.min(creditMs, maxCreditInWindow);
+		}
 
 		// Skip if no credit or if outside the requested window
 		if (creditMs <= 0) continue;
