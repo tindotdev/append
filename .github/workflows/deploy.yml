@@ -67,8 +67,16 @@ jobs:
           # This makes Doppler the canonical source of truth for secrets
           set -euo pipefail
 
+          set +e
           doppler secrets download --no-file --format json | \
             pnpm exec wrangler secret bulk --env production --config wrangler.jsonc
+          SYNC_EXIT_CODE=$?
+          set -e
+
+          if [ $SYNC_EXIT_CODE -ne 0 ]; then
+            echo "::error::Secret sync failed for production Worker. This should not happen if the Worker exists."
+            exit 1
+          fi
 
       - name: Verify critical Worker secrets exist (no values)
         working-directory: packages/api

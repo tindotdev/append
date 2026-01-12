@@ -80,8 +80,18 @@ jobs:
           # Set E2E_AUTH_EMAIL with PR-specific suffix for environment isolation
           # This is the canonical place where preview E2E_AUTH_EMAIL is set.
           # This matches the wildcard pattern in ALLOWED_EMAIL (e2e-bot+*@append.test)
+          set -euo pipefail
+
+          set +e
           echo "e2e-bot+pr-${{ github.event.pull_request.number }}@append.test" | \
             pnpm exec wrangler secret put E2E_AUTH_EMAIL --env preview --config wrangler.jsonc
+          PUT_EXIT_CODE=$?
+          set -e
+
+          if [ $PUT_EXIT_CODE -ne 0 ]; then
+            echo "::error::Failed to set E2E_AUTH_EMAIL secret for preview Worker."
+            exit 1
+          fi
 
       - name: Verify required Worker secrets exist (no values)
         working-directory: packages/api
