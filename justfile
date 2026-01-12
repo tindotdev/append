@@ -10,7 +10,7 @@ help:
 # Sync secrets from Doppler to .dev.vars (run after updating secrets in Doppler)
 sync-secrets:
   @echo "Syncing secrets from Doppler (project: apps, config: dev_append)..."
-  @doppler secrets download --project apps --config dev_append --no-file --format env > packages/api/.dev.vars
+  @doppler secrets download --project apps --config dev_append --no-file --format env | grep -v '^DOPPLER_' > packages/api/.dev.vars
   @echo "Adding local dev configuration overrides..."
   @echo '' >> packages/api/.dev.vars
   @echo '# Local development configuration (not secrets, managed in justfile)' >> packages/api/.dev.vars
