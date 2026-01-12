@@ -180,6 +180,10 @@ export const eventsRoutes = app
 	 *
 	 * Streams events ordered by (emitted_at ASC, device_id ASC, event_id ASC).
 	 * Uses composite cursor for pagination.
+	 *
+	 * Limits:
+	 * - Max 100,000 events per export request
+	 * - Future: pagination token support for resumable exports
 	 */
 	.get('/export', async (c) => {
 		const userId = c.get('userId');
@@ -206,6 +210,7 @@ export const eventsRoutes = app
 		}
 
 		const PAGE_SIZE = 1000;
+		const MAX_TOTAL_ROWS = 100_000;
 
 		return stream(c, async (s) => {
 			// Set content type for NDJSON
@@ -213,71 +218,96 @@ export const eventsRoutes = app
 
 			let cursor: { emittedAt: Date; deviceId: string; eventId: string } | null = null;
 			let hasMore = true;
+			let totalExported = 0;
 
-			while (hasMore) {
-				const baseWhere: WhereClause = and(
-					eq(eventTable.userId, userId),
-					gte(eventTable.emittedAt, new Date(fromMs)),
-					lte(eventTable.emittedAt, new Date(toMs))
-				);
+			try {
+				while (hasMore && totalExported < MAX_TOTAL_ROWS) {
+					const baseWhere: WhereClause = and(
+						eq(eventTable.userId, userId),
+						gte(eventTable.emittedAt, new Date(fromMs)),
+						lte(eventTable.emittedAt, new Date(toMs))
+					);
 
-				const cursorWhere: WhereClause = cursor
-					? and(
-							baseWhere,
-							or(
-								gt(eventTable.emittedAt, cursor.emittedAt),
-								and(eq(eventTable.emittedAt, cursor.emittedAt), gt(eventTable.deviceId, cursor.deviceId)),
-								and(eq(eventTable.emittedAt, cursor.emittedAt), eq(eventTable.deviceId, cursor.deviceId), gt(eventTable.eventId, cursor.eventId))
+					const cursorWhere: WhereClause = cursor
+						? and(
+								baseWhere,
+								or(
+									gt(eventTable.emittedAt, cursor.emittedAt),
+									and(eq(eventTable.emittedAt, cursor.emittedAt), gt(eventTable.deviceId, cursor.deviceId)),
+									and(eq(eventTable.emittedAt, cursor.emittedAt), eq(eventTable.deviceId, cursor.deviceId), gt(eventTable.eventId, cursor.eventId))
+								)
 							)
-						)
-					: baseWhere;
+						: baseWhere;
 
-				const rows: EventRow[] = await db
-					.select()
-					.from(eventTable)
-					.where(cursorWhere)
-					.orderBy(eventTable.emittedAt, eventTable.deviceId, eventTable.eventId)
-					.limit(PAGE_SIZE);
+					const rows: EventRow[] = await db
+						.select()
+						.from(eventTable)
+						.where(cursorWhere)
+						.orderBy(eventTable.emittedAt, eventTable.deviceId, eventTable.eventId)
+						.limit(PAGE_SIZE);
 
-				if (rows.length === 0) {
-					hasMore = false;
-					break;
+					if (rows.length === 0) {
+						hasMore = false;
+						break;
+					}
+
+					// Determine how many rows we can process without exceeding the limit
+					const remainingCapacity = MAX_TOTAL_ROWS - totalExported;
+					const toProcess: EventRow[] = rows.slice(0, remainingCapacity);
+
+					for (const row of toProcess) {
+						// Build event envelope (exclude user_id)
+						const artifact =
+							row.artifactHost && row.artifactUrlHash
+								? {
+										host: row.artifactHost,
+										url_hash: row.artifactUrlHash,
+										...(row.artifactPathHint && { path_hint: row.artifactPathHint }),
+										...(row.titleHint && { title_hint: row.titleHint }),
+									}
+								: null;
+
+						const envelope = {
+							schema_version: row.schemaVersion,
+							event_id: row.eventId,
+							device_id: row.deviceId,
+							emitted_at: row.emittedAt.getTime(),
+							received_at: row.receivedAt.getTime(),
+							type: row.type,
+							...(artifact && { artifact }),
+							payload: JSON.parse(row.payloadJson),
+						};
+
+						try {
+							await s.write(JSON.stringify(envelope) + '\n');
+							totalExported += 1;
+						} catch (writeError) {
+							// Client disconnected or write failed - abort stream gracefully
+							console.error('Stream write failed:', writeError);
+							hasMore = false;
+							break;
+						}
+					}
+
+					// Update cursor for next page
+					if (toProcess.length < PAGE_SIZE) {
+						hasMore = false;
+					} else if (totalExported >= MAX_TOTAL_ROWS) {
+						// Reached max export limit - stop gracefully
+						hasMore = false;
+					} else {
+						const last: EventRow = toProcess[toProcess.length - 1]!;
+						cursor = { emittedAt: last.emittedAt, deviceId: last.deviceId, eventId: last.eventId };
+					}
 				}
-
-				const toProcess: EventRow[] = rows;
-
-				for (const row of toProcess) {
-					// Build event envelope (exclude user_id)
-					const artifact =
-						row.artifactHost && row.artifactUrlHash
-							? {
-									host: row.artifactHost,
-									url_hash: row.artifactUrlHash,
-									...(row.artifactPathHint && { path_hint: row.artifactPathHint }),
-									...(row.titleHint && { title_hint: row.titleHint }),
-								}
-							: null;
-
-					const envelope = {
-						schema_version: row.schemaVersion,
-						event_id: row.eventId,
-						device_id: row.deviceId,
-						emitted_at: row.emittedAt.getTime(),
-						received_at: row.receivedAt.getTime(),
-						type: row.type,
-						...(artifact && { artifact }),
-						payload: JSON.parse(row.payloadJson),
-					};
-
-					await s.write(JSON.stringify(envelope) + '\n');
-				}
-
-				// Update cursor for next page
-				if (toProcess.length < PAGE_SIZE) {
-					hasMore = false;
-				} else {
-					const last: EventRow = toProcess[toProcess.length - 1]!;
-					cursor = { emittedAt: last.emittedAt, deviceId: last.deviceId, eventId: last.eventId };
+			} catch (error) {
+				// Handle unexpected errors during query or processing
+				console.error('Stream processing failed:', error);
+				// Attempt to write error to stream if still connected
+				try {
+					await s.write(JSON.stringify({ error: 'Stream processing failed' }) + '\n');
+				} catch {
+					// Client already disconnected, cleanup silently
 				}
 			}
 		});
