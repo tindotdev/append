@@ -41,7 +41,13 @@ export const dashboardRoutes = app
 		const result = await getDashboardToday(db, userId, tz);
 
 		if (!result.ok) {
-			return apiError(c, 413, 'RANGE_TOO_LARGE', 'Too many events to process. Please narrow the date range or wait for materialized rollups.');
+			return apiError(
+				c,
+				413,
+				'RANGE_TOO_LARGE',
+				'Too many events to process. Please narrow the date range or wait for materialized rollups.',
+				{ max_events_scanned: 250_000 }
+			);
 		}
 
 		return c.json(result.data);
@@ -65,7 +71,13 @@ export const dashboardRoutes = app
 		const result = await getDashboardWeek(db, userId, start, tz);
 
 		if (!result.ok) {
-			return apiError(c, 413, 'RANGE_TOO_LARGE', 'Too many events to process. Please narrow the date range or wait for materialized rollups.');
+			return apiError(
+				c,
+				413,
+				'RANGE_TOO_LARGE',
+				'Too many events to process. Please narrow the date range or wait for materialized rollups.',
+				{ max_events_scanned: 250_000 }
+			);
 		}
 
 		return c.json(result.data);
@@ -89,7 +101,13 @@ export const dashboardRoutes = app
 		const result = await getDashboardHeatmap(db, userId, year, tz);
 
 		if (!result.ok) {
-			return apiError(c, 413, 'RANGE_TOO_LARGE', 'Too many events to process. Please narrow the date range or wait for materialized rollups.');
+			return apiError(
+				c,
+				413,
+				'RANGE_TOO_LARGE',
+				'Too many events to process. Please narrow the date range or wait for materialized rollups.',
+				{ max_events_scanned: 250_000 }
+			);
 		}
 
 		return c.json(result.data);
