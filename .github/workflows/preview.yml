@@ -62,7 +62,7 @@ jobs:
           set -euo pipefail
 
           set +e
-          doppler secrets download --no-file --format json | \
+          doppler secrets --json | \
             jq -c 'with_entries(.value = .value.computed) | del(.DOPPLER_PROJECT, .DOPPLER_CONFIG, .DOPPLER_ENVIRONMENT, .DOPPLER_ENVIRONMENT_SLUG, .DOPPLER_PROJECT_NAME, .DOPPLER_CONFIG_NAME)' | \
             pnpm exec wrangler secret bulk --env preview --config wrangler.jsonc
           SYNC_EXIT_CODE=$?
@@ -74,7 +74,7 @@ jobs:
             # This transient state is acceptable for preview - the secret is set in the next step
             # and validated before the final deployment. No public traffic reaches this intermediate state.
             pnpm exec wrangler deploy --env preview --config wrangler.jsonc
-            doppler secrets download --no-file --format json | \
+            doppler secrets --json | \
               jq -c 'with_entries(.value = .value.computed) | del(.DOPPLER_PROJECT, .DOPPLER_CONFIG, .DOPPLER_ENVIRONMENT, .DOPPLER_ENVIRONMENT_SLUG, .DOPPLER_PROJECT_NAME, .DOPPLER_CONFIG_NAME)' | \
               pnpm exec wrangler secret bulk --env preview --config wrangler.jsonc
           fi

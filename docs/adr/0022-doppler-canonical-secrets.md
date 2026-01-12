@@ -24,7 +24,7 @@ Make **Doppler the single source of truth** for all secrets across all environme
 
 Secrets are synced from Doppler to Cloudflare Workers using (env-scoped):
 ```bash
-doppler secrets download --no-file --format json | \
+doppler secrets --json | \
   jq -c 'with_entries(.value = .value.computed)' | \
   wrangler secret bulk --env <env>
 ```
