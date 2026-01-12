@@ -16,10 +16,8 @@ export type Bindings = {
 	AI_GATEWAY_ID: string;
 	CF_AIG_TOKEN?: string;
 
-	// OpenAI API key - either:
-	// - Plain string from .dev.vars (local development)
-	// - SecretsStoreSecret from Secrets Store (production)
-	OPENAI_API_KEY?: string | SecretsStoreSecret;
+	// OpenAI API key (plain string, synced from Doppler at deploy time)
+	OPENAI_API_KEY?: string;
 
 	// Suggestion provider: 'openai' | 'stub' | 'disabled'
 	SUGGESTIONS_PROVIDER?: string;

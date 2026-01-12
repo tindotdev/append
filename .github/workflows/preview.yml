@@ -42,6 +42,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@v3
+
+      - name: Sync secrets from Doppler to Cloudflare
+        working-directory: packages/api
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PREVIEW_APPEND }}
+        run: |
+          # Sync all secrets from Doppler to Cloudflare Worker (preview environment)
+          # This makes Doppler the canonical source of truth for secrets
+          doppler secrets download --no-file --format json | \
+            pnpm exec wrangler secret bulk --env preview --config wrangler.jsonc
+
       - name: Run preview tests
         run: pnpm --filter @append/api test:preview
 

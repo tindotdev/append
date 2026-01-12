@@ -12,9 +12,7 @@ import { makeStubLlmClient } from './llm.stub';
 /**
  * Create an LLM client based on environment configuration.
  *
- * Supports both:
- * - Plain string API keys from .dev.vars (local development)
- * - Cloudflare Secrets Store bindings (production)
+ * API keys are synced from Doppler at deploy time (all environments).
  *
  * @param env - Cloudflare Worker bindings
  * @returns LLM client instance, or null if suggestions are disabled
@@ -31,7 +29,7 @@ export async function createLlmClient(env: Bindings): Promise<LlmClient | null> 
 			return makeStubLlmClient();
 
 		case 'openai': {
-			// Get API key - works with both plain strings (.dev.vars) and Secrets Store (production)
+			// Get API key (synced from Doppler)
 			const openaiApiKey = await getSecretValue(env.OPENAI_API_KEY);
 
 			if (!env.CF_ACCOUNT_ID || !env.AI_GATEWAY_ID || !openaiApiKey) {

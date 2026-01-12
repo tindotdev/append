@@ -21,8 +21,8 @@ export function isSecretsStoreBinding(value: unknown): value is SecretsStoreSecr
 
 /**
  * Get a secret value, handling both:
- * - Plain strings from .dev.vars (local development)
- * - SecretsStoreSecret objects from Secrets Store (production)
+ * - Plain strings (all environments, synced from Doppler)
+ * - SecretsStoreSecret objects (legacy, for future use if needed)
  */
 export async function getSecretValue(secret: string | SecretsStoreSecret | undefined): Promise<string | undefined> {
 	if (!secret) return undefined;

@@ -27,32 +27,41 @@ See [Extension security configuration](#extension-security-configuration) for de
 
 ## Secrets management
 
-Secrets are managed via **Doppler** (local) and Cloudflare (production):
+**Doppler is the canonical source of truth** for all secrets across all environments.
+Secrets are synced from Doppler to Cloudflare Workers at deploy time via GitHub Actions.
 
 - **Local dev**: `.dev.vars` in `packages/api/` (gitignored, synced via `just sync-secrets`)
-- **Production**: `wrangler secret put <NAME>` (stored in Cloudflare)
+- **Preview**: Synced from Doppler `apps/prv_append` at deploy time
+- **Production**: Synced from Doppler `apps/prd_append` at deploy time
 
-### Local secrets (Doppler)
+### Doppler configs
 
-Project: `apps`, Config: `dev_append`
+| Environment | Doppler Config    | Sync Method                             |
+| ----------- | ----------------- | --------------------------------------- |
+| Local dev   | `apps/dev_append` | `just sync-secrets` → `.dev.vars`       |
+| Preview     | `apps/prv_append` | GitHub Actions → `wrangler secret bulk` |
+| Production  | `apps/prd_append` | GitHub Actions → `wrangler secret bulk` |
 
-Update and sync:
+### Updating secrets
+
+**Local dev:**
 
 ```bash
 doppler secrets set BETTER_AUTH_URL="http://localhost:8787" --project apps --config dev_append
 just sync-secrets
 ```
 
-### Setting production secrets
+**Preview/Production:**
 
 ```bash
-cd packages/api
-pnpm wrangler secret put GOOGLE_CLIENT_ID
-pnpm wrangler secret put GOOGLE_CLIENT_SECRET
-pnpm wrangler secret put BETTER_AUTH_SECRET
-pnpm wrangler secret put BETTER_AUTH_URL      # https://api.append.tindev.dev
-pnpm wrangler secret put ALLOWED_SUB          # or ALLOWED_EMAIL for bootstrap
+# Update in Doppler (secrets sync automatically on next deploy)
+doppler secrets set <SECRET_NAME> --project apps --config prv_append  # preview
+doppler secrets set <SECRET_NAME> --project apps --config prd_append  # production
+
+# To sync immediately without a code change, trigger a deploy manually
 ```
+
+**Important:** Never use `wrangler secret put` directly — it will be overwritten on the next deploy.
 
 ### Extension security configuration
 
@@ -64,6 +73,7 @@ The API restricts `/events/*` access from Chrome extensions using two security m
 **Secure by default**: If `ALLOWED_EXTENSION_IDS` is not set or empty, **all** chrome-extension:// origins are rejected by CORS. This prevents unauthorized extensions from accessing the API.
 
 **Test coverage**: The CORS behavior is verified by integration tests:
+
 - `packages/api/test/cors.spec.ts` — Tests rejection when `ALLOWED_EXTENSION_IDS` is not set
 - `packages/api/test/cors.extension.spec.ts` — Tests acceptance when configured (run via `pnpm test:extension`)
 
@@ -92,12 +102,10 @@ When you publish the extension to Chrome Web Store, it gets a **permanent ID** t
 
 1. Get the production extension ID from Chrome Web Store developer dashboard or from `chrome://extensions/` after installing the published version
 
-2. Set it in Cloudflare (one-time):
+2. Set it in Doppler (one-time):
 
    ```bash
-   cd packages/api
-   pnpm wrangler secret put ALLOWED_EXTENSION_IDS
-   # Enter the production extension ID when prompted
+   doppler secrets set ALLOWED_EXTENSION_IDS="<production-extension-id>" --project apps --config prd_append
    ```
 
 3. Document the production ID in this runbook for reference:
@@ -113,9 +121,7 @@ When you publish the extension to Chrome Web Store, it gets a **permanent ID** t
 For PR previews, use the local dev ID (same stable key):
 
 ```bash
-cd packages/api
-pnpm wrangler secret put ALLOWED_EXTENSION_IDS --env preview
-# Enter: nnhipglpoenbcdonkbnfdcmfcfaggjle
+doppler secrets set ALLOWED_EXTENSION_IDS="nnhipglpoenbcdonkbnfdcmfcfaggjle" --project apps --config prv_append
 ```
 
 #### Verifying the extension ID
@@ -197,6 +203,9 @@ Required GitHub secrets:
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CF_PAGES_PROJECT` (Cloudflare Pages project name)
+- `DOPPLER_TOKEN_PROD_APPEND` (Doppler service token for production)
+- `DOPPLER_TOKEN_PREVIEW_APPEND` (Doppler service token for preview, used in `preview.yml`)
+- `E2E_AUTH_SECRET` (for E2E tests in preview workflow)
 
 Deploy order (automated):
 
@@ -247,12 +256,10 @@ When publishing the extension to Chrome Web Store for the first time, follow thi
    - Open `chrome://extensions/`
    - Copy the 32-character extension ID
 
-3. **Set the extension ID in Cloudflare** (one-time):
+3. **Set the extension ID in Doppler** (one-time):
 
    ```bash
-   cd packages/api
-   pnpm wrangler secret put ALLOWED_EXTENSION_IDS
-   # Enter the production ID when prompted
+   doppler secrets set ALLOWED_EXTENSION_IDS="<production-extension-id>" --project apps --config prd_append
    ```
 
 4. **Document the production ID** in this runbook:
@@ -270,7 +277,7 @@ When publishing the extension to Chrome Web Store for the first time, follow thi
 ### Important notes
 
 - **The production extension ID never changes** after first publish
-- You only need to set `ALLOWED_EXTENSION_IDS` once in Cloudflare
+- You only need to set `ALLOWED_EXTENSION_IDS` once in Doppler
 - No need to update it on every deploy or extension update
 - For local development, continue using the stable dev ID: `nnhipglpoenbcdonkbnfdcmfcfaggjle`
 
@@ -340,19 +347,20 @@ pnpm --filter @append/web exec wrangler pages deploy dist --project-name "$CF_PA
 
 ### Preview environment secrets
 
-Preview environment has Google OAuth configured for authentication:
+Preview secrets are managed in Doppler (`apps/prv_append`) and synced automatically at deploy time.
 
 ```bash
-# Secrets are already set for preview environment
-pnpm --filter @append/api exec wrangler secret list --env preview
+# View preview secrets in Doppler
+doppler secrets --project apps --config prv_append
 ```
 
-Required secrets (already configured):
+Required secrets (configured in Doppler `apps/prv_append`):
 
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `BETTER_AUTH_SECRET`
-- `ALLOWED_SUB` (preferred) or `ALLOWED_EMAIL` (fallback)
+- `E2E_AUTH_SECRET`
+- `CF_AIG_TOKEN` (optional, preview uses stub AI provider)
 
 ### E2E authentication for Playwright (ADR 0019)
 
@@ -367,8 +375,8 @@ must allow the preview Pages origin and use preview-only cookie settings per ADR
 
 Required preview configuration for E2E tests (ADR 0019):
 
-- Secrets (preview Worker):
-  - `E2E_AUTH_SECRET` — secret required by `x-e2e-secret` header (set in Cloudflare)
+- Secrets (synced from Doppler `apps/prv_append`):
+  - `E2E_AUTH_SECRET` — secret required by `x-e2e-secret` header
   - `E2E_AUTH_EMAIL` — set dynamically by preview workflow per PR (e.g., `e2e-bot+pr-123@append.test`)
 - Vars (preview Worker) — already configured in `wrangler.jsonc`:
   - `APP_ENV=preview`
@@ -382,13 +390,15 @@ Required preview configuration for E2E tests (ADR 0019):
 `e2e-bot+pr-{PR_NUMBER}@append.test` for each PR. This provides environment isolation
 while using a single wildcard allowlist pattern.
 
-Set E2E secret (required for Playwright tests):
+**E2E secret setup:**
 
-```bash
-pnpm --filter @append/api exec wrangler secret put E2E_AUTH_SECRET --env preview
-```
+1. Set in Doppler (synced to Worker at deploy time):
 
-Also add `E2E_AUTH_SECRET` to GitHub Actions secrets for the workflow to use.
+   ```bash
+   doppler secrets set E2E_AUTH_SECRET --project apps --config prv_append
+   ```
+
+2. Also add `E2E_AUTH_SECRET` to GitHub Actions secrets (for Playwright to use directly).
 
 Note: `E2E_AUTH_EMAIL` is set automatically by the preview workflow — no manual configuration needed.
 
@@ -462,17 +472,19 @@ To rotate the E2E secret in preview:
 # Generate a new secret
 openssl rand -base64 32
 
-# Update in Cloudflare Worker
-pnpm --filter @append/api exec wrangler secret put E2E_AUTH_SECRET --env preview
+# Update in Doppler (will sync to Worker on next deploy)
+doppler secrets set E2E_AUTH_SECRET --project apps --config prv_append
 
 # Update in GitHub Actions secrets
 # (manual step in GitHub repository settings)
+
+# Trigger a deploy to sync the new secret (or wait for next PR push)
 ```
 
 Verify the old secret is rejected:
 
 ```bash
-curl -i -X POST "https://append-api-preview.tindotdev.workers.dev/auth/e2e/login" \\
+curl -i -X POST "https://append-api-preview.tindotdev.workers.dev/auth/e2e/login" \
   -H "x-e2e-secret: <old-secret>"
 # Expect HTTP 403
 ```
