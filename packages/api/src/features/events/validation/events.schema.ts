@@ -92,9 +92,20 @@ export type IngestEventsRequestInput = v.InferOutput<typeof IngestEventsRequestS
 
 const DayKeyRegex = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Validate that a day key represents a real calendar date (not just format).
+ * Rejects impossible dates like 2026-02-30 or 2026-13-01.
+ */
+function isValidDayKey(dayKey: string): boolean {
+	if (!DayKeyRegex.test(dayKey)) return false;
+	const [y, m, d] = dayKey.split('-').map((n) => Number(n));
+	const date = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+	return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
+
 const DayKeySchema = v.pipe(
 	v.string(),
-	v.check((s) => DayKeyRegex.test(s), 'Invalid date format. Must be YYYY-MM-DD.')
+	v.check((s) => isValidDayKey(s), 'Invalid date. Must be a valid calendar date in YYYY-MM-DD format.')
 );
 
 export const ExportEventsQuerySchema = v.object({
