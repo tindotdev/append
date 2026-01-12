@@ -37,6 +37,19 @@ Remove Cloudflare Secrets Store binding for `OPENAI_API_KEY` — it becomes a re
 - **GitHub Actions secrets**: Require `DOPPLER_TOKEN_PREVIEW_APPEND` and `DOPPLER_TOKEN_PROD_APPEND` service tokens
 - **Never edit Cloudflare directly**: Worker secrets will be overwritten on next deploy
 
+## Exceptions: E2E_AUTH_EMAIL
+
+**`E2E_AUTH_EMAIL` is intentionally excluded from Doppler** and set dynamically by the preview workflow per pull request (see ADR 0019).
+
+Rationale:
+- E2E tests need per-PR email isolation (e.g., `e2e-bot+pr-123@append.test`) to prevent cross-PR test pollution
+- The email pattern must match the allowlist (`ALLOWED_EMAIL=e2e-bot+*@append.test`) but vary by PR
+- Setting it in Doppler would create a static value unsuitable for per-PR test environments
+
+**`E2E_AUTH_EMAIL` is set by**: `.github/workflows/preview.yml` step "Set PR-specific E2E auth email" (after Doppler sync).
+
+This is the only exception to the "Doppler is canonical" rule. All other secrets follow the standard Doppler workflow.
+
 ## Migration
 
 1. Import existing secrets into Doppler configs (`prv_append`, `prd_append`)

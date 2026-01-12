@@ -196,7 +196,8 @@ jobs:
             echo "To set it up:"
             echo "  1. Generate a 32+ character random secret: openssl rand -base64 32"
             echo "  2. Add it to GitHub Actions secrets as E2E_AUTH_SECRET"
-            echo "  3. Add the same secret to the preview Worker via: wrangler secret put E2E_AUTH_SECRET -e preview"
+            echo "  3. Add the same secret to Doppler: doppler secrets set E2E_AUTH_SECRET --project apps --config prv_append"
+            echo "     (The Doppler sync step will deploy it to Cloudflare)"
             exit 1
           fi
           echo "✓ E2E_AUTH_SECRET is configured"
