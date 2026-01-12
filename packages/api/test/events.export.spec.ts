@@ -117,6 +117,22 @@ describe('GET /events/export', () => {
 		expect(body.error.code).toBe('VALIDATION_ERROR');
 	});
 
+	it('returns 400 for impossible calendar dates (regression: 2026-02-30)', async () => {
+		// Feb 30 doesn't exist - should reject, not normalize to Mar 2
+		const res = await authFetch('/events/export?from=2026-02-30&to=2026-03-01&format=ndjson', { cookie: authCookie });
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+		expect(body.error.message).toContain('Invalid date');
+	});
+
+	it('returns 400 for invalid month (2026-13-01)', async () => {
+		const res = await authFetch('/events/export?from=2026-13-01&to=2026-13-31&format=ndjson', { cookie: authCookie });
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+	});
+
 	it('returns 400 when from is after to', async () => {
 		const res = await authFetch('/events/export?from=2026-01-31&to=2026-01-01&format=ndjson', { cookie: authCookie });
 		expect(res.status).toBe(400);
