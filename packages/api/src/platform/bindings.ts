@@ -45,7 +45,3 @@ export type Variables = {
 	userId: string;
 	db: DrizzleD1Database<typeof schema>;
 };
-
-export interface SecretsStoreSecret {
-	get(): Promise<string>;
-}
