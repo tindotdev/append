@@ -66,6 +66,16 @@ export function computeCreditIndex(rows: DbEventRow[], timezone: string, windowS
 		}
 	}
 
+	// Validate all rows belong to the same user (defense-in-depth)
+	if (rows.length > 0) {
+		const firstUserId = rows[0].userId;
+		for (let i = 1; i < rows.length; i++) {
+			if (rows[i].userId !== firstUserId) {
+				throw new Error(`All rows must belong to the same user. Found userId ${rows[i].userId} at row ${i}, expected ${firstUserId}.`);
+			}
+		}
+	}
+
 	const overridesByArtifact = buildTopicOverrideIndex(rows);
 
 	// Filter to artifact_active events with artifacts
