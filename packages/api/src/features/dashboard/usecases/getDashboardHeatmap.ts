@@ -8,7 +8,7 @@
  * Computes in pages (month-by-month) to avoid huge memory use.
  */
 
-import { and, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type EventType, event as eventTable, type schema } from '../../../db';
 import { computeCreditIndex, IDLE_CUTOFF_MS, msToMinutes } from '../rollups/credit';
@@ -107,13 +107,15 @@ async function fetchEventsPaged(
 /**
  * Fetch all topic_override events for a user without date filter.
  * Used to ensure persistent overrides apply regardless of when they were emitted.
+ * Order DESC so newest overrides are fetched first and kept when hitting the limit.
+ * This ensures the latest override wins when resolving topics.
  */
 async function fetchAllOverrides(db: DrizzleD1Database<typeof schema>, userId: string): Promise<DbEventRow[]> {
 	return db
 		.select()
 		.from(eventTable)
 		.where(and(eq(eventTable.userId, userId), eq(eventTable.type, 'topic_override')))
-		.orderBy(eventTable.emittedAt)
+		.orderBy(desc(eventTable.emittedAt))
 		.limit(MAX_OVERRIDES);
 }
 

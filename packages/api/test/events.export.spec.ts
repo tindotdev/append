@@ -389,6 +389,12 @@ describe('GET /events/export', () => {
 	// ─────────────────────────────────────────────────────────────────────────
 	// Truncation header behavior
 	// ─────────────────────────────────────────────────────────────────────────
+	//
+	// NOTE: We test that X-Export-Truncated is NOT set for non-truncated exports.
+	// Testing the positive case (header IS set when exceeding MAX_TOTAL_ROWS=100k)
+	// is impractical in automated tests due to the time required to insert 100k+ rows.
+	// The truncation logic is verified through code review (see routes.ts:267-269).
+	// ─────────────────────────────────────────────────────────────────────────
 
 	it('does not set X-Export-Truncated header when all data is exported', async () => {
 		const deviceId = generateUUID();

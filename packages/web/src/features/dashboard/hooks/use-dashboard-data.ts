@@ -49,12 +49,12 @@ export function useTodayHeroData(options: UseDashboardDataOptions = {}) {
 		if (forceLoading) return EMPTY_TODAY_HERO;
 		if (forceEmpty) return EMPTY_TODAY_HERO;
 
-		// Use API data if enabled and available
-		if (useApi && apiQuery.data) {
-			return apiQuery.data.todayHero;
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.todayHero : EMPTY_TODAY_HERO;
 		}
 
-		// Fall back to local computation
+		// Not in API mode, use local computation
 		if (!isReady) return EMPTY_TODAY_HERO;
 		return getComputed(revision, events, timezone).todayHero;
 	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
@@ -73,10 +73,12 @@ export function useTodayBreakdownData(options: UseDashboardDataOptions = {}) {
 		if (forceLoading) return EMPTY_BREAKDOWN;
 		if (forceEmpty) return EMPTY_BREAKDOWN;
 
-		if (useApi && apiQuery.data) {
-			return apiQuery.data.todayBreakdown;
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.todayBreakdown : EMPTY_BREAKDOWN;
 		}
 
+		// Not in API mode, use local computation
 		if (!isReady) return EMPTY_BREAKDOWN;
 		return getComputed(revision, events, timezone).todayBreakdown;
 	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
@@ -96,10 +98,12 @@ export function useWeekBarChartData(options: UseDashboardDataOptions = {}) {
 		if (forceLoading) return EMPTY_WEEK_DATA;
 		if (forceEmpty) return EMPTY_WEEK_DATA;
 
-		if (useApi && apiQuery.data) {
-			return apiQuery.data.week;
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.week : EMPTY_WEEK_DATA;
 		}
 
+		// Not in API mode, use local computation
 		if (!isReady) return EMPTY_WEEK_DATA;
 		return getComputed(revision, events, timezone).week;
 	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
@@ -118,10 +122,12 @@ export function useTodayCapturesData(options: UseDashboardDataOptions = {}) {
 		if (forceLoading) return EMPTY_CAPTURES;
 		if (forceEmpty) return EMPTY_CAPTURES;
 
-		if (useApi && apiQuery.data) {
-			return apiQuery.data.todayCaptures;
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.todayCaptures : EMPTY_CAPTURES;
 		}
 
+		// Not in API mode, use local computation
 		if (!isReady) return EMPTY_CAPTURES;
 		return getComputed(revision, events, timezone).captures;
 	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
@@ -140,10 +146,12 @@ export function useStreakData(options: UseDashboardDataOptions = {}) {
 		if (forceLoading) return EMPTY_STREAK;
 		if (forceEmpty) return EMPTY_STREAK;
 
-		if (useApi && apiQuery.data) {
-			return apiQuery.data.streak;
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.streak : EMPTY_STREAK;
 		}
 
+		// Not in API mode, use local computation
 		if (!isReady) return EMPTY_STREAK;
 		return getComputed(revision, events, timezone).streak;
 	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
@@ -162,10 +170,12 @@ export function useTopSourceData(options: UseDashboardDataOptions = {}) {
 		if (forceLoading) return EMPTY_TOP_SOURCE;
 		if (forceEmpty) return EMPTY_TOP_SOURCE;
 
-		if (useApi && apiQuery.data) {
-			return apiQuery.data.topSource;
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.topSource : EMPTY_TOP_SOURCE;
 		}
 
+		// Not in API mode, use local computation
 		if (!isReady) return EMPTY_TOP_SOURCE;
 		return getComputed(revision, events, timezone).topSource;
 	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
@@ -184,10 +194,12 @@ export function useTopTopicData(options: UseDashboardDataOptions = {}) {
 		if (forceLoading) return EMPTY_TOP_TOPIC;
 		if (forceEmpty) return EMPTY_TOP_TOPIC;
 
-		if (useApi && apiQuery.data) {
-			return apiQuery.data.topTopic;
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.topTopic : EMPTY_TOP_TOPIC;
 		}
 
+		// Not in API mode, use local computation
 		if (!isReady) return EMPTY_TOP_TOPIC;
 		return getComputed(revision, events, timezone).topTopic;
 	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
