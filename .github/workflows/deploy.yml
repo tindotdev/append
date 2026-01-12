@@ -55,6 +55,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Deploy Worker API
+        working-directory: packages/api
+        run: pnpm run deploy -- --config wrangler.jsonc
+
       - name: Install Doppler CLI
         uses: dopplerhq/cli-action@v3
 
@@ -65,16 +69,13 @@ jobs:
         run: |
           # Sync all secrets from Doppler to Cloudflare Worker (production)
           # This makes Doppler the canonical source of truth for secrets
+          # Worker must be deployed first before secrets can be attached
           doppler secrets download --no-file --format json | \
             pnpm exec wrangler secret bulk --config wrangler.jsonc
 
       - name: Apply D1 migrations
         working-directory: packages/api
         run: pnpm exec wrangler d1 migrations apply append-db --remote --config wrangler.jsonc
-
-      - name: Deploy Worker API
-        working-directory: packages/api
-        run: pnpm run deploy -- --config wrangler.jsonc
 
   deploy-web:
     runs-on: ubuntu-latest
