@@ -4,7 +4,7 @@
  * Creates the appropriate LLM client based on the configured provider.
  */
 
-import { type Bindings, getSecretValue } from '../../../platform/env';
+import type { Bindings } from '../../../platform/env';
 import type { LlmClient, SuggestionProvider } from '../ports/llm';
 import { makeLlmClient as makeAIGatewayClient } from './llm.aigateway';
 import { makeStubLlmClient } from './llm.stub';
@@ -30,7 +30,7 @@ export async function createLlmClient(env: Bindings): Promise<LlmClient | null> 
 
 		case 'openai': {
 			// Get API key (synced from Doppler)
-			const openaiApiKey = await getSecretValue(env.OPENAI_API_KEY);
+			const openaiApiKey = env.OPENAI_API_KEY;
 
 			if (!env.CF_ACCOUNT_ID || !env.AI_GATEWAY_ID || !openaiApiKey) {
 				throw new Error('OpenAI provider requires CF_ACCOUNT_ID, AI_GATEWAY_ID, and OPENAI_API_KEY');
