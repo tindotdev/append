@@ -11,12 +11,27 @@ import type { ListBatchesInput } from '../validation/listBatches.schema';
 import { decodeCursor, encodeCursor } from '../validation/listBatches.schema';
 
 /**
+ * Status breakdown for a batch.
+ */
+export interface StatusBreakdown {
+	ready: number; // Has effective bucket + text, not accepted
+	pending: number; // Awaiting suggestions or missing values
+	accepted: number; // Already materialized
+	error: number; // Suggestion failed
+}
+
+/**
  * Batch summary for list response.
  */
 export interface BatchSummary {
 	id: string;
 	status: BatchStatus;
 	candidateCount: number;
+	statusBreakdown: StatusBreakdown;
+	acceptanceRate: number; // 0-100 percentage
+	sampleTerms: string[]; // First 3-5 terms
+	hasErrors: boolean;
+	errorCount: number;
 	createdAt: number;
 	updatedAt: number;
 }
@@ -87,15 +102,44 @@ export async function listBatches(
 		});
 	}
 
-	// Get candidate counts for all batches in one query
+	// Get enhanced metadata for all batches in one query
 	const batchIds = resultBatches.map((b) => b.id);
-	let candidateCounts: { batchId: string; count: number }[] = [];
+	let candidateStats: {
+		batchId: string;
+		totalCount: number;
+		acceptedCount: number;
+		pendingCount: number;
+		errorCount: number;
+		readyCount: number;
+	}[] = [];
+	const sampleTermsMap: Map<string, string[]> = new Map();
 
 	if (batchIds.length > 0) {
-		candidateCounts = await db
+		// Query status breakdown using SQL aggregation
+		candidateStats = await db
 			.select({
 				batchId: candidate.batchId,
-				count: count(),
+				totalCount: count(),
+				// Accepted: has materialized term sense ID
+				acceptedCount: sql<number>`sum(case when ${candidate.materializedTermSenseId} is not null then 1 else 0 end)`,
+				// Error: suggestion status is 'error'
+				errorCount: sql<number>`sum(case when ${candidate.suggestionStatus} = 'error' then 1 else 0 end)`,
+				// Pending: suggestion in progress OR missing effective values
+				pendingCount: sql<number>`sum(case when
+					${candidate.materializedTermSenseId} is null
+					and (${candidate.suggestionStatus} = 'in_progress'
+						or (${candidate.suggestionStatus} != 'error'
+							and (coalesce(${candidate.chosenBucket}, ${candidate.suggestedBucket}) is null
+								or coalesce(${candidate.chosenText}, ${candidate.suggestedText}) is null)))
+					then 1 else 0 end)`,
+				// Ready: has effective values and not accepted
+				readyCount: sql<number>`sum(case when
+					${candidate.materializedTermSenseId} is null
+					and ${candidate.suggestionStatus} != 'in_progress'
+					and ${candidate.suggestionStatus} != 'error'
+					and coalesce(${candidate.chosenBucket}, ${candidate.suggestedBucket}) is not null
+					and coalesce(${candidate.chosenText}, ${candidate.suggestedText}) is not null
+					then 1 else 0 end)`,
 			})
 			.from(candidate)
 			.where(
@@ -105,22 +149,58 @@ export async function listBatches(
 				)})`
 			)
 			.groupBy(candidate.batchId);
+
+		// Query sample terms (first 3 per batch)
+		for (const batchId of batchIds) {
+			const terms = await db
+				.select({
+					term: candidate.term,
+				})
+				.from(candidate)
+				.where(eq(candidate.batchId, batchId))
+				.orderBy(candidate.position)
+				.limit(3);
+
+			sampleTermsMap.set(
+				batchId,
+				terms.map((t) => t.term)
+			);
+		}
 	}
 
-	// Build map of batch ID to candidate count
-	const countMap = new Map<string, number>();
-	for (const cc of candidateCounts) {
-		countMap.set(cc.batchId, cc.count);
+	// Build map of batch ID to stats
+	const statsMap = new Map<string, (typeof candidateStats)[0]>();
+	for (const stat of candidateStats) {
+		statsMap.set(stat.batchId, stat);
 	}
 
 	return {
-		batches: resultBatches.map((b) => ({
-			id: b.id,
-			status: b.status,
-			candidateCount: countMap.get(b.id) ?? 0,
-			createdAt: b.createdAt.getTime(),
-			updatedAt: b.updatedAt.getTime(),
-		})),
+		batches: resultBatches.map((b) => {
+			const stats = statsMap.get(b.id);
+			const totalCount = stats?.totalCount ?? 0;
+			const acceptedCount = stats?.acceptedCount ?? 0;
+			const errorCount = stats?.errorCount ?? 0;
+			const pendingCount = stats?.pendingCount ?? 0;
+			const readyCount = stats?.readyCount ?? 0;
+
+			return {
+				id: b.id,
+				status: b.status,
+				candidateCount: totalCount,
+				statusBreakdown: {
+					ready: readyCount,
+					pending: pendingCount,
+					accepted: acceptedCount,
+					error: errorCount,
+				},
+				acceptanceRate: totalCount > 0 ? Math.round((acceptedCount / totalCount) * 100) : 0,
+				sampleTerms: sampleTermsMap.get(b.id) ?? [],
+				hasErrors: errorCount > 0,
+				errorCount,
+				createdAt: b.createdAt.getTime(),
+				updatedAt: b.updatedAt.getTime(),
+			};
+		}),
 		nextCursor,
 	};
 }
