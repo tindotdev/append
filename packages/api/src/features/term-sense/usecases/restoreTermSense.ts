@@ -41,9 +41,11 @@ export type RestoreTermSenseError =
  * Restore a term sense with optimistic locking.
  *
  * Behavior:
- * - If not archived, returns { noop: true, sense: {...} }
- * - Restores the sense (archivedAt = null, version++)
- * - If parent term is archived, restores it too (archivedAt = null, version++)
+ * - Restores the sense if archived (archivedAt = null, version++)
+ * - Always checks parent term state; if archived, restores it too (archivedAt = null, version++)
+ * - Returns { noop: true } only if both sense and term are already unarchived
+ * - This ensures atomicity: if sense restore succeeds but term restore fails,
+ *   retry will skip sense (already done) but still attempt term restoration
  */
 export async function restoreTermSense(
 	db: DrizzleD1Database<typeof schema>,
@@ -70,50 +72,55 @@ export async function restoreTermSense(
 
 	const termRow = termOwnership.value;
 
-	// 3. If not archived, return noop
+	// 3. Restore sense if archived (with optimistic locking)
+	let senseNoop = false;
+	let updatedSense: RestoreTermSenseResult['sense'];
+
 	if (senseRow.archivedAt === null) {
-		return {
-			success: true,
-			result: {
-				sense: {
-					id: senseRow.id,
-					termId: senseRow.termId,
-					version: senseRow.version,
-					archivedAt: null,
-				},
-				noop: true,
-			},
+		// Sense already restored - mark as noop but continue to check term
+		senseNoop = true;
+		updatedSense = {
+			id: senseRow.id,
+			termId: senseRow.termId,
+			version: senseRow.version,
+			archivedAt: null,
+		};
+	} else {
+		// 4. Atomic conditional update with optimistic locking
+		const updateResult = await db
+			.update(termSense)
+			.set({
+				archivedAt: null,
+				version: sql`${termSense.version} + 1`,
+			})
+			.where(sql`${termSense.id} = ${senseId} AND ${termSense.version} = ${expectedVersion}`)
+			.returning({
+				id: termSense.id,
+				termId: termSense.termId,
+				version: termSense.version,
+				archivedAt: termSense.archivedAt,
+			});
+
+		// 5. Handle conflict
+		if (updateResult.length === 0) {
+			const conflict = await resolveOptimisticConflict(
+				() =>
+					db.query.termSense.findFirst({
+						where: eq(termSense.id, senseId),
+					}),
+				(currentSense) => currentSense.version
+			);
+			return { success: false, error: toOptimisticError(conflict) };
+		}
+
+		updatedSense = {
+			id: updateResult[0].id,
+			termId: updateResult[0].termId,
+			version: updateResult[0].version,
+			archivedAt: null,
 		};
 	}
 
-	// 4. Atomic conditional update with optimistic locking
-	const updateResult = await db
-		.update(termSense)
-		.set({
-			archivedAt: null,
-			version: sql`${termSense.version} + 1`,
-		})
-		.where(sql`${termSense.id} = ${senseId} AND ${termSense.version} = ${expectedVersion}`)
-		.returning({
-			id: termSense.id,
-			termId: termSense.termId,
-			version: termSense.version,
-			archivedAt: termSense.archivedAt,
-		});
-
-	// 5. Handle conflict or success
-	if (updateResult.length === 0) {
-		const conflict = await resolveOptimisticConflict(
-			() =>
-				db.query.termSense.findFirst({
-					where: eq(termSense.id, senseId),
-				}),
-			(currentSense) => currentSense.version
-		);
-		return { success: false, error: toOptimisticError(conflict) };
-	}
-
-	const updatedSense = updateResult[0];
 	let termResult: RestoreTermSenseResult['term'] | undefined;
 
 	// 6. If parent term is archived, restore it too (with version guard)
@@ -151,13 +158,9 @@ export async function restoreTermSense(
 	return {
 		success: true,
 		result: {
-			sense: {
-				id: updatedSense.id,
-				termId: updatedSense.termId,
-				version: updatedSense.version,
-				archivedAt: null,
-			},
+			sense: updatedSense,
 			...(termResult && { term: termResult }),
+			...(senseNoop && !termResult && { noop: true }),
 		},
 	};
 }

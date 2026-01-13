@@ -526,4 +526,121 @@ describe('POST /api/term-sense/:id/restore', () => {
 		const body = (await res.json()) as { noop: boolean };
 		expect(body.noop).toBe(true);
 	});
+
+	it('restores term on retry even when sense restoration was noop (regression test for atomicity bug)', async () => {
+		// Regression test for bug: if sense restore succeeds but term restore hits version conflict,
+		// the retry would noop on sense and never restore the term, leaving data in wedged state.
+		//
+		// Bug scenario:
+		// 1. Both sense and term archived
+		// 2. First attempt: sense restores ✓, term restore hits version conflict ✗
+		// 3. Retry: OLD CODE would noop on sense and exit early, never checking term
+		// 4. Result: sense unarchived, term still archived (WEDGED)
+		//
+		// Fix: Even when sense restoration is noop, still check and restore term if needed.
+
+		const { termId, senseId, senseVersion } = await createTermWithSense(authCookie);
+
+		// Archive the only sense (which also archives the term)
+		const archiveRes = await SELF.fetch(`https://example.com/api/term-sense/${senseId}/archive`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', cookie: authCookie },
+			body: JSON.stringify({ expectedVersion: senseVersion }),
+		});
+		const archiveBody = (await archiveRes.json()) as {
+			sense: { version: number };
+			term: { id: string; version: number; archivedAt: number };
+		};
+		expect(archiveBody.term.archivedAt).toBeTypeOf('number');
+
+		// Manually restore sense to simulate successful sense restoration
+		await db
+			.update(termSense)
+			.set({ archivedAt: null, version: archiveBody.sense.version + 1 })
+			.where(eq(termSense.id, senseId));
+
+		// Verify term is still archived
+		const termBeforeRestore = await db.query.term.findFirst({ where: eq(term.id, termId) });
+		expect(termBeforeRestore?.archivedAt).not.toBeNull();
+
+		// Now restore - sense should be noop but term should still be restored
+		const res = await SELF.fetch(`https://example.com/api/term-sense/${senseId}/restore`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', cookie: authCookie },
+			body: JSON.stringify({ expectedVersion: archiveBody.sense.version + 1 }),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as {
+			sense: { id: string; archivedAt: null };
+			term: { id: string; archivedAt: null };
+			noop?: boolean;
+		};
+
+		// Should NOT be noop because term was restored
+		expect(body.noop).toBeUndefined();
+		expect(body.sense.id).toBe(senseId);
+		expect(body.sense.archivedAt).toBeNull();
+		expect(body.term.id).toBe(termId);
+		expect(body.term.archivedAt).toBeNull();
+
+		// Verify term was actually restored in DB
+		const termAfterRestore = await db.query.term.findFirst({ where: eq(term.id, termId) });
+		expect(termAfterRestore?.archivedAt).toBeNull();
+	});
+
+	it('handles retry correctly after partial restore with term conflict', async () => {
+		// This test verifies the complete retry scenario:
+		// 1. Sense and term both archived
+		// 2. Sense restored manually (simulating partial success before term conflict)
+		// 3. Retry with correct versions completes successfully
+		//
+		// This demonstrates that even after a partial restore, the operation is retry-safe.
+
+		const { termId, senseId, senseVersion } = await createTermWithSense(authCookie);
+
+		// Archive the only sense (which also archives the term)
+		const archiveRes = await SELF.fetch(`https://example.com/api/term-sense/${senseId}/archive`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', cookie: authCookie },
+			body: JSON.stringify({ expectedVersion: senseVersion }),
+		});
+		const archiveBody = (await archiveRes.json()) as {
+			sense: { version: number };
+			term: { version: number; archivedAt: number };
+		};
+
+		// Manually restore sense to simulate partial success
+		await db
+			.update(termSense)
+			.set({ archivedAt: null, version: archiveBody.sense.version + 1 })
+			.where(eq(termSense.id, senseId));
+
+		// Verify initial state: sense restored, term still archived
+		const senseBeforeRetry = await db.query.termSense.findFirst({ where: eq(termSense.id, senseId) });
+		expect(senseBeforeRetry?.archivedAt).toBeNull();
+		const termBeforeRetry = await db.query.term.findFirst({ where: eq(term.id, termId) });
+		expect(termBeforeRetry?.archivedAt).not.toBeNull();
+
+		// Retry with correct sense version - should complete the term restoration
+		const retryRes = await SELF.fetch(`https://example.com/api/term-sense/${senseId}/restore`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', cookie: authCookie },
+			body: JSON.stringify({ expectedVersion: archiveBody.sense.version + 1 }),
+		});
+
+		expect(retryRes.status).toBe(200);
+		const retryBody = (await retryRes.json()) as {
+			sense: { archivedAt: null };
+			term: { archivedAt: null };
+		};
+
+		// Both should be restored now
+		expect(retryBody.sense.archivedAt).toBeNull();
+		expect(retryBody.term.archivedAt).toBeNull();
+
+		// Verify in database
+		const termAfterRetry = await db.query.term.findFirst({ where: eq(term.id, termId) });
+		expect(termAfterRetry?.archivedAt).toBeNull();
+	});
 });
