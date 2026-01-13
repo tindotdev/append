@@ -64,6 +64,7 @@ export async function createBucket(
 		name: input.name,
 		description: input.description,
 		color: input.color ?? null,
+		icon: input.icon ?? null,
 		order: nextOrder,
 	});
 

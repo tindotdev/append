@@ -1,5 +1,5 @@
 /**
- * Update a bucket's name, description, or color.
+ * Update a bucket's name, description, color, or icon.
  * Slug cannot be changed (immutable after creation).
  */
 
@@ -34,6 +34,7 @@ export async function updateBucket(
 		name: string;
 		description: string;
 		color: string | null;
+		icon: string | null;
 	}> = {};
 
 	if (input.name !== undefined) {
@@ -44,6 +45,9 @@ export async function updateBucket(
 	}
 	if (input.color !== undefined) {
 		updates.color = input.color ?? null;
+	}
+	if (input.icon !== undefined) {
+		updates.icon = input.icon ?? null;
 	}
 
 	// Only update if there are changes

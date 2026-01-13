@@ -13,6 +13,7 @@ export interface BucketWithCount {
 	name: string;
 	description: string;
 	color: string | null;
+	icon: string | null;
 	order: number;
 	senseCount: number;
 	createdAt: Date;
@@ -32,6 +33,7 @@ export async function listBuckets(db: DrizzleD1Database<typeof schema>, userId: 
 			name: bucket.name,
 			description: bucket.description,
 			color: bucket.color,
+			icon: bucket.icon,
 			order: bucket.order,
 			createdAt: bucket.createdAt,
 			updatedAt: bucket.updatedAt,

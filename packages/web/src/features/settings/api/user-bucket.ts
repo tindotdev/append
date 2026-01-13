@@ -21,6 +21,7 @@ export interface CreateBucketInput {
 	name: string;
 	description: string;
 	color?: string | null;
+	icon?: string | null;
 }
 
 export function useCreateBucket() {
@@ -50,6 +51,7 @@ export interface UpdateBucketInput {
 	name?: string;
 	description?: string;
 	color?: string | null;
+	icon?: string | null;
 }
 
 export function useUpdateBucket() {
