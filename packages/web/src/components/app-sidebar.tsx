@@ -36,6 +36,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarRail,
+	SidebarSeparator,
 	useSidebar,
 } from '@/components/ui/sidebar';
 import { signOut, useAuth } from '@/features/auth';
@@ -221,13 +222,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 					</SidebarMenu>
 				</SidebarGroup>
 
+				<SidebarSeparator className="opacity-10" />
+
 				{/* Buckets - Collapsible section (Linear-style) */}
 				<SidebarGroup className="group-data-[collapsible=icon]:hidden">
 					<Collapsible open={bucketsOpen} onOpenChange={setBucketsOpen}>
 						<div className="flex items-center justify-between px-2">
 							<CollapsibleTrigger asChild>
 								<SidebarGroupLabel className="cursor-pointer hover:text-sidebar-foreground/70 flex-1">
-									<ChevronDown className={`mr-1 size-3 transition-transform duration-200 ${bucketsOpen ? '' : '-rotate-90'}`} />
+									<ChevronDown className={`mr-1 size-3 transition-transform duration-200 ease-in-out ${bucketsOpen ? '' : '-rotate-90'}`} />
 									Buckets
 									<span className="ml-auto text-xs text-muted-foreground mr-2">({buckets.length}/20)</span>
 								</SidebarGroupLabel>
@@ -270,6 +273,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 						</CollapsibleContent>
 					</Collapsible>
 				</SidebarGroup>
+
+				<SidebarSeparator className="opacity-10" />
 
 				{/* Utilities - Collapsible section */}
 				<SidebarGroup className="group-data-[collapsible=icon]:hidden">

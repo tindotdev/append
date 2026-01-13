@@ -11,6 +11,7 @@ import {
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { BucketColorPicker } from '@/features/settings/components/BucketColorPicker';
 import { BucketContextMenu } from '@/features/settings/components/BucketContextMenu';
 import { cn } from '@/lib/utils';
@@ -75,7 +76,16 @@ export function SidebarBucketItem({ bucket, onEdit, onColorChange, onExport, onD
 							{/* Bucket name and description */}
 							<div className="flex-1 min-w-0">
 								<div className="flex items-center justify-between gap-2">
-									<span className="text-[13px] font-normal truncate">{bucket.name}</span>
+									<TooltipProvider delayDuration={500}>
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<span className="text-[13px] font-normal truncate">{bucket.name}</span>
+											</TooltipTrigger>
+											<TooltipContent side="right" className="max-w-xs">
+												{bucket.name}
+											</TooltipContent>
+										</Tooltip>
+									</TooltipProvider>
 									<span className="text-[11px] text-muted-foreground tabular-nums flex-shrink-0">{bucket.senseCount}</span>
 								</div>
 								{bucket.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{bucket.description}</p>}
