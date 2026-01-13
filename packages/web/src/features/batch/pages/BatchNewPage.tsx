@@ -95,8 +95,9 @@ function loadDraft(): TermRow[] {
 function saveDraft(rows: TermRow[]): void {
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
-	} catch {
-		// Ignore storage errors
+	} catch (err) {
+		console.warn('Failed to save draft to localStorage:', err);
+		toast.warning('Unable to save draft. Your changes may be lost on page refresh.');
 	}
 }
 

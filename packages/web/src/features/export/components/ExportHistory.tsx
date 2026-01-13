@@ -3,7 +3,8 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, XCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -62,7 +63,7 @@ function ExportHistorySkeleton() {
 }
 
 export function ExportHistory() {
-	const { data, isLoading, error } = useQuery({
+	const { data, isLoading, error, refetch } = useQuery({
 		queryKey: ['export-history'],
 		queryFn: () => getExportHistory(10),
 		staleTime: 30000, // 30 seconds
@@ -90,7 +91,14 @@ export function ExportHistory() {
 					<CardDescription>View past exports and re-download files.</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<p className="text-sm text-muted-foreground">Failed to load export history.</p>
+					<Alert variant="destructive" className="mb-4">
+						<XCircle className="size-4" />
+						<AlertTitle>Error</AlertTitle>
+						<AlertDescription>Failed to load export history.</AlertDescription>
+					</Alert>
+					<Button variant="secondary" onClick={() => refetch()} className="w-full">
+						Retry
+					</Button>
 				</CardContent>
 			</Card>
 		);

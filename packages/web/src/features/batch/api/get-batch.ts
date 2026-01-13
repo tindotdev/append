@@ -1,4 +1,6 @@
 import { queryOptions, useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
 import { api, parseRpcJson } from '@/lib/api-rpc';
 import type { BatchResponse } from '../types';
 
@@ -31,5 +33,15 @@ export function getBatchQueryOptions(id: string) {
 
 // React Query hook
 export function useBatch(id: string) {
-	return useQuery(getBatchQueryOptions(id));
+	const query = useQuery(getBatchQueryOptions(id));
+
+	// Show toast on error (only when error state changes)
+	useEffect(() => {
+		if (query.error) {
+			console.error('[Batch] Failed to load batch:', query.error);
+			toast.error('Failed to load batch. Please try again.');
+		}
+	}, [query.error]);
+
+	return query;
 }

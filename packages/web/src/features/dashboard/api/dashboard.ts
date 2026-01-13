@@ -6,7 +6,8 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
+import { toast } from 'sonner';
 import { api, parseRpcJson } from '../../../lib/api-rpc';
 import { getBrowserTimezone } from '../telemetry/time';
 import type { HeatmapData, HeatmapStatsData } from '../types';
@@ -163,13 +164,23 @@ export function useDashboardToday(timezone?: string) {
 	const tz = timezone ?? getBrowserTimezone();
 	const enabled = useApiToggle();
 
-	return useQuery({
+	const query = useQuery({
 		queryKey: dashboardKeys.today(tz),
 		queryFn: () => fetchDashboardToday(tz),
 		enabled,
 		staleTime: 30_000, // 30 seconds
 		refetchOnWindowFocus: true,
 	});
+
+	// Show toast on error (only when error state changes)
+	useEffect(() => {
+		if (query.error) {
+			console.error("[Dashboard] Failed to load today's data:", query.error);
+			toast.error('Failed to load dashboard. Please try again.');
+		}
+	}, [query.error]);
+
+	return query;
 }
 
 /**
@@ -180,13 +191,23 @@ export function useDashboardWeek(start: string, timezone?: string) {
 	const tz = timezone ?? getBrowserTimezone();
 	const enabled = useApiToggle();
 
-	return useQuery({
+	const query = useQuery({
 		queryKey: dashboardKeys.week(start, tz),
 		queryFn: () => fetchDashboardWeek(start, tz),
 		enabled,
 		staleTime: 30_000,
 		refetchOnWindowFocus: true,
 	});
+
+	// Show toast on error (only when error state changes)
+	useEffect(() => {
+		if (query.error) {
+			console.error('[Dashboard] Failed to load weekly data:', query.error);
+			toast.error('Failed to load weekly dashboard. Please try again.');
+		}
+	}, [query.error]);
+
+	return query;
 }
 
 /**
@@ -197,11 +218,21 @@ export function useDashboardHeatmap(year: number, timezone?: string) {
 	const tz = timezone ?? getBrowserTimezone();
 	const enabled = useApiToggle();
 
-	return useQuery({
+	const query = useQuery({
 		queryKey: dashboardKeys.heatmap(year, tz),
 		queryFn: () => fetchDashboardHeatmap(year, tz),
 		enabled,
 		staleTime: 60_000, // 1 minute (heatmap changes less frequently)
 		refetchOnWindowFocus: true,
 	});
+
+	// Show toast on error (only when error state changes)
+	useEffect(() => {
+		if (query.error) {
+			console.error('[Dashboard] Failed to load heatmap data:', query.error);
+			toast.error('Failed to load heatmap. Please try again.');
+		}
+	}, [query.error]);
+
+	return query;
 }

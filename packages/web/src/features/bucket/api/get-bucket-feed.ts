@@ -1,4 +1,6 @@
 import { type QueryFunctionContext, useInfiniteQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
 import { api, type InferResponseType, parseRpcJson } from '@/lib/api-rpc';
 
 // Query key factory
@@ -35,11 +37,21 @@ export async function getBucketFeed(slug: string, options?: GetBucketFeedOptions
 
 // React Query hook with infinite scroll support
 export function useBucketFeed(slug: string, options?: { enabled?: boolean }) {
-	return useInfiniteQuery({
+	const query = useInfiniteQuery({
 		queryKey: bucketKeys.feed(slug),
 		queryFn: ({ pageParam }: QueryFunctionContext) => getBucketFeed(slug, { cursor: pageParam as string | undefined }),
 		initialPageParam: undefined as string | undefined,
 		getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
 		enabled: options?.enabled ?? true,
 	});
+
+	// Show toast on error (only when error state changes)
+	useEffect(() => {
+		if (query.error) {
+			console.error('[Bucket] Failed to load bucket feed:', query.error);
+			toast.error('Failed to load bucket. Please try again.');
+		}
+	}, [query.error]);
+
+	return query;
 }
