@@ -1,7 +1,7 @@
 import { type AnyRoute, createRoute, redirect } from '@tanstack/react-router';
 
 import { AppShell } from '@/components/layouts/AppShell';
-import { BatchDetailPage, BatchListPage, BatchNewPage, SearchPage } from '@/features/batch';
+import { BatchDetailPage, BatchListPage, BatchNewPage } from '@/features/batch';
 import { BucketFeedPage } from '@/features/bucket';
 import { DashboardPage } from '@/features/dashboard';
 import { ExportPage } from '@/features/export';
@@ -68,12 +68,6 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 		component: ImportPage,
 	});
 
-	const searchRoute = createRoute({
-		getParentRoute: () => protectedRoute,
-		path: '/search',
-		component: SearchPage,
-	});
-
 	const settingsRoute = createRoute({
 		getParentRoute: () => protectedRoute,
 		path: '/settings',
@@ -100,7 +94,6 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 		bucketFeedRoute,
 		exportRoute,
 		importRoute,
-		searchRoute,
 		settingsRoute,
 		dashboardRoute,
 		privacyRoute,

@@ -57,10 +57,6 @@ export function AppShell() {
 						e.preventDefault();
 						navigate({ to: '/batch/new' });
 						break;
-					case '/':
-						e.preventDefault();
-						navigate({ to: '/search' });
-						break;
 				}
 			}
 		};

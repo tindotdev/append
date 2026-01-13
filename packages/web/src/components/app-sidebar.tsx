@@ -9,7 +9,6 @@ import {
 	LogOut,
 	PenSquare,
 	Plus,
-	Search,
 	Settings,
 	Shield,
 } from 'lucide-react';
@@ -43,7 +42,6 @@ import { useUserBuckets } from '@/features/settings';
 
 const NAV_ITEMS = [
 	{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, shortcut: undefined },
-	{ to: '/search', label: 'Search', icon: Search, shortcut: '/' },
 	{ to: '/batch/new', label: 'Capture', icon: Plus, shortcut: 'C' },
 	{ to: '/batch', label: 'Batches', icon: Archive, shortcut: 'G B' },
 ] as const;
@@ -125,13 +123,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 					</SidebarMenu>
 					{/* Quick action icons (Linear-style) */}
 					<div className="flex items-center gap-0.5 pr-2 group-data-[collapsible=icon]:hidden">
-						<button
-							type="button"
-							className="flex size-7 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-							title="Search"
-						>
-							<Search className="size-4" />
-						</button>
 						<button
 							type="button"
 							className="flex size-7 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
