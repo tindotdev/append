@@ -14,6 +14,5 @@ export { BatchDetailPage } from './pages/BatchDetailPage';
 // Pages
 export { BatchListPage } from './pages/BatchListPage';
 export { BatchNewPage } from './pages/BatchNewPage';
-export { SearchPage } from './pages/SearchPage';
 // Types
 export type * from './types';
