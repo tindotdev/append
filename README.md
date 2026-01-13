@@ -12,25 +12,16 @@ just help   # Show all available commands
 
 See `docs/runbook.md` for detailed setup and operations.
 
-## Development Setup
+## Development Setup (CI/No Secrets)
 
-First-time setup (including git worktrees):
-
-```bash
-pnpm setup
-```
-
-This will:
-1. Install dependencies
-2. Initialize the local D1 database with migrations
-
-Then start the development servers:
+For CI or when secrets are already configured:
 
 ```bash
-pnpm dev
+pnpm setup:deps  # Install deps + run migrations (no secrets sync)
+pnpm dev:nosecrets  # Start servers without Doppler wrapper
 ```
 
-This runs both the API (http://localhost:8787) and Web (http://localhost:5173) servers in parallel.
+Note: Local development should use `just setup` and `just dev` instead (handles secrets via Doppler).
 
 ## Deployment (Cloudflare)
 
