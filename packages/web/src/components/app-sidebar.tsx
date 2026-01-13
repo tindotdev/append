@@ -69,6 +69,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const [editTarget, setEditTarget] = React.useState<UserBucket | null>(null);
 	const [deleteTarget, setDeleteTarget] = React.useState<UserBucket | null>(null);
 	const [deleteError, setDeleteError] = React.useState<string | null>(null);
+	const [focusedItemIndex, setFocusedItemIndex] = React.useState<number>(-1);
+	const menuItemsRef = React.useRef<(HTMLAnchorElement | null)[]>([]);
 
 	const updateBucketMutation = useUpdateBucket();
 	const deleteBucketMutation = useDeleteBucket();
@@ -138,6 +140,70 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 		navigate({ to: '/batch/new', search: { bucket: bucketSlug } });
 	};
 
+	// Keyboard navigation for sidebar items
+	React.useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			// Skip if user is typing in input/textarea or if a modal is open
+			const target = event.target as HTMLElement;
+			const isEditing = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+			if (isEditing || deleteTarget !== null || editTarget !== null || createSheetOpen) {
+				return;
+			}
+
+			// Get all navigable items (NAV_ITEMS + buckets + UTILITY_ITEMS)
+			const totalNavItems = NAV_ITEMS.length;
+			const totalBucketItems = bucketsOpen ? buckets.length : 0;
+			const totalUtilityItems = UTILITY_ITEMS.length;
+			const totalItems = totalNavItems + totalBucketItems + totalUtilityItems;
+
+			switch (event.key) {
+				case 'ArrowDown':
+					event.preventDefault();
+					setFocusedItemIndex((prev) => {
+						const next = prev < totalItems - 1 ? prev + 1 : 0;
+						// Focus the element
+						setTimeout(() => menuItemsRef.current[next]?.focus(), 0);
+						return next;
+					});
+					break;
+
+				case 'ArrowUp':
+					event.preventDefault();
+					setFocusedItemIndex((prev) => {
+						const next = prev > 0 ? prev - 1 : totalItems - 1;
+						setTimeout(() => menuItemsRef.current[next]?.focus(), 0);
+						return next;
+					});
+					break;
+
+				case 'Home':
+					event.preventDefault();
+					setFocusedItemIndex(0);
+					setTimeout(() => menuItemsRef.current[0]?.focus(), 0);
+					break;
+
+				case 'End':
+					event.preventDefault();
+					setFocusedItemIndex(totalItems - 1);
+					setTimeout(() => menuItemsRef.current[totalItems - 1]?.focus(), 0);
+					break;
+
+				case 'Enter':
+					event.preventDefault();
+					if (focusedItemIndex >= 0) {
+						menuItemsRef.current[focusedItemIndex]?.click();
+					}
+					break;
+
+				default:
+					break;
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, [focusedItemIndex, bucketsOpen, buckets.length, deleteTarget, editTarget, createSheetOpen]);
+
 	return (
 		<Sidebar collapsible="icon" {...props}>
 			{/* Header with user menu and action icons (Linear-style) */}
@@ -205,14 +271,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 				{/* Main Navigation */}
 				<SidebarGroup>
 					<SidebarMenu>
-						{NAV_ITEMS.map((item) => (
+						{NAV_ITEMS.map((item, index) => (
 							<SidebarMenuItem key={item.to}>
 								<SidebarMenuButton
 									asChild
 									isActive={location.pathname === item.to || (item.to === '/batch/new' && location.pathname === '/')}
 									tooltip={item.label}
 								>
-									<Link to={item.to}>
+									<Link
+										to={item.to}
+										ref={(el) => {
+											menuItemsRef.current[index] = el;
+										}}
+										tabIndex={0}
+									>
 										<item.icon className="size-4" />
 										<span>{item.label}</span>
 									</Link>
@@ -250,7 +322,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 						<CollapsibleContent>
 							<SidebarMenu>
 								{buckets.length > 0 ? (
-									buckets.map((bucket) => (
+									buckets.map((bucket, index) => (
 										<SidebarBucketItem
 											key={bucket.id}
 											bucket={bucket}
@@ -259,6 +331,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 											onExport={() => handleExportBucket(bucket.id)}
 											onDelete={() => handleDeleteBucket(bucket.id)}
 											onQuickAdd={() => handleQuickAdd(bucket.slug)}
+											ref={(el) => {
+												menuItemsRef.current[NAV_ITEMS.length + index] = el;
+											}}
 										/>
 									))
 								) : (
@@ -280,10 +355,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 				<SidebarGroup className="group-data-[collapsible=icon]:hidden">
 					<SidebarGroupLabel>Tools</SidebarGroupLabel>
 					<SidebarMenu>
-						{UTILITY_ITEMS.map((item) => (
+						{UTILITY_ITEMS.map((item, index) => (
 							<SidebarMenuItem key={item.to}>
 								<SidebarMenuButton asChild isActive={location.pathname === item.to} tooltip={item.label}>
-									<Link to={item.to}>
+									<Link
+										to={item.to}
+										ref={(el) => {
+											menuItemsRef.current[NAV_ITEMS.length + buckets.length + index] = el;
+										}}
+										tabIndex={0}
+									>
 										<item.icon className="size-4" />
 										<span>{item.label}</span>
 									</Link>
