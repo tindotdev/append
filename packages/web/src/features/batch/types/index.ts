@@ -54,9 +54,28 @@ export interface ListBatchesResponse {
 	nextCursor: string | null;
 }
 
+// Valid batch statuses for filtering
+export type BatchStatusFilter = 'captured' | 'suggested' | 'accepted';
+
+// Valid sort fields
+export type BatchSortField = 'created' | 'candidateCount' | 'acceptanceRate';
+
+// Valid sort orders
+export type BatchSortOrder = 'asc' | 'desc';
+
 export interface ListBatchesOptions {
 	limit?: number;
 	cursor?: string;
+	// Search filter: searches batch sample terms
+	search?: string;
+	// Status filter: filter by batch status
+	status?: BatchStatusFilter;
+	// Error filter: filter batches with errors
+	hasErrors?: boolean;
+	// Sort field
+	sortBy?: BatchSortField;
+	// Sort order
+	sortOrder?: BatchSortOrder;
 }
 
 export interface CreateBatchRequest {

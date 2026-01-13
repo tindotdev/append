@@ -2,9 +2,10 @@
  * Use case: List batches for a user.
  *
  * Returns paginated batches with candidate counts.
+ * Supports search, filtering, and sorting.
  */
 
-import { and, count, eq, lt, or, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, like, lt, or, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type BatchStatus, batch, candidate, type schema } from '../../../db';
 import type { ListBatchesInput } from '../validation/listBatches.schema';
@@ -45,7 +46,7 @@ export interface ListBatchesResult {
 }
 
 /**
- * List batches for a user with pagination.
+ * List batches for a user with pagination, search, filtering, and sorting.
  *
  * @param db - Drizzle D1 database instance
  * @param userId - User ID
@@ -57,13 +58,59 @@ export async function listBatches(
 	userId: string,
 	input: ListBatchesInput
 ): Promise<ListBatchesResult> {
-	const { limit, cursor } = input;
+	const { limit, cursor, search, status, hasErrors, sortBy, sortOrder } = input;
 
 	// Build query conditions
 	const conditions = [eq(batch.userId, userId)];
 
-	// If cursor provided, get batches created before the cursor
-	if (cursor) {
+	// Status filter
+	if (status) {
+		conditions.push(eq(batch.status, status));
+	}
+
+	// Search filter: find batch IDs where any candidate term matches
+	let searchBatchIds: string[] | null = null;
+	if (search) {
+		const searchPattern = `%${search.toLowerCase()}%`;
+		const matchingBatches = await db
+			.selectDistinct({ batchId: candidate.batchId })
+			.from(candidate)
+			.innerJoin(batch, eq(candidate.batchId, batch.id))
+			.where(and(eq(batch.userId, userId), like(sql`lower(${candidate.term})`, searchPattern)));
+
+		searchBatchIds = matchingBatches.map((b) => b.batchId);
+
+		// If no matches, return empty result early
+		if (searchBatchIds.length === 0) {
+			return { batches: [], nextCursor: null };
+		}
+
+		conditions.push(inArray(batch.id, searchBatchIds));
+	}
+
+	// hasErrors filter: find batch IDs with error candidates
+	if (hasErrors === true) {
+		const errorBatches = await db
+			.selectDistinct({ batchId: candidate.batchId })
+			.from(candidate)
+			.innerJoin(batch, eq(candidate.batchId, batch.id))
+			.where(and(eq(batch.userId, userId), eq(candidate.suggestionStatus, 'error')));
+
+		const errorBatchIds = errorBatches.map((b) => b.batchId);
+
+		// If no matches, return empty result early
+		if (errorBatchIds.length === 0) {
+			return { batches: [], nextCursor: null };
+		}
+
+		conditions.push(inArray(batch.id, errorBatchIds));
+	}
+
+	// Determine if we need custom sorting (by candidateCount or acceptanceRate)
+	const needsCustomSort = sortBy === 'candidateCount' || sortBy === 'acceptanceRate';
+
+	// If cursor provided and not using custom sort, get batches created before the cursor
+	if (cursor && !needsCustomSort) {
 		const decoded = decodeCursor(cursor);
 		if (decoded) {
 			// Use (createdAt, id) tuple for stable cursor-based pagination
@@ -75,7 +122,18 @@ export async function listBatches(
 		}
 	}
 
-	// Fetch batches with one extra to determine if there's a next page
+	// Build sort order
+	const descOrder = sortOrder !== 'asc'; // Default to desc
+	const orderByClause =
+		sortBy === 'created' || !sortBy
+			? descOrder
+				? sql`${batch.createdAt} DESC, ${batch.id} DESC`
+				: sql`${batch.createdAt} ASC, ${batch.id} ASC`
+			: // For candidateCount and acceptanceRate, we'll sort in-memory after fetching stats
+				sql`${batch.createdAt} DESC, ${batch.id} DESC`;
+
+	// Fetch batches - get more if we need custom sorting
+	const fetchLimit = needsCustomSort ? 1000 : limit + 1;
 	const batches = await db
 		.select({
 			id: batch.id,
@@ -85,25 +143,11 @@ export async function listBatches(
 		})
 		.from(batch)
 		.where(and(...conditions))
-		.orderBy(sql`${batch.createdAt} DESC, ${batch.id} DESC`)
-		.limit(limit + 1);
+		.orderBy(orderByClause)
+		.limit(fetchLimit);
 
-	// Determine if there's a next page
-	const hasNextPage = batches.length > limit;
-	const resultBatches = hasNextPage ? batches.slice(0, limit) : batches;
-
-	// Encode next cursor
-	let nextCursor: string | null = null;
-	if (hasNextPage && resultBatches.length > 0) {
-		const lastBatch = resultBatches[resultBatches.length - 1];
-		nextCursor = encodeCursor({
-			createdAt: lastBatch.createdAt.getTime(),
-			id: lastBatch.id,
-		});
-	}
-
-	// Get enhanced metadata for all batches in one query
-	const batchIds = resultBatches.map((b) => b.id);
+	// Get enhanced metadata for all batches
+	const batchIds = batches.map((b) => b.id);
 	let candidateStats: {
 		batchId: string;
 		totalCount: number;
@@ -174,33 +218,74 @@ export async function listBatches(
 		statsMap.set(stat.batchId, stat);
 	}
 
-	return {
-		batches: resultBatches.map((b) => {
-			const stats = statsMap.get(b.id);
-			const totalCount = stats?.totalCount ?? 0;
-			const acceptedCount = stats?.acceptedCount ?? 0;
-			const errorCount = stats?.errorCount ?? 0;
-			const pendingCount = stats?.pendingCount ?? 0;
-			const readyCount = stats?.readyCount ?? 0;
+	// Transform batches to summaries with stats
+	let batchSummaries: BatchSummary[] = batches.map((b) => {
+		const stats = statsMap.get(b.id);
+		const totalCount = stats?.totalCount ?? 0;
+		const acceptedCount = stats?.acceptedCount ?? 0;
+		const errorCount = stats?.errorCount ?? 0;
+		const pendingCount = stats?.pendingCount ?? 0;
+		const readyCount = stats?.readyCount ?? 0;
 
-			return {
-				id: b.id,
-				status: b.status,
-				candidateCount: totalCount,
-				statusBreakdown: {
-					ready: readyCount,
-					pending: pendingCount,
-					accepted: acceptedCount,
-					error: errorCount,
-				},
-				acceptanceRate: totalCount > 0 ? Math.round((acceptedCount / totalCount) * 100) : 0,
-				sampleTerms: sampleTermsMap.get(b.id) ?? [],
-				hasErrors: errorCount > 0,
-				errorCount,
-				createdAt: b.createdAt.getTime(),
-				updatedAt: b.updatedAt.getTime(),
-			};
-		}),
+		return {
+			id: b.id,
+			status: b.status,
+			candidateCount: totalCount,
+			statusBreakdown: {
+				ready: readyCount,
+				pending: pendingCount,
+				accepted: acceptedCount,
+				error: errorCount,
+			},
+			acceptanceRate: totalCount > 0 ? Math.round((acceptedCount / totalCount) * 100) : 0,
+			sampleTerms: sampleTermsMap.get(b.id) ?? [],
+			hasErrors: errorCount > 0,
+			errorCount,
+			createdAt: b.createdAt.getTime(),
+			updatedAt: b.updatedAt.getTime(),
+		};
+	});
+
+	// Custom sort if needed
+	if (needsCustomSort) {
+		const multiplier = descOrder ? -1 : 1;
+
+		if (sortBy === 'candidateCount') {
+			batchSummaries.sort((a, b) => multiplier * (a.candidateCount - b.candidateCount));
+		} else if (sortBy === 'acceptanceRate') {
+			batchSummaries.sort((a, b) => multiplier * (a.acceptanceRate - b.acceptanceRate));
+		}
+
+		// Apply cursor-based pagination for custom sort
+		if (cursor) {
+			const cursorIndex = batchSummaries.findIndex((b) => b.id === cursor);
+			if (cursorIndex !== -1) {
+				batchSummaries = batchSummaries.slice(cursorIndex + 1);
+			}
+		}
+	}
+
+	// Determine pagination
+	const hasNextPage = batchSummaries.length > limit;
+	const resultBatches = hasNextPage ? batchSummaries.slice(0, limit) : batchSummaries;
+
+	// Encode next cursor
+	let nextCursor: string | null = null;
+	if (hasNextPage && resultBatches.length > 0) {
+		const lastBatch = resultBatches[resultBatches.length - 1];
+		if (needsCustomSort) {
+			// For custom sort, use batch ID as cursor
+			nextCursor = lastBatch.id;
+		} else {
+			nextCursor = encodeCursor({
+				createdAt: lastBatch.createdAt,
+				id: lastBatch.id,
+			});
+		}
+	}
+
+	return {
+		batches: resultBatches,
 		nextCursor,
 	};
 }
