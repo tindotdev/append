@@ -1,18 +1,25 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import type { RowSelectionState } from '@tanstack/react-table';
 import { Loader2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useOutboxSafe } from '@/features/outbox';
+import { ApiRequestError } from '@/lib/api-rpc';
 import { UNDO_GRACE_MS } from '@/lib/outbox-adapter';
+import { acceptBatch } from '../api/accept-batch';
+import { deleteBatch } from '../api/delete-batch';
+import { batchKeys, getBatch } from '../api/get-batch';
 import { useBatches } from '../api/list-batches';
+import { generateSuggestions } from '../api/retry-suggestions';
 import { BatchTable } from '../components/BatchTable';
 import { type BatchColumnMeta, getBatchColumns } from '../components/batch-columns';
-import type { BatchListItem } from '../types';
+import type { BatchListItem, Candidate } from '../types';
 
 // --- Constants ---
 const TERM_MIN = 1;
@@ -120,10 +127,19 @@ export function BatchNewPage() {
 	// Use safe hook that won't throw during initialization
 	const outbox = useOutboxSafe();
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
 
 	const [rows, setRows] = useState<TermRow[]>(() => loadDraft());
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+	// Action loading states: Map of batchId -> action type
+	const [acceptingBatches, setAcceptingBatches] = useState<Set<string>>(new Set());
+	const [retryingBatches, setRetryingBatches] = useState<Set<string>>(new Set());
+	const [deletingBatches, setDeletingBatches] = useState<Set<string>>(new Set());
+
+	// Delete confirmation dialog state
+	const [batchToDelete, setBatchToDelete] = useState<BatchListItem | null>(null);
 
 	// Fetch batches for the table
 	const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useBatches();
@@ -309,19 +325,135 @@ export function BatchNewPage() {
 		[navigate]
 	);
 
-	const handleAcceptAllReady = useCallback((batch: BatchListItem) => {
-		// TODO: Implement accept all ready candidates
-		toast.info(`Accepting ${batch.statusBreakdown.ready} ready candidates...`);
-	}, []);
+	const handleAcceptAllReady = useCallback(
+		async (batch: BatchListItem) => {
+			// Skip if already accepting this batch
+			if (acceptingBatches.has(batch.id)) return;
 
-	const handleRetry = useCallback((batch: BatchListItem) => {
-		// TODO: Implement retry failed suggestions
-		toast.info(`Retrying ${batch.errorCount} failed suggestions...`);
-	}, []);
+			setAcceptingBatches((prev) => new Set(prev).add(batch.id));
+
+			try {
+				const summary = await acceptBatch(batch.id);
+				toast.success(`Accepted ${summary.acceptedCount} terms (${summary.termCreatedCount} new terms created)`);
+
+				// Invalidate the batches list to refetch updated data
+				await queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
+			} catch (err) {
+				if (err instanceof ApiRequestError) {
+					if (err.status === 409) {
+						const reason = err.details?.reason as string | undefined;
+						if (reason === 'SUGGESTIONS_IN_PROGRESS') {
+							toast.error('Cannot accept: some suggestions are still being generated.');
+						} else if (reason === 'MISSING_EFFECTIVE_FIELDS') {
+							toast.error('Cannot accept: some candidates are missing bucket or text.');
+						} else {
+							toast.error('Cannot accept: please refresh and try again.');
+						}
+					} else {
+						toast.error('Accept failed. Please try again.');
+					}
+				} else {
+					toast.error('Accept failed. Please try again.');
+				}
+			} finally {
+				setAcceptingBatches((prev) => {
+					const next = new Set(prev);
+					next.delete(batch.id);
+					return next;
+				});
+			}
+		},
+		[acceptingBatches, queryClient]
+	);
+
+	const handleRetry = useCallback(
+		async (batch: BatchListItem) => {
+			// Skip if already retrying this batch
+			if (retryingBatches.has(batch.id)) return;
+
+			setRetryingBatches((prev) => new Set(prev).add(batch.id));
+
+			let successCount = 0;
+			let errorCount = 0;
+
+			try {
+				await generateSuggestions(batch.id, {
+					onCandidate: (event) => {
+						if (event.status === 'ok' || event.status === 'cached') successCount++;
+						if (event.status === 'error') errorCount++;
+					},
+					onDone: () => {
+						if (errorCount > 0) {
+							toast.warning(`Generated ${successCount} suggestions, ${errorCount} failed`);
+						} else if (successCount > 0) {
+							toast.success(`Generated ${successCount} suggestions`);
+						} else {
+							toast.info('No suggestions to generate');
+						}
+					},
+					onError: (err) => {
+						toast.error(`Generation failed: ${err}`);
+					},
+				});
+
+				// Invalidate the batches list to refetch updated data
+				await queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
+			} catch {
+				toast.error('Failed to generate suggestions. Please try again.');
+			} finally {
+				setRetryingBatches((prev) => {
+					const next = new Set(prev);
+					next.delete(batch.id);
+					return next;
+				});
+			}
+		},
+		[retryingBatches, queryClient]
+	);
 
 	const handleDelete = useCallback((batch: BatchListItem) => {
-		// TODO: Implement delete batch
-		toast.info('Delete batch functionality coming soon...');
+		// Show confirmation dialog
+		setBatchToDelete(batch);
+	}, []);
+
+	const handleConfirmDelete = useCallback(async () => {
+		if (!batchToDelete) return;
+		if (deletingBatches.has(batchToDelete.id)) return;
+
+		const batch = batchToDelete;
+		setBatchToDelete(null);
+		setDeletingBatches((prev) => new Set(prev).add(batch.id));
+
+		try {
+			await deleteBatch(batch.id);
+			toast.success(`Deleted batch with ${batch.candidateCount} terms`);
+
+			// Invalidate the batches list to refetch updated data
+			await queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
+		} catch (err) {
+			if (err instanceof ApiRequestError) {
+				if (err.status === 404) {
+					toast.error('Batch not found. It may have already been deleted.');
+					await queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
+				} else {
+					toast.error('Failed to delete batch. Please try again.');
+				}
+			} else {
+				toast.error('Failed to delete batch. Please try again.');
+			}
+		} finally {
+			setDeletingBatches((prev) => {
+				const next = new Set(prev);
+				next.delete(batch.id);
+				return next;
+			});
+		}
+	}, [batchToDelete, deletingBatches, queryClient]);
+
+	// Fetch candidates for expanded row preview
+	const handleFetchCandidates = useCallback(async (batchId: string): Promise<Candidate[]> => {
+		const data = await getBatch(batchId);
+		return data.candidates;
 	}, []);
 
 	// Column metadata
@@ -330,6 +462,9 @@ export function BatchNewPage() {
 		onAcceptAllReady: handleAcceptAllReady,
 		onRetry: handleRetry,
 		onDelete: handleDelete,
+		acceptingBatches,
+		retryingBatches,
+		deletingBatches,
 	};
 
 	const columns = getBatchColumns(columnMeta);
@@ -467,6 +602,7 @@ export function BatchNewPage() {
 								onRowClick={handleViewDetails}
 								rowSelection={rowSelection}
 								onRowSelectionChange={setRowSelection}
+								onFetchCandidates={handleFetchCandidates}
 							/>
 
 							{/* Load more button */}
@@ -482,6 +618,27 @@ export function BatchNewPage() {
 					)}
 				</div>
 			</div>
+
+			{/* Delete Confirmation Dialog */}
+			<Dialog open={!!batchToDelete} onOpenChange={(open) => !open && setBatchToDelete(null)}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Delete Batch</DialogTitle>
+						<DialogDescription>
+							Are you sure you want to delete this batch with {batchToDelete?.candidateCount ?? 0} term
+							{batchToDelete?.candidateCount !== 1 ? 's' : ''}? This action cannot be undone.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<DialogClose asChild>
+							<Button variant="secondary">Cancel</Button>
+						</DialogClose>
+						<Button variant="destructive" onClick={handleConfirmDelete}>
+							Delete
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

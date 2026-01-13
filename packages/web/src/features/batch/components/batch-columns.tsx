@@ -1,6 +1,6 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, ChevronRight, Loader2, MoreHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -19,6 +19,9 @@ export interface BatchColumnMeta {
 	onAcceptAllReady: (batch: BatchListItem) => void;
 	onRetry: (batch: BatchListItem) => void;
 	onDelete: (batch: BatchListItem) => void;
+	acceptingBatches?: Set<string>;
+	retryingBatches?: Set<string>;
+	deletingBatches?: Set<string>;
 }
 
 function getStatusVariant(status: string): 'secondary' | 'default' | 'success' {
@@ -87,14 +90,18 @@ export function getBatchColumns(meta: BatchColumnMeta): ColumnDef<BatchListItem>
 				const batch = row.original;
 				const displayTerms = batch.sampleTerms.slice(0, 3).join(', ');
 				const remainingCount = batch.candidateCount - 3;
+				const isExpanded = row.getIsExpanded();
 
 				return (
-					<div className="flex flex-col gap-1">
-						<div className="font-medium">
-							{displayTerms || 'Empty batch'}
-							{remainingCount > 0 && <span className="text-muted-foreground"> +{remainingCount} more</span>}
+					<div className="flex items-center gap-2">
+						<span className="text-zinc-500">{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</span>
+						<div className="flex flex-col gap-1">
+							<div className="font-medium">
+								{displayTerms || 'Empty batch'}
+								{remainingCount > 0 && <span className="text-muted-foreground"> +{remainingCount} more</span>}
+							</div>
+							<div className="text-xs text-muted-foreground">{batch.candidateCount} terms</div>
 						</div>
-						<div className="text-xs text-muted-foreground">{batch.candidateCount} terms</div>
 					</div>
 				);
 			},
@@ -195,24 +202,55 @@ export function getBatchColumns(meta: BatchColumnMeta): ColumnDef<BatchListItem>
 				const batch = row.original;
 				const hasReadyCandidates = batch.statusBreakdown.ready > 0;
 				const hasErrors = batch.hasErrors;
+				const isAccepting = meta.acceptingBatches?.has(batch.id) ?? false;
+				const isRetrying = meta.retryingBatches?.has(batch.id) ?? false;
+				const isDeleting = meta.deletingBatches?.has(batch.id) ?? false;
+				const isLoading = isAccepting || isRetrying || isDeleting;
 
 				return (
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-							<Button variant="ghost" className="h-8 w-8 p-0">
+							<Button variant="ghost" className="h-8 w-8 p-0" disabled={isLoading}>
 								<span className="sr-only">Open menu</span>
-								<MoreHorizontal className="h-4 w-4" />
+								{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
 							</Button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end">
 							<DropdownMenuItem onClick={() => meta.onViewDetails(batch)}>View Details</DropdownMenuItem>
 							{hasReadyCandidates && (
-								<DropdownMenuItem onClick={() => meta.onAcceptAllReady(batch)}>Accept All Ready ({batch.statusBreakdown.ready})</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => meta.onAcceptAllReady(batch)} disabled={isAccepting}>
+									{isAccepting ? (
+										<>
+											<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+											Accepting...
+										</>
+									) : (
+										`Accept All Ready (${batch.statusBreakdown.ready})`
+									)}
+								</DropdownMenuItem>
 							)}
-							{hasErrors && <DropdownMenuItem onClick={() => meta.onRetry(batch)}>Retry Failed ({batch.errorCount})</DropdownMenuItem>}
+							{hasErrors && (
+								<DropdownMenuItem onClick={() => meta.onRetry(batch)} disabled={isRetrying}>
+									{isRetrying ? (
+										<>
+											<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+											Retrying...
+										</>
+									) : (
+										`Retry Failed (${batch.errorCount})`
+									)}
+								</DropdownMenuItem>
+							)}
 							<DropdownMenuSeparator />
-							<DropdownMenuItem className="text-destructive" onClick={() => meta.onDelete(batch)}>
-								Delete Batch
+							<DropdownMenuItem className="text-destructive" onClick={() => meta.onDelete(batch)} disabled={isDeleting}>
+								{isDeleting ? (
+									<>
+										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+										Deleting...
+									</>
+								) : (
+									'Delete Batch'
+								)}
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>

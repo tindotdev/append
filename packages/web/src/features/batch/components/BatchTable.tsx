@@ -1,15 +1,18 @@
 import {
 	type ColumnDef,
+	type ExpandedState,
 	flexRender,
 	getCoreRowModel,
+	getExpandedRowModel,
 	getSortedRowModel,
 	type RowSelectionState,
 	type SortingState,
 	useReactTable,
 } from '@tanstack/react-table';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { BatchListItem } from '../types';
+import type { BatchListItem, Candidate } from '../types';
+import { ExpandedRowContent } from './ExpandedRowContent';
 
 interface BatchTableProps {
 	columns: ColumnDef<BatchListItem>[];
@@ -17,17 +20,21 @@ interface BatchTableProps {
 	onRowClick?: (row: BatchListItem) => void;
 	rowSelection?: RowSelectionState;
 	onRowSelectionChange?: (selection: RowSelectionState) => void;
+	onFetchCandidates?: (batchId: string) => Promise<Candidate[]>;
 }
 
-export function BatchTable({ columns, data, onRowClick, rowSelection = {}, onRowSelectionChange }: BatchTableProps) {
+export function BatchTable({ columns, data, onRowClick, rowSelection = {}, onRowSelectionChange, onFetchCandidates }: BatchTableProps) {
 	const [sorting, setSorting] = useState<SortingState>([{ id: 'created', desc: true }]);
+	const [expanded, setExpanded] = useState<ExpandedState>({});
 
 	const table = useReactTable({
 		data,
 		columns,
 		getCoreRowModel: getCoreRowModel(),
 		getSortedRowModel: getSortedRowModel(),
+		getExpandedRowModel: getExpandedRowModel(),
 		onSortingChange: setSorting,
+		onExpandedChange: setExpanded,
 		onRowSelectionChange: (updater) => {
 			const newSelection = typeof updater === 'function' ? updater(rowSelection) : updater;
 			onRowSelectionChange?.(newSelection);
@@ -37,6 +44,7 @@ export function BatchTable({ columns, data, onRowClick, rowSelection = {}, onRow
 		state: {
 			sorting,
 			rowSelection,
+			expanded,
 		},
 	});
 
@@ -57,16 +65,37 @@ export function BatchTable({ columns, data, onRowClick, rowSelection = {}, onRow
 				<TableBody>
 					{table.getRowModel().rows?.length ? (
 						table.getRowModel().rows.map((row) => (
-							<TableRow
-								key={row.id}
-								data-state={row.getIsSelected() && 'selected'}
-								className="border-zinc-800 cursor-pointer hover:bg-zinc-800/50"
-								onClick={() => onRowClick?.(row.original)}
-							>
-								{row.getVisibleCells().map((cell) => (
-									<TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
-								))}
-							</TableRow>
+							<Fragment key={row.id}>
+								<TableRow
+									data-state={row.getIsSelected() && 'selected'}
+									data-expanded={row.getIsExpanded()}
+									className="border-zinc-800 cursor-pointer hover:bg-zinc-800/50"
+									onClick={(e) => {
+										// Check if click was on an interactive element
+										const target = e.target as HTMLElement;
+										const isInteractive = target.closest('button, input, [role="checkbox"], [role="menuitem"]');
+										if (!isInteractive) {
+											row.toggleExpanded();
+										}
+									}}
+									onDoubleClick={() => onRowClick?.(row.original)}
+								>
+									{row.getVisibleCells().map((cell) => (
+										<TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+									))}
+								</TableRow>
+								{row.getIsExpanded() && (
+									<TableRow className="border-zinc-800 hover:bg-transparent">
+										<TableCell colSpan={columns.length} className="p-0">
+											<ExpandedRowContent
+												batch={row.original}
+												onFetchCandidates={onFetchCandidates}
+												onViewDetails={() => onRowClick?.(row.original)}
+											/>
+										</TableCell>
+									</TableRow>
+								)}
+							</Fragment>
 						))
 					) : (
 						<TableRow>
