@@ -19,10 +19,10 @@ import { bulkDeleteBatches } from '../api/bulk-delete';
 import { deleteBatch } from '../api/delete-batch';
 import { batchKeys, getBatch } from '../api/get-batch';
 import { type BatchesFilterOptions, useBatches } from '../api/list-batches';
-import { generateSuggestions } from '../api/retry-suggestions';
 import { BatchBulkActionBar } from '../components/BatchBulkActionBar';
 import { BatchTable } from '../components/BatchTable';
 import { type BatchColumnMeta, getBatchColumns } from '../components/batch-columns';
+import { useBatchStatusUpdates } from '../hooks/useBatchStatusUpdates';
 import type { BatchListItem, BatchSortField, BatchSortOrder, BatchStatusFilter, Candidate } from '../types';
 
 // --- Constants ---
@@ -136,6 +136,12 @@ export function BatchNewPage() {
 	const [rows, setRows] = useState<TermRow[]>(() => loadDraft());
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+	// Real-time batch status updates via SSE
+	const { trackBatch, progress: batchProgress } = useBatchStatusUpdates({
+		showToasts: true,
+		autoRefresh: true,
+	});
 
 	// Action loading states: Map of batchId -> action type
 	const [acceptingBatches, setAcceptingBatches] = useState<Set<string>>(new Set());
@@ -413,33 +419,11 @@ export function BatchNewPage() {
 
 			setRetryingBatches((prev) => new Set(prev).add(batch.id));
 
-			let successCount = 0;
-			let errorCount = 0;
-
 			try {
-				await generateSuggestions(batch.id, {
-					onCandidate: (event) => {
-						if (event.status === 'ok' || event.status === 'cached') successCount++;
-						if (event.status === 'error') errorCount++;
-					},
-					onDone: () => {
-						if (errorCount > 0) {
-							toast.warning(`Generated ${successCount} suggestions, ${errorCount} failed`);
-						} else if (successCount > 0) {
-							toast.success(`Generated ${successCount} suggestions`);
-						} else {
-							toast.info('No suggestions to generate');
-						}
-					},
-					onError: (err) => {
-						toast.error(`Generation failed: ${err}`);
-					},
-				});
-
-				// Invalidate the batches list to refetch updated data
-				await queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
+				// Use trackBatch for real-time updates
+				await trackBatch(batch.id);
 			} catch {
-				toast.error('Failed to generate suggestions. Please try again.');
+				// Error handling is done in the hook
 			} finally {
 				setRetryingBatches((prev) => {
 					const next = new Set(prev);
@@ -448,7 +432,7 @@ export function BatchNewPage() {
 				});
 			}
 		},
-		[retryingBatches, queryClient]
+		[retryingBatches, trackBatch]
 	);
 
 	const handleDelete = useCallback((batch: BatchListItem) => {
@@ -540,41 +524,28 @@ export function BatchNewPage() {
 
 		let successCount = 0;
 		let failedCount = 0;
-		let totalGenerated = 0;
 
-		// Process batches sequentially using existing SSE endpoint
+		// Process batches sequentially using trackBatch for real-time updates
 		for (const batchId of selectedBatchIds) {
 			try {
-				await generateSuggestions(batchId, {
-					onCandidate: (event) => {
-						if (event.status === 'ok' || event.status === 'cached') totalGenerated++;
-					},
-					onDone: () => {
-						successCount++;
-					},
-					onError: () => {
-						failedCount++;
-					},
-				});
+				await trackBatch(batchId);
+				successCount++;
 			} catch {
 				failedCount++;
 			}
 		}
 
-		// Show appropriate toast
-		if (failedCount === 0) {
-			toast.success(`Generated suggestions for ${successCount} batches (${totalGenerated} candidates)`);
-		} else if (successCount === 0) {
+		// Show appropriate toast (individual batch toasts are handled by the hook)
+		if (failedCount > 0 && successCount > 0) {
+			toast.warning(`Completed ${successCount} batches, ${failedCount} failed`);
+		} else if (failedCount > 0) {
 			toast.error('Failed to retry all batches. Please try again.');
-		} else {
-			toast.warning(`Retried ${successCount} batches, ${failedCount} failed`);
 		}
 
-		// Clear selection and refresh
+		// Clear selection (list refresh is handled by the hook)
 		setRowSelection({});
-		await queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
 		setIsBulkRetrying(false);
-	}, [selectedBatchIds, isBulkRetrying, queryClient]);
+	}, [selectedBatchIds, isBulkRetrying, trackBatch]);
 
 	const handleBulkDeleteRequest = useCallback(() => {
 		if (selectedBatchIds.length === 0) return;
@@ -623,6 +594,7 @@ export function BatchNewPage() {
 		acceptingBatches,
 		retryingBatches,
 		deletingBatches,
+		batchProgress,
 	};
 
 	const columns = getBatchColumns(columnMeta);
