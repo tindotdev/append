@@ -1,11 +1,18 @@
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
+import type { RowSelectionState } from '@tanstack/react-table';
 import { Search } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
+import { ApiRequestError } from '@/lib/api-rpc';
 import { useUserBuckets } from '@/lib/user-buckets';
+import { useArchiveTerm, useRestoreTerm } from '../api/archive-term';
 import { useBucketFeed } from '../api/get-bucket-feed';
+import { useUpdateTermSense } from '../api/update-term-sense';
 import { BucketTable } from '../components/BucketTable';
-import { columns } from '../components/columns';
+import { BulkActionBar } from '../components/BulkActionBar';
+import { type ColumnMeta, getColumns } from '../components/columns';
+import { MoveToBucketDialog } from '../components/MoveToBucketDialog';
 import { TermDetailSheet } from '../components/TermDetailSheet';
 import type { BucketFeedItem } from '../types';
 
@@ -80,6 +87,13 @@ function FeedContent({
 	selectedTermId,
 	onRowClick,
 	onClosePanel,
+	rowSelection,
+	onRowSelectionChange,
+	onDelete,
+	onMove,
+	onClearSelection,
+	onBulkDelete,
+	onBulkMove,
 }: {
 	title: string;
 	items: BucketFeedItem[];
@@ -89,6 +103,13 @@ function FeedContent({
 	selectedTermId: string | null;
 	onRowClick: (item: BucketFeedItem) => void;
 	onClosePanel: () => void;
+	rowSelection: RowSelectionState;
+	onRowSelectionChange: (selection: RowSelectionState) => void;
+	onDelete: (item: BucketFeedItem) => void;
+	onMove: (item: BucketFeedItem) => void;
+	onClearSelection: () => void;
+	onBulkDelete: () => void;
+	onBulkMove: () => void;
 }) {
 	const [searchQuery, setSearchQuery] = useState('');
 	const deferredQuery = useDeferredValue(searchQuery);
@@ -101,54 +122,74 @@ function FeedContent({
 
 	const isFiltering = searchQuery !== deferredQuery;
 
+	const columnMeta: ColumnMeta = useMemo(() => ({ onDelete, onMove }), [onDelete, onMove]);
+	const columns = useMemo(() => getColumns(columnMeta), [columnMeta]);
+	const selectedCount = Object.keys(rowSelection).length;
+
 	return (
-		<div className="max-w-4xl">
-			<h2 className="text-xl font-semibold">{title}</h2>
-			<p className="text-sm text-zinc-500 mt-1">
-				{items.length} item{items.length !== 1 ? 's' : ''}
-				{hasNextPage ? ' (more available)' : ''}
-			</p>
+		<>
+			<div className="max-w-4xl">
+				<h2 className="text-xl font-semibold">{title}</h2>
+				<p className="text-sm text-zinc-500 mt-1">
+					{items.length} item{items.length !== 1 ? 's' : ''}
+					{hasNextPage ? ' (more available)' : ''}
+				</p>
 
-			{/* Search input */}
-			<div className="mt-4 relative">
-				<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
-				<Input
-					type="search"
-					placeholder="Filter items..."
-					value={searchQuery}
-					onChange={(e) => setSearchQuery(e.target.value)}
-					className="pl-9"
-				/>
-			</div>
-
-			{/* Filtered count */}
-			{searchQuery && (
-				<p className="text-sm text-zinc-500 mt-2">{isFiltering ? 'Filtering...' : `${filteredItems.length} of ${items.length} items`}</p>
-			)}
-
-			{/* Table */}
-			<div className="mt-4">
-				<BucketTable columns={columns} data={filteredItems} onRowClick={onRowClick} />
-			</div>
-
-			{hasNextPage && (
-				<div className="mt-6 flex justify-center">
-					<button
-						type="button"
-						onClick={onFetchNextPage}
-						disabled={isFetchingNextPage}
-						className="px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-					>
-						{isFetchingNextPage && <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />}
-						Load more
-					</button>
+				{/* Search input */}
+				<div className="mt-4 relative">
+					<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+					<Input
+						type="search"
+						placeholder="Filter items..."
+						value={searchQuery}
+						onChange={(e) => setSearchQuery(e.target.value)}
+						className="pl-9"
+					/>
 				</div>
-			)}
 
-			{/* Term detail sheet */}
-			<TermDetailSheet termId={selectedTermId} onClose={onClosePanel} />
-		</div>
+				{/* Filtered count */}
+				{searchQuery && (
+					<p className="text-sm text-zinc-500 mt-2">{isFiltering ? 'Filtering...' : `${filteredItems.length} of ${items.length} items`}</p>
+				)}
+
+				{/* Table */}
+				<div className="mt-4">
+					<BucketTable
+						columns={columns}
+						data={filteredItems}
+						onRowClick={onRowClick}
+						rowSelection={rowSelection}
+						onRowSelectionChange={onRowSelectionChange}
+					/>
+				</div>
+
+				{hasNextPage && (
+					<div className="mt-6 flex justify-center">
+						<button
+							type="button"
+							onClick={onFetchNextPage}
+							disabled={isFetchingNextPage}
+							className="px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+						>
+							{isFetchingNextPage && <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />}
+							Load more
+						</button>
+					</div>
+				)}
+
+				{/* Term detail sheet */}
+				<TermDetailSheet termId={selectedTermId} onClose={onClosePanel} />
+			</div>
+
+			{/* Bulk action bar */}
+			<BulkActionBar selectedCount={selectedCount} onClear={onClearSelection} onBulkDelete={onBulkDelete} onBulkMove={onBulkMove} />
+		</>
 	);
+}
+
+interface MoveDialogState {
+	open: boolean;
+	items: BucketFeedItem[];
 }
 
 export function BucketFeedPage() {
@@ -157,6 +198,13 @@ export function BucketFeedPage() {
 	const navigate = useNavigate();
 
 	const selectedTermId = search.term ?? null;
+	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+	const [moveDialog, setMoveDialog] = useState<MoveDialogState>({ open: false, items: [] });
+
+	// Mutations
+	const archiveTerm = useArchiveTerm();
+	const restoreTerm = useRestoreTerm();
+	const updateTermSense = useUpdateTermSense();
 
 	const handleRowClick = (item: BucketFeedItem) => {
 		navigate({ to: '/bucket/$slug', params: { slug }, search: { term: item.termId } });
@@ -164,6 +212,217 @@ export function BucketFeedPage() {
 
 	const handleClosePanel = () => {
 		navigate({ to: '/bucket/$slug', params: { slug }, search: { term: undefined } });
+	};
+
+	// Delete a single term with Undo
+	const handleDelete = async (item: BucketFeedItem) => {
+		try {
+			const result = await archiveTerm.mutateAsync({
+				termId: item.termId,
+				expectedVersion: item.termVersion,
+			});
+
+			toast.success('Term deleted', {
+				action: {
+					label: 'Undo',
+					onClick: async () => {
+						try {
+							await restoreTerm.mutateAsync({
+								termId: item.termId,
+								expectedVersion: result.term.version,
+							});
+							toast.success('Restored');
+						} catch {
+							toast.error('Undo failed');
+						}
+					},
+				},
+			});
+		} catch (error) {
+			if (error instanceof ApiRequestError && error.status === 409) {
+				toast.error('Conflict: Please refresh the page');
+			} else {
+				toast.error('Delete failed');
+			}
+		}
+	};
+
+	// Open move dialog for a single term
+	const handleMove = (item: BucketFeedItem) => {
+		setMoveDialog({ open: true, items: [item] });
+	};
+
+	const handleClearSelection = () => {
+		setRowSelection({});
+	};
+
+	// Bulk delete with single Undo toast
+	const handleBulkDelete = async () => {
+		const selectedItems = items.filter((item) => rowSelection[item.termId]);
+		if (selectedItems.length === 0) return;
+
+		const results: Array<{ termId: string; version: number }> = [];
+		let failedCount = 0;
+
+		for (const item of selectedItems) {
+			try {
+				const result = await archiveTerm.mutateAsync({
+					termId: item.termId,
+					expectedVersion: item.termVersion,
+				});
+				results.push({ termId: item.termId, version: result.term.version });
+			} catch (error) {
+				console.error('Failed to archive term:', item.termId, error);
+				failedCount++;
+			}
+		}
+
+		setRowSelection({});
+
+		if (results.length === 0) {
+			// All failed
+			toast.error('Delete failed. Please refresh and try again.');
+		} else if (failedCount > 0) {
+			// Partial success - show Undo for successful items
+			toast.success(`${results.length} deleted, ${failedCount} failed`, {
+				action: {
+					label: 'Undo',
+					onClick: async () => {
+						let restored = 0;
+						for (const { termId, version } of results) {
+							try {
+								await restoreTerm.mutateAsync({ termId, expectedVersion: version });
+								restored++;
+							} catch {
+								// Continue with other restores
+							}
+						}
+						if (restored === results.length) {
+							toast.success('Restored');
+						} else {
+							toast.error(`Only restored ${restored} of ${results.length}`);
+						}
+					},
+				},
+			});
+		} else {
+			// Full success
+			toast.success(`${results.length} ${results.length === 1 ? 'term' : 'terms'} deleted`, {
+				action: {
+					label: 'Undo',
+					onClick: async () => {
+						let restored = 0;
+						for (const { termId, version } of results) {
+							try {
+								await restoreTerm.mutateAsync({ termId, expectedVersion: version });
+								restored++;
+							} catch {
+								// Continue with other restores
+							}
+						}
+						if (restored === results.length) {
+							toast.success('Restored');
+						} else {
+							toast.error(`Only restored ${restored} of ${results.length}`);
+						}
+					},
+				},
+			});
+		}
+	};
+
+	// Open move dialog for bulk move
+	const handleBulkMove = () => {
+		const selectedItems = items.filter((item) => rowSelection[item.termId]);
+		if (selectedItems.length === 0) return;
+		setMoveDialog({ open: true, items: selectedItems });
+	};
+
+	// Handle move confirmation
+	const handleMoveConfirm = async (targetBucket: string) => {
+		const itemsToMove = moveDialog.items;
+		const results: Array<{ senseId: string; previousBucket: string; version: number }> = [];
+		let failedCount = 0;
+
+		for (const item of itemsToMove) {
+			try {
+				const result = await updateTermSense.mutateAsync({
+					senseId: item.primarySense.id,
+					request: {
+						expectedVersion: item.primarySense.version,
+						bucket: targetBucket,
+					},
+				});
+				results.push({
+					senseId: item.primarySense.id,
+					previousBucket: item.primarySense.bucket,
+					version: result.sense.version,
+				});
+			} catch (error) {
+				console.error('Failed to move term sense:', item.primarySense.id, error);
+				failedCount++;
+			}
+		}
+
+		setMoveDialog({ open: false, items: [] });
+		setRowSelection({});
+
+		if (results.length === 0) {
+			// All failed
+			toast.error('Move failed. Please refresh and try again.');
+		} else if (failedCount > 0) {
+			// Partial success - show Undo for successful items
+			toast.success(`${results.length} moved, ${failedCount} failed`, {
+				action: {
+					label: 'Undo',
+					onClick: async () => {
+						let restored = 0;
+						for (const { senseId, previousBucket, version } of results) {
+							try {
+								await updateTermSense.mutateAsync({
+									senseId,
+									request: { expectedVersion: version, bucket: previousBucket },
+								});
+								restored++;
+							} catch {
+								// Continue with other restores
+							}
+						}
+						if (restored === results.length) {
+							toast.success('Moved back');
+						} else {
+							toast.error(`Only moved back ${restored} of ${results.length}`);
+						}
+					},
+				},
+			});
+		} else {
+			// Full success
+			toast.success(`${results.length} ${results.length === 1 ? 'term' : 'terms'} moved`, {
+				action: {
+					label: 'Undo',
+					onClick: async () => {
+						let restored = 0;
+						for (const { senseId, previousBucket, version } of results) {
+							try {
+								await updateTermSense.mutateAsync({
+									senseId,
+									request: { expectedVersion: version, bucket: previousBucket },
+								});
+								restored++;
+							} catch {
+								// Continue with other restores
+							}
+						}
+						if (restored === results.length) {
+							toast.success('Moved back');
+						} else {
+							toast.error(`Only moved back ${restored} of ${results.length}`);
+						}
+					},
+				},
+			});
+		}
 	};
 
 	const { data: bucketsData, isLoading: bucketsLoading } = useUserBuckets();
@@ -187,15 +446,33 @@ export function BucketFeedPage() {
 	if (items.length === 0) return <FeedEmptyState title={title} />;
 
 	return (
-		<FeedContent
-			title={title}
-			items={items}
-			hasNextPage={!!hasNextPage}
-			isFetchingNextPage={isFetchingNextPage}
-			onFetchNextPage={fetchNextPage}
-			selectedTermId={selectedTermId}
-			onRowClick={handleRowClick}
-			onClosePanel={handleClosePanel}
-		/>
+		<>
+			<FeedContent
+				title={title}
+				items={items}
+				hasNextPage={!!hasNextPage}
+				isFetchingNextPage={isFetchingNextPage}
+				onFetchNextPage={fetchNextPage}
+				selectedTermId={selectedTermId}
+				onRowClick={handleRowClick}
+				onClosePanel={handleClosePanel}
+				rowSelection={rowSelection}
+				onRowSelectionChange={setRowSelection}
+				onDelete={handleDelete}
+				onMove={handleMove}
+				onClearSelection={handleClearSelection}
+				onBulkDelete={handleBulkDelete}
+				onBulkMove={handleBulkMove}
+			/>
+
+			<MoveToBucketDialog
+				open={moveDialog.open}
+				onClose={() => setMoveDialog({ open: false, items: [] })}
+				onConfirm={handleMoveConfirm}
+				currentBucket={slug}
+				itemCount={moveDialog.items.length}
+				isPending={updateTermSense.isPending}
+			/>
+		</>
 	);
 }

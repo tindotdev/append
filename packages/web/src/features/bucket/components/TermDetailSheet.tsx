@@ -1,4 +1,4 @@
-import { Pencil } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { ApiRequestError } from '@/lib/api-rpc';
+import { useArchiveTerm, useRestoreTerm } from '../api/archive-term';
+import { useArchiveTermSense, useRestoreTermSense } from '../api/archive-term-sense';
 import { useTermDetail } from '../api/get-term';
 import { useUpdateTerm } from '../api/update-term';
 import { useUpdateTermSense } from '../api/update-term-sense';
@@ -74,13 +76,17 @@ interface EditableSenseProps {
 		createdAt: number;
 		isPrimary: boolean;
 	};
+	canDelete: boolean;
 	onSaved: () => void;
+	onDeleted: () => void;
 }
 
-function EditableSense({ sense, onSaved }: EditableSenseProps) {
+function EditableSense({ sense, canDelete, onSaved, onDeleted }: EditableSenseProps) {
 	const [isEditing, setIsEditing] = useState(false);
 	const [editedText, setEditedText] = useState(sense.text);
 	const updateSense = useUpdateTermSense();
+	const archiveSense = useArchiveTermSense();
+	const restoreSense = useRestoreTermSense();
 
 	const handleSave = async () => {
 		if (editedText.trim() === sense.text) {
@@ -116,6 +122,42 @@ function EditableSense({ sense, onSaved }: EditableSenseProps) {
 		});
 	};
 
+	const handleDelete = async () => {
+		try {
+			const result = await archiveSense.mutateAsync({
+				senseId: sense.id,
+				expectedVersion: sense.version,
+			});
+
+			onDeleted();
+
+			toast.success('Definition deleted', {
+				action: {
+					label: 'Undo',
+					onClick: async () => {
+						try {
+							await restoreSense.mutateAsync({
+								senseId: sense.id,
+								expectedVersion: result.sense.version,
+							});
+							onSaved();
+							toast.success('Restored');
+						} catch {
+							toast.error('Undo failed');
+						}
+					},
+				},
+			});
+		} catch (error) {
+			if (error instanceof ApiRequestError && error.status === 409) {
+				toast.error('Conflict: Please refresh the page');
+				onSaved();
+			} else {
+				toast.error('Delete failed');
+			}
+		}
+	};
+
 	const handleCancel = () => {
 		setEditedText(sense.text);
 		setIsEditing(false);
@@ -139,15 +181,23 @@ function EditableSense({ sense, onSaved }: EditableSenseProps) {
 
 	return (
 		<div className="group relative">
-			<p className="text-zinc-300 pr-8">{sense.text}</p>
-			<Button
-				size="icon"
-				variant="ghost"
-				className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 h-6 w-6"
-				onClick={() => setIsEditing(true)}
-			>
-				<Pencil className="h-3 w-3" />
-			</Button>
+			<p className="text-zinc-300 pr-16">{sense.text}</p>
+			<div className="absolute right-0 top-0 flex gap-1 opacity-0 group-hover:opacity-100">
+				<Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setIsEditing(true)}>
+					<Pencil className="h-3 w-3" />
+				</Button>
+				{canDelete && (
+					<Button
+						size="icon"
+						variant="ghost"
+						className="h-6 w-6 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+						onClick={handleDelete}
+						disabled={archiveSense.isPending}
+					>
+						<Trash2 className="h-3 w-3" />
+					</Button>
+				)}
+			</div>
 		</div>
 	);
 }
@@ -234,9 +284,48 @@ function EditableTermName({ termId, displayTerm, version, onSaved }: EditableTer
 
 export function TermDetailSheet({ termId, onClose }: TermDetailSheetProps) {
 	const { data, isLoading, error, refetch } = useTermDetail(termId);
+	const archiveTerm = useArchiveTerm();
+	const restoreTerm = useRestoreTerm();
 
 	const handleSaved = () => {
 		refetch();
+	};
+
+	const handleDeleteTerm = async () => {
+		if (!data) return;
+
+		try {
+			const result = await archiveTerm.mutateAsync({
+				termId: data.term.id,
+				expectedVersion: data.term.version,
+			});
+
+			onClose();
+
+			toast.success('Term deleted', {
+				action: {
+					label: 'Undo',
+					onClick: async () => {
+						try {
+							await restoreTerm.mutateAsync({
+								termId: data.term.id,
+								expectedVersion: result.term.version,
+							});
+							toast.success('Restored');
+						} catch {
+							toast.error('Undo failed');
+						}
+					},
+				},
+			});
+		} catch (error) {
+			if (error instanceof ApiRequestError && error.status === 409) {
+				toast.error('Conflict: Please refresh the page');
+				refetch();
+			} else {
+				toast.error('Delete failed');
+			}
+		}
 	};
 
 	return (
@@ -260,9 +349,20 @@ export function TermDetailSheet({ termId, onClose }: TermDetailSheetProps) {
 				{data && (
 					<>
 						<SheetHeader>
-							<SheetTitle asChild>
-								<EditableTermName termId={data.term.id} displayTerm={data.term.displayTerm} version={data.term.version} onSaved={handleSaved} />
-							</SheetTitle>
+							<div className="flex items-center justify-between">
+								<SheetTitle asChild>
+									<EditableTermName termId={data.term.id} displayTerm={data.term.displayTerm} version={data.term.version} onSaved={handleSaved} />
+								</SheetTitle>
+								<Button
+									size="icon"
+									variant="ghost"
+									className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+									onClick={handleDeleteTerm}
+									disabled={archiveTerm.isPending}
+								>
+									<Trash2 className="h-4 w-4" />
+								</Button>
+							</div>
 							<SheetDescription>Added {formatDate(data.term.createdAt)}</SheetDescription>
 						</SheetHeader>
 
@@ -278,7 +378,7 @@ export function TermDetailSheet({ termId, onClose }: TermDetailSheetProps) {
 												<span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">{sense.bucket}</span>
 												{sense.isPrimary && <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Primary</span>}
 											</div>
-											<EditableSense sense={sense} onSaved={handleSaved} />
+											<EditableSense sense={sense} canDelete={data.senses.length > 1} onSaved={handleSaved} onDeleted={handleSaved} />
 											<div className="mt-2 text-xs text-zinc-500">
 												Source: {sense.source} &middot; {formatDate(sense.createdAt)}
 											</div>

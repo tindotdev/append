@@ -3,14 +3,20 @@
  *
  * GET /api/term/:id - Get term with all senses
  * PATCH /api/term/:id - Update term displayTerm
+ * POST /api/term/:id/archive - Archive term and all senses
+ * POST /api/term/:id/restore - Restore term and all senses
  */
 
 import { vValidator } from '@hono/valibot-validator';
 import { Hono } from 'hono';
 import type { Bindings, Variables } from '../../platform/env';
 import { apiErrorFrom, ownershipErrorMap, validationHook } from '../../shared/api-error';
+import { archiveTerm } from './usecases/archiveTerm';
 import { getTerm } from './usecases/getTerm';
+import { restoreTerm } from './usecases/restoreTerm';
 import { updateTerm } from './usecases/updateTerm';
+import { ArchiveTermSchema } from './validation/archiveTerm.schema';
+import { RestoreTermSchema } from './validation/restoreTerm.schema';
 import { UpdateTermSchema } from './validation/updateTerm.schema';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -66,6 +72,70 @@ app.patch('/:id', vValidator('json', UpdateTermSchema, validationHook), async (c
 	}
 
 	return c.json({ term: result.result });
+});
+
+/**
+ * POST /api/term/:id/archive - Archive term and all senses (owner-only)
+ *
+ * Request: {
+ *   expectedVersion: number (required)
+ * }
+ *
+ * Response 200: { term: { id, version, archivedAt }, noop?: boolean }
+ * Errors: 400, 401, 403, 404, 409
+ */
+app.post('/:id/archive', vValidator('json', ArchiveTermSchema, validationHook), async (c) => {
+	const userId = c.get('userId');
+	const termId = c.req.param('id');
+	const db = c.get('db');
+	const body = c.req.valid('json');
+
+	const result = await archiveTerm(db, userId, termId, body);
+	if (!result.success) {
+		return apiErrorFrom(c, result.error, {
+			...termAccessErrors,
+			version_conflict: {
+				status: 409,
+				code: 'VERSION_CONFLICT',
+				message: 'Term was modified by another request',
+				details: (error) => ({ currentVersion: error.currentVersion }),
+			},
+		});
+	}
+
+	return c.json(result.result);
+});
+
+/**
+ * POST /api/term/:id/restore - Restore term and all senses (owner-only)
+ *
+ * Request: {
+ *   expectedVersion: number (required)
+ * }
+ *
+ * Response 200: { term: { id, version, archivedAt: null }, noop?: boolean }
+ * Errors: 400, 401, 403, 404, 409
+ */
+app.post('/:id/restore', vValidator('json', RestoreTermSchema, validationHook), async (c) => {
+	const userId = c.get('userId');
+	const termId = c.req.param('id');
+	const db = c.get('db');
+	const body = c.req.valid('json');
+
+	const result = await restoreTerm(db, userId, termId, body);
+	if (!result.success) {
+		return apiErrorFrom(c, result.error, {
+			...termAccessErrors,
+			version_conflict: {
+				status: 409,
+				code: 'VERSION_CONFLICT',
+				message: 'Term was modified by another request',
+				details: (error) => ({ currentVersion: error.currentVersion }),
+			},
+		});
+	}
+
+	return c.json(result.result);
 });
 
 export const termRoutes = app;
