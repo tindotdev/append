@@ -4,6 +4,8 @@ export type { CreateBucketInput, ListBucketsResponse, UpdateBucketInput, UserBuc
 export { useCreateBucket, useDeleteBucket, useReorderBuckets, userBucketKeys, useUpdateBucket, useUserBuckets } from './api/user-bucket';
 
 // Components
+export { BucketCreateSheet } from './components/BucketCreateSheet';
+export { BucketEditSheet } from './components/BucketEditSheet';
 export { BucketForm } from './components/BucketForm';
 export { BucketList } from './components/BucketList';
 export { BucketManager } from './components/BucketManager';

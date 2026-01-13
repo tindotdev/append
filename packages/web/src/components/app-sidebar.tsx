@@ -40,6 +40,8 @@ import {
 } from '@/components/ui/sidebar';
 import { signOut, useAuth } from '@/features/auth';
 import { type UserBucket, useDeleteBucket, useUpdateBucket, useUserBuckets } from '@/features/settings';
+import { BucketCreateSheet } from '@/features/settings/components/BucketCreateSheet';
+import { BucketEditSheet } from '@/features/settings/components/BucketEditSheet';
 import { SidebarBucketItem } from './SidebarBucketItem';
 
 const NAV_ITEMS = [
@@ -62,6 +64,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const buckets = bucketsData?.buckets ?? [];
 	const { isMobile } = useSidebar();
 	const [bucketsOpen, setBucketsOpen] = React.useState(true);
+	const [createSheetOpen, setCreateSheetOpen] = React.useState(false);
+	const [editTarget, setEditTarget] = React.useState<UserBucket | null>(null);
 	const [deleteTarget, setDeleteTarget] = React.useState<UserBucket | null>(null);
 	const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
@@ -81,8 +85,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
 	// Bucket action handlers
 	const handleEditBucket = (bucketId: string) => {
-		// TODO: Open edit sheet/modal
-		console.log('Edit bucket:', bucketId);
+		const bucket = buckets.find((b) => b.id === bucketId);
+		if (bucket) {
+			setEditTarget(bucket);
+		}
 	};
 
 	const handleColorChange = async (bucketId: string, color: string | null) => {
@@ -232,10 +238,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 								variant="ghost"
 								size="icon"
 								className="h-5 w-5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity"
-								onClick={() => {
-									// TODO: Open create bucket sheet
-									console.log('Create new bucket');
-								}}
+								onClick={() => setCreateSheetOpen(true)}
 							>
 								<Plus className="h-3.5 w-3.5" />
 								<span className="sr-only">Create bucket</span>
@@ -329,6 +332,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+			{/* Create bucket sheet */}
+			<BucketCreateSheet open={createSheetOpen} onOpenChange={setCreateSheetOpen} />
+
+			{/* Edit bucket sheet */}
+			<BucketEditSheet bucket={editTarget} open={editTarget !== null} onOpenChange={(open) => !open && setEditTarget(null)} />
 		</Sidebar>
 	);
 }
