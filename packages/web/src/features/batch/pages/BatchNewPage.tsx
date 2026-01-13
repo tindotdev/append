@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import type { RowSelectionState } from '@tanstack/react-table';
+import type { ExpandedState, RowSelectionState } from '@tanstack/react-table';
 import { ArrowDownAZ, ArrowUpAZ, Loader2, Search, X } from 'lucide-react';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -20,7 +20,9 @@ import { deleteBatch } from '../api/delete-batch';
 import { batchKeys, getBatch } from '../api/get-batch';
 import { type BatchesFilterOptions, useBatches } from '../api/list-batches';
 import { BatchBulkActionBar } from '../components/BatchBulkActionBar';
+import { BatchErrorBoundary } from '../components/BatchErrorBoundary';
 import { BatchTable } from '../components/BatchTable';
+import { BatchTableSkeleton } from '../components/BatchTableSkeleton';
 import { type BatchColumnMeta, getBatchColumns } from '../components/batch-columns';
 import { useBatchStatusUpdates } from '../hooks/useBatchStatusUpdates';
 import type { BatchListItem, BatchSortField, BatchSortOrder, BatchStatusFilter, Candidate } from '../types';
@@ -127,6 +129,7 @@ function clearDraft(): void {
 }
 
 // --- Component ---
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Main page component orchestrates capture form, batch list, and real-time updates
 export function BatchNewPage() {
 	// Use safe hook that won't throw during initialization
 	const outbox = useOutboxSafe();
@@ -136,6 +139,9 @@ export function BatchNewPage() {
 	const [rows, setRows] = useState<TermRow[]>(() => loadDraft());
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+	const [expandedRows, setExpandedRows] = useState<ExpandedState>({});
+	const [justSubmitted, setJustSubmitted] = useState(false);
+	const [previousBatchIds, setPreviousBatchIds] = useState<Set<string>>(new Set());
 
 	// Real-time batch status updates via SSE
 	const { trackBatch, progress: batchProgress } = useBatchStatusUpdates({
@@ -194,6 +200,7 @@ export function BatchNewPage() {
 	// Refs for focus management
 	const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
 	const focusRowId = useRef<string | null>(null);
+	const batchListRef = useRef<HTMLDivElement>(null);
 
 	// Save draft on changes
 	useEffect(() => {
@@ -212,6 +219,37 @@ export function BatchNewPage() {
 			focusRowId.current = null;
 		}
 	});
+
+	// Auto-expand and scroll to newly created batch
+	useEffect(() => {
+		if (!justSubmitted || !batches.length) return;
+
+		// Get current batch IDs
+		const currentBatchIds = new Set(batches.map((b) => b.id));
+
+		// Find new batches (in current but not in previous)
+		const newBatches = batches.filter((b) => !previousBatchIds.has(b.id));
+
+		if (newBatches.length > 0) {
+			// Auto-expand the first new batch (most recent)
+			const newestBatch = newBatches[0];
+			setExpandedRows((prev) => {
+				const prevObj = typeof prev === 'object' ? prev : {};
+				return { ...prevObj, [newestBatch.id]: true };
+			});
+
+			// Scroll to batch list section
+			if (batchListRef.current) {
+				batchListRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			}
+
+			// Reset the flag
+			setJustSubmitted(false);
+		}
+
+		// Update previous batch IDs
+		setPreviousBatchIds(currentBatchIds);
+	}, [batches, justSubmitted, previousBatchIds]);
 
 	// Get all term values for duplicate checking
 	const termValues = rows.map((r) => r.value);
@@ -306,6 +344,9 @@ export function BatchNewPage() {
 			clearDraft();
 			setRows([{ id: crypto.randomUUID(), value: '' }]);
 
+			// Mark as just submitted to trigger auto-expand on next refetch
+			setJustSubmitted(true);
+
 			// Show toast with Undo action
 			toast.info('Queued for sync', {
 				duration: UNDO_GRACE_MS,
@@ -315,6 +356,7 @@ export function BatchNewPage() {
 						const result = await outbox.undo(item.id);
 						if (result.success && result.command?.type === 'capture_terms') {
 							restoreDraft(result.command.request.terms);
+							setJustSubmitted(false); // Cancel auto-expand if undo
 							toast.success('Restored to composer');
 						} else {
 							toast.error('Cannot undo — already sent');
@@ -324,6 +366,7 @@ export function BatchNewPage() {
 			});
 		} catch {
 			toast.error('Failed to queue. Please try again.');
+			setJustSubmitted(false); // Reset flag on error
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -371,6 +414,7 @@ export function BatchNewPage() {
 		[navigate]
 	);
 
+	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles accept with error cases and conflict detection
 	const handleAcceptAllReady = useCallback(
 		async (batch: BatchListItem) => {
 			// Skip if already accepting this batch
@@ -440,6 +484,7 @@ export function BatchNewPage() {
 		setBatchToDelete(batch);
 	}, []);
 
+	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles delete with error cases and state cleanup
 	const handleConfirmDelete = useCallback(async () => {
 		if (!batchToDelete) return;
 		if (deletingBatches.has(batchToDelete.id)) return;
@@ -600,303 +645,307 @@ export function BatchNewPage() {
 	const columns = getBatchColumns(columnMeta);
 
 	return (
-		<div className="max-w-2xl">
-			<div className="flex items-center justify-between">
-				<div>
-					<h2 className="text-xl font-semibold">Capture</h2>
-					<p className="mt-1 text-sm text-zinc-400">Enter terms, one per row. Brain dump welcome.</p>
+		<BatchErrorBoundary>
+			<div className="max-w-full px-4 sm:px-6 md:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto">
+				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+					<div>
+						<h2 className="text-xl font-semibold">Capture</h2>
+						<p className="mt-1 text-sm text-zinc-400">Enter terms, one per row. Brain dump welcome.</p>
+					</div>
+					{rows.some((r) => r.value.trim()) && (
+						<Button variant="ghost" size="sm" onClick={handleClearDraft} className="text-zinc-500 hover:text-zinc-300 self-start sm:self-auto">
+							Clear draft
+						</Button>
+					)}
 				</div>
-				{rows.some((r) => r.value.trim()) && (
-					<Button variant="ghost" size="sm" onClick={handleClearDraft} className="text-zinc-500 hover:text-zinc-300">
-						Clear draft
+
+				<div className="mt-6 space-y-2">
+					{rows.map((row, index) => {
+						const validation = validateTerm(row.value, termValues, index);
+						const hasError = validation.status === 'too-long' || validation.status === 'forbidden-delimiter';
+						const messageClass = validationMessageClass[validation.status];
+						const showMessage = Boolean(messageClass && validation.message);
+						const dotClass = validationDotClass[validation.status] ?? 'bg-zinc-600';
+
+						return (
+							<div key={row.id} className="group flex items-center gap-2">
+								<div className="flex h-8 w-8 shrink-0 items-center justify-center">
+									<span className={`h-2 w-2 rounded-full ${dotClass}`} />
+								</div>
+								<div className="relative flex-1">
+									<Input
+										ref={(el) => {
+											if (el) {
+												inputRefs.current.set(row.id, el);
+											} else {
+												inputRefs.current.delete(row.id);
+											}
+										}}
+										value={row.value}
+										onChange={(e) => handleRowChange(row.id, e.target.value)}
+										onPaste={(e) => handleRowPaste(row.id, e)}
+										onKeyDown={(e) => handleRowKeyDown(row.id, e)}
+										placeholder={index === 0 ? 'Type a term or paste many...' : ''}
+										disabled={isSubmitting}
+										className={getInputClassName(hasError)}
+										aria-invalid={hasError}
+									/>
+									{showMessage && <span className={`absolute right-10 top-1/2 -translate-y-1/2 text-xs ${messageClass}`}>{validation.message}</span>}
+								</div>
+								<TooltipProvider delayDuration={300}>
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<Button
+												variant="ghost"
+												size="icon"
+												className="h-8 w-8 shrink-0 text-zinc-500 opacity-0 transition-opacity hover:text-zinc-300 group-hover:opacity-100 focus:opacity-100"
+												onClick={() => handleRemoveRow(row.id)}
+												disabled={isSubmitting}
+												aria-label="Remove row"
+											>
+												<X className="h-4 w-4" />
+											</Button>
+										</TooltipTrigger>
+										<TooltipContent side="right">Remove</TooltipContent>
+									</Tooltip>
+								</TooltipProvider>
+							</div>
+						);
+					})}
+				</div>
+
+				<div className="mt-4">
+					<Button variant="ghost" size="sm" onClick={handleAddRow} disabled={isSubmitting} className="text-zinc-400 hover:text-zinc-200">
+						+ Add term
 					</Button>
-				)}
-			</div>
+				</div>
 
-			<div className="mt-6 space-y-2">
-				{rows.map((row, index) => {
-					const validation = validateTerm(row.value, termValues, index);
-					const hasError = validation.status === 'too-long' || validation.status === 'forbidden-delimiter';
-					const messageClass = validationMessageClass[validation.status];
-					const showMessage = Boolean(messageClass && validation.message);
-					const dotClass = validationDotClass[validation.status] ?? 'bg-zinc-600';
+				<div className="mt-6 flex items-center justify-between">
+					<div className="text-sm text-zinc-500">
+						<span className={validTermCount < TERM_MIN || validTermCount > TERM_MAX ? 'text-amber-400' : ''}>
+							{validTermCount} term{validTermCount !== 1 ? 's' : ''}
+						</span>
+						<span className="mx-2">·</span>
+						<span>
+							{TERM_MIN}–{TERM_MAX} allowed
+						</span>
+					</div>
+					<div className="flex items-center gap-3">
+						<span className="hidden text-xs text-zinc-500 sm:inline-flex sm:items-center sm:gap-1">
+							<Kbd>⌘</Kbd>
+							<Kbd>↵</Kbd>
+							<span className="ml-1">to submit</span>
+						</span>
+						<Button onClick={handleSubmit} disabled={!canSubmit}>
+							{isSubmitting ? 'Submitting...' : 'Submit Batch'}
+						</Button>
+					</div>
+				</div>
 
-					return (
-						<div key={row.id} className="group flex items-center gap-2">
-							<div className="flex h-8 w-8 shrink-0 items-center justify-center">
-								<span className={`h-2 w-2 rounded-full ${dotClass}`} />
-							</div>
-							<div className="relative flex-1">
-								<Input
-									ref={(el) => {
-										if (el) {
-											inputRefs.current.set(row.id, el);
-										} else {
-											inputRefs.current.delete(row.id);
-										}
-									}}
-									value={row.value}
-									onChange={(e) => handleRowChange(row.id, e.target.value)}
-									onPaste={(e) => handleRowPaste(row.id, e)}
-									onKeyDown={(e) => handleRowKeyDown(row.id, e)}
-									placeholder={index === 0 ? 'Type a term or paste many...' : ''}
-									disabled={isSubmitting}
-									className={getInputClassName(hasError)}
-									aria-invalid={hasError}
-								/>
-								{showMessage && <span className={`absolute right-10 top-1/2 -translate-y-1/2 text-xs ${messageClass}`}>{validation.message}</span>}
-							</div>
+				{/* Separator */}
+				<div className="my-8 border-t border-zinc-800" />
+
+				{/* Recent Batches Section */}
+				<div ref={batchListRef}>
+					<div className="flex items-center justify-between">
+						<div>
+							<h3 className="text-lg font-semibold">Recent batches</h3>
+							<p className="mt-1 text-sm text-zinc-400">View and manage your submitted batches</p>
+						</div>
+					</div>
+
+					{/* Search and Filter Bar */}
+					<div className="mt-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
+						{/* Search Input */}
+						<div className="relative flex-1 min-w-full sm:min-w-[200px]">
+							<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+							<Input
+								type="text"
+								placeholder="Search terms..."
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+								className="pl-9 pr-8"
+							/>
+							{searchQuery && (
+								<button
+									type="button"
+									onClick={() => setSearchQuery('')}
+									className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+									aria-label="Clear search"
+								>
+									<X className="h-4 w-4" />
+								</button>
+							)}
+						</div>
+
+						<div className="flex items-center gap-3 flex-wrap">
+							{/* Status Filter */}
+							<Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as BatchStatusFilter | 'all')}>
+								<SelectTrigger className="w-full sm:w-[140px]" size="sm">
+									<SelectValue placeholder="Status" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="all">All statuses</SelectItem>
+									<SelectItem value="captured">Captured</SelectItem>
+									<SelectItem value="suggested">Suggested</SelectItem>
+									<SelectItem value="accepted">Accepted</SelectItem>
+								</SelectContent>
+							</Select>
+
+							{/* Sort Options */}
+							<Select value={sortBy} onValueChange={(value) => setSortBy(value as BatchSortField)}>
+								<SelectTrigger className="w-full sm:w-[140px]" size="sm">
+									<SelectValue placeholder="Sort by" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="created">Date created</SelectItem>
+									<SelectItem value="candidateCount">Term count</SelectItem>
+									<SelectItem value="acceptanceRate">Acceptance %</SelectItem>
+								</SelectContent>
+							</Select>
+
+							{/* Sort Order Toggle */}
 							<TooltipProvider delayDuration={300}>
 								<Tooltip>
 									<TooltipTrigger asChild>
 										<Button
-											variant="ghost"
+											variant="outline"
 											size="icon"
-											className="h-8 w-8 shrink-0 text-zinc-500 opacity-0 transition-opacity hover:text-zinc-300 group-hover:opacity-100 focus:opacity-100"
-											onClick={() => handleRemoveRow(row.id)}
-											disabled={isSubmitting}
-											aria-label="Remove row"
+											className="h-8 w-8"
+											onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
 										>
-											<X className="h-4 w-4" />
+											{sortOrder === 'desc' ? <ArrowDownAZ className="h-4 w-4" /> : <ArrowUpAZ className="h-4 w-4" />}
 										</Button>
 									</TooltipTrigger>
-									<TooltipContent side="right">Remove</TooltipContent>
+									<TooltipContent>{sortOrder === 'desc' ? 'Descending' : 'Ascending'}</TooltipContent>
 								</Tooltip>
 							</TooltipProvider>
+
+							{/* Clear Filters */}
+							{hasActiveFilters && (
+								<Button variant="ghost" size="sm" onClick={handleClearFilters} className="text-zinc-500 hover:text-zinc-300">
+									Clear filters
+								</Button>
+							)}
 						</div>
-					);
-				})}
-			</div>
-
-			<div className="mt-4">
-				<Button variant="ghost" size="sm" onClick={handleAddRow} disabled={isSubmitting} className="text-zinc-400 hover:text-zinc-200">
-					+ Add term
-				</Button>
-			</div>
-
-			<div className="mt-6 flex items-center justify-between">
-				<div className="text-sm text-zinc-500">
-					<span className={validTermCount < TERM_MIN || validTermCount > TERM_MAX ? 'text-amber-400' : ''}>
-						{validTermCount} term{validTermCount !== 1 ? 's' : ''}
-					</span>
-					<span className="mx-2">·</span>
-					<span>
-						{TERM_MIN}–{TERM_MAX} allowed
-					</span>
-				</div>
-				<div className="flex items-center gap-3">
-					<span className="hidden text-xs text-zinc-500 sm:inline-flex sm:items-center sm:gap-1">
-						<Kbd>⌘</Kbd>
-						<Kbd>↵</Kbd>
-						<span className="ml-1">to submit</span>
-					</span>
-					<Button onClick={handleSubmit} disabled={!canSubmit}>
-						{isSubmitting ? 'Submitting...' : 'Submit Batch'}
-					</Button>
-				</div>
-			</div>
-
-			{/* Separator */}
-			<div className="my-8 border-t border-zinc-800" />
-
-			{/* Recent Batches Section */}
-			<div>
-				<div className="flex items-center justify-between">
-					<div>
-						<h3 className="text-lg font-semibold">Recent batches</h3>
-						<p className="mt-1 text-sm text-zinc-400">View and manage your submitted batches</p>
 					</div>
-				</div>
 
-				{/* Search and Filter Bar */}
-				<div className="mt-4 flex flex-wrap items-center gap-3">
-					{/* Search Input */}
-					<div className="relative flex-1 min-w-[200px]">
-						<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-						<Input
-							type="text"
-							placeholder="Search terms..."
-							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							className="pl-9 pr-8"
-						/>
-						{searchQuery && (
-							<button
-								type="button"
-								onClick={() => setSearchQuery('')}
-								className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
-								aria-label="Clear search"
-							>
-								<X className="h-4 w-4" />
-							</button>
+					{/* Search Status */}
+					{isSearching && (
+						<div className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
+							<Loader2 className="h-3 w-3 animate-spin" />
+							<span>Searching...</span>
+						</div>
+					)}
+
+					<div className="mt-4">
+						{isLoading ? (
+							// Loading skeleton
+							<BatchTableSkeleton rows={5} />
+						) : isError ? (
+							// Error state
+							<div className="flex flex-col items-center justify-center py-12 text-center">
+								<p className="text-zinc-400">Failed to load batches. Please try again.</p>
+								<Button variant="secondary" onClick={() => refetch()} className="mt-4">
+									Retry
+								</Button>
+							</div>
+						) : batches.length === 0 ? (
+							// Empty state
+							<div className="flex flex-col items-center justify-center py-12 text-center">
+								{hasActiveFilters ? (
+									<>
+										<p className="text-zinc-400">No batches match your filters.</p>
+										<Button variant="secondary" onClick={handleClearFilters} className="mt-4">
+											Clear filters
+										</Button>
+									</>
+								) : (
+									<p className="text-zinc-400">No batches yet. Submit your first batch above to get started.</p>
+								)}
+							</div>
+						) : (
+							// Table with batches
+							<>
+								<BatchTable
+									columns={columns}
+									data={batches}
+									onRowClick={handleViewDetails}
+									rowSelection={rowSelection}
+									onRowSelectionChange={setRowSelection}
+									onFetchCandidates={handleFetchCandidates}
+									expanded={expandedRows}
+									onExpandedChange={setExpandedRows}
+								/>
+
+								{/* Load more button */}
+								{hasNextPage && (
+									<div className="mt-6 flex justify-center">
+										<Button variant="secondary" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+											{isFetchingNextPage && <Loader2 className="size-4 animate-spin mr-2" />}
+											Load more
+										</Button>
+									</div>
+								)}
+							</>
 						)}
 					</div>
-
-					{/* Status Filter */}
-					<Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as BatchStatusFilter | 'all')}>
-						<SelectTrigger className="w-[140px]" size="sm">
-							<SelectValue placeholder="Status" />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All statuses</SelectItem>
-							<SelectItem value="captured">Captured</SelectItem>
-							<SelectItem value="suggested">Suggested</SelectItem>
-							<SelectItem value="accepted">Accepted</SelectItem>
-						</SelectContent>
-					</Select>
-
-					{/* Sort Options */}
-					<Select value={sortBy} onValueChange={(value) => setSortBy(value as BatchSortField)}>
-						<SelectTrigger className="w-[140px]" size="sm">
-							<SelectValue placeholder="Sort by" />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="created">Date created</SelectItem>
-							<SelectItem value="candidateCount">Term count</SelectItem>
-							<SelectItem value="acceptanceRate">Acceptance %</SelectItem>
-						</SelectContent>
-					</Select>
-
-					{/* Sort Order Toggle */}
-					<TooltipProvider delayDuration={300}>
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<Button
-									variant="outline"
-									size="icon"
-									className="h-8 w-8"
-									onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
-								>
-									{sortOrder === 'desc' ? <ArrowDownAZ className="h-4 w-4" /> : <ArrowUpAZ className="h-4 w-4" />}
-								</Button>
-							</TooltipTrigger>
-							<TooltipContent>{sortOrder === 'desc' ? 'Descending' : 'Ascending'}</TooltipContent>
-						</Tooltip>
-					</TooltipProvider>
-
-					{/* Clear Filters */}
-					{hasActiveFilters && (
-						<Button variant="ghost" size="sm" onClick={handleClearFilters} className="text-zinc-500 hover:text-zinc-300">
-							Clear filters
-						</Button>
-					)}
 				</div>
 
-				{/* Search Status */}
-				{isSearching && (
-					<div className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
-						<Loader2 className="h-3 w-3 animate-spin" />
-						<span>Searching...</span>
-					</div>
-				)}
-
-				<div className="mt-4">
-					{isLoading ? (
-						// Loading state
-						<div className="flex items-center justify-center py-12">
-							<Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
-						</div>
-					) : isError ? (
-						// Error state
-						<div className="flex flex-col items-center justify-center py-12 text-center">
-							<p className="text-zinc-400">Failed to load batches. Please try again.</p>
-							<Button variant="secondary" onClick={() => refetch()} className="mt-4">
-								Retry
+				{/* Delete Confirmation Dialog */}
+				<Dialog open={!!batchToDelete} onOpenChange={(open) => !open && setBatchToDelete(null)}>
+					<DialogContent>
+						<DialogHeader>
+							<DialogTitle>Delete Batch</DialogTitle>
+							<DialogDescription>
+								Are you sure you want to delete this batch with {batchToDelete?.candidateCount ?? 0} term
+								{batchToDelete?.candidateCount !== 1 ? 's' : ''}? This action cannot be undone.
+							</DialogDescription>
+						</DialogHeader>
+						<DialogFooter>
+							<DialogClose asChild>
+								<Button variant="secondary">Cancel</Button>
+							</DialogClose>
+							<Button variant="destructive" onClick={handleConfirmDelete}>
+								Delete
 							</Button>
-						</div>
-					) : batches.length === 0 ? (
-						// Empty state
-						<div className="flex flex-col items-center justify-center py-12 text-center">
-							{hasActiveFilters ? (
-								<>
-									<p className="text-zinc-400">No batches match your filters.</p>
-									<Button variant="secondary" onClick={handleClearFilters} className="mt-4">
-										Clear filters
-									</Button>
-								</>
-							) : (
-								<p className="text-zinc-400">No batches yet. Submit your first batch above to get started.</p>
-							)}
-						</div>
-					) : (
-						// Table with batches
-						<>
-							<BatchTable
-								columns={columns}
-								data={batches}
-								onRowClick={handleViewDetails}
-								rowSelection={rowSelection}
-								onRowSelectionChange={setRowSelection}
-								onFetchCandidates={handleFetchCandidates}
-							/>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
 
-							{/* Load more button */}
-							{hasNextPage && (
-								<div className="mt-6 flex justify-center">
-									<Button variant="secondary" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
-										{isFetchingNextPage && <Loader2 className="size-4 animate-spin mr-2" />}
-										Load more
-									</Button>
-								</div>
-							)}
-						</>
-					)}
-				</div>
+				{/* Bulk Delete Confirmation Dialog */}
+				<Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+					<DialogContent>
+						<DialogHeader>
+							<DialogTitle>Delete {selectedCount} Batches</DialogTitle>
+							<DialogDescription>
+								Are you sure you want to delete {selectedCount} batch{selectedCount !== 1 ? 'es' : ''} and all their candidates? This action cannot
+								be undone.
+							</DialogDescription>
+						</DialogHeader>
+						<DialogFooter>
+							<DialogClose asChild>
+								<Button variant="secondary">Cancel</Button>
+							</DialogClose>
+							<Button variant="destructive" onClick={handleBulkDeleteConfirm}>
+								Delete {selectedCount} Batches
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+
+				{/* Bulk Action Bar */}
+				<BatchBulkActionBar
+					selectedCount={selectedCount}
+					isAccepting={isBulkAccepting}
+					isRetrying={isBulkRetrying}
+					isDeleting={isBulkDeleting}
+					onClear={handleClearSelection}
+					onAcceptAllReady={handleBulkAcceptAllReady}
+					onRetry={handleBulkRetry}
+					onDelete={handleBulkDeleteRequest}
+				/>
 			</div>
-
-			{/* Delete Confirmation Dialog */}
-			<Dialog open={!!batchToDelete} onOpenChange={(open) => !open && setBatchToDelete(null)}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Delete Batch</DialogTitle>
-						<DialogDescription>
-							Are you sure you want to delete this batch with {batchToDelete?.candidateCount ?? 0} term
-							{batchToDelete?.candidateCount !== 1 ? 's' : ''}? This action cannot be undone.
-						</DialogDescription>
-					</DialogHeader>
-					<DialogFooter>
-						<DialogClose asChild>
-							<Button variant="secondary">Cancel</Button>
-						</DialogClose>
-						<Button variant="destructive" onClick={handleConfirmDelete}>
-							Delete
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-
-			{/* Bulk Delete Confirmation Dialog */}
-			<Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Delete {selectedCount} Batches</DialogTitle>
-						<DialogDescription>
-							Are you sure you want to delete {selectedCount} batch{selectedCount !== 1 ? 'es' : ''} and all their candidates? This action cannot
-							be undone.
-						</DialogDescription>
-					</DialogHeader>
-					<DialogFooter>
-						<DialogClose asChild>
-							<Button variant="secondary">Cancel</Button>
-						</DialogClose>
-						<Button variant="destructive" onClick={handleBulkDeleteConfirm}>
-							Delete {selectedCount} Batches
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-
-			{/* Bulk Action Bar */}
-			<BatchBulkActionBar
-				selectedCount={selectedCount}
-				isAccepting={isBulkAccepting}
-				isRetrying={isBulkRetrying}
-				isDeleting={isBulkDeleting}
-				onClear={handleClearSelection}
-				onAcceptAllReady={handleBulkAcceptAllReady}
-				onRetry={handleBulkRetry}
-				onDelete={handleBulkDeleteRequest}
-			/>
-		</div>
+		</BatchErrorBoundary>
 	);
 }

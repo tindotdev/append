@@ -21,11 +21,26 @@ interface BatchTableProps {
 	rowSelection?: RowSelectionState;
 	onRowSelectionChange?: (selection: RowSelectionState) => void;
 	onFetchCandidates?: (batchId: string) => Promise<Candidate[]>;
+	expanded?: ExpandedState;
+	onExpandedChange?: (expanded: ExpandedState) => void;
 }
 
-export function BatchTable({ columns, data, onRowClick, rowSelection = {}, onRowSelectionChange, onFetchCandidates }: BatchTableProps) {
+export function BatchTable({
+	columns,
+	data,
+	onRowClick,
+	rowSelection = {},
+	onRowSelectionChange,
+	onFetchCandidates,
+	expanded: controlledExpanded,
+	onExpandedChange,
+}: BatchTableProps) {
 	const [sorting, setSorting] = useState<SortingState>([{ id: 'created', desc: true }]);
-	const [expanded, setExpanded] = useState<ExpandedState>({});
+	const [internalExpanded, setInternalExpanded] = useState<ExpandedState>({});
+
+	// Use controlled state if provided, otherwise use internal state
+	const expanded = controlledExpanded ?? internalExpanded;
+	const setExpanded = onExpandedChange ?? setInternalExpanded;
 
 	const table = useReactTable({
 		data,
@@ -34,7 +49,10 @@ export function BatchTable({ columns, data, onRowClick, rowSelection = {}, onRow
 		getSortedRowModel: getSortedRowModel(),
 		getExpandedRowModel: getExpandedRowModel(),
 		onSortingChange: setSorting,
-		onExpandedChange: setExpanded,
+		onExpandedChange: (updater) => {
+			const newExpanded = typeof updater === 'function' ? updater(expanded) : updater;
+			setExpanded(newExpanded);
+		},
 		onRowSelectionChange: (updater) => {
 			const newSelection = typeof updater === 'function' ? updater(rowSelection) : updater;
 			onRowSelectionChange?.(newSelection);
@@ -49,7 +67,7 @@ export function BatchTable({ columns, data, onRowClick, rowSelection = {}, onRow
 	});
 
 	return (
-		<div className="border border-zinc-800 rounded-lg">
+		<div className="border border-zinc-800 rounded-lg overflow-x-auto">
 			<Table>
 				<TableHeader>
 					{table.getHeaderGroups().map((headerGroup) => (
