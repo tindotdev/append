@@ -6,6 +6,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { useSyncExternalStore } from 'react';
 import { api, parseRpcJson } from '../../../lib/api-rpc';
 import { getBrowserTimezone } from '../telemetry/time';
 import type { HeatmapData, HeatmapStatsData } from '../types';
@@ -16,6 +17,9 @@ import type { HeatmapData, HeatmapStatsData } from '../types';
 
 const DEV_MODE = import.meta.env.DEV;
 const LOCAL_STORAGE_KEY = 'append.dashboard.useApi';
+
+// Subscribers for localStorage changes
+const subscribers = new Set<() => void>();
 
 /**
  * Check if we should use API for dashboard data.
@@ -33,6 +37,7 @@ export function shouldUseApi(): boolean {
 
 /**
  * Set whether to use API for dashboard data in dev mode.
+ * Notifies all subscribers of the change.
  */
 export function setUseApi(enabled: boolean): void {
 	try {
@@ -41,9 +46,29 @@ export function setUseApi(enabled: boolean): void {
 		} else {
 			localStorage.removeItem(LOCAL_STORAGE_KEY);
 		}
+		// Notify all subscribers
+		for (const callback of subscribers) {
+			callback();
+		}
 	} catch {
 		// Ignore storage errors
 	}
+}
+
+/**
+ * React hook to subscribe to API toggle state.
+ * Returns true in production or when API mode is enabled in dev.
+ * Automatically re-renders when the toggle changes.
+ */
+export function useApiToggle(): boolean {
+	return useSyncExternalStore(
+		(callback) => {
+			subscribers.add(callback);
+			return () => subscribers.delete(callback);
+		},
+		shouldUseApi,
+		() => true // Server-side always returns true
+	);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -132,11 +157,11 @@ export const dashboardKeys = {
 
 /**
  * Hook to fetch today's dashboard data.
- * Only enabled when shouldUseApi() returns true.
+ * Only enabled when API mode is active.
  */
 export function useDashboardToday(timezone?: string) {
 	const tz = timezone ?? getBrowserTimezone();
-	const enabled = shouldUseApi();
+	const enabled = useApiToggle();
 
 	return useQuery({
 		queryKey: dashboardKeys.today(tz),
@@ -149,11 +174,11 @@ export function useDashboardToday(timezone?: string) {
 
 /**
  * Hook to fetch weekly dashboard data.
- * Only enabled when shouldUseApi() returns true.
+ * Only enabled when API mode is active.
  */
 export function useDashboardWeek(start: string, timezone?: string) {
 	const tz = timezone ?? getBrowserTimezone();
-	const enabled = shouldUseApi();
+	const enabled = useApiToggle();
 
 	return useQuery({
 		queryKey: dashboardKeys.week(start, tz),
@@ -166,11 +191,11 @@ export function useDashboardWeek(start: string, timezone?: string) {
 
 /**
  * Hook to fetch heatmap data.
- * Only enabled when shouldUseApi() returns true.
+ * Only enabled when API mode is active.
  */
 export function useDashboardHeatmap(year: number, timezone?: string) {
 	const tz = timezone ?? getBrowserTimezone();
-	const enabled = shouldUseApi();
+	const enabled = useApiToggle();
 
 	return useQuery({
 		queryKey: dashboardKeys.heatmap(year, tz),

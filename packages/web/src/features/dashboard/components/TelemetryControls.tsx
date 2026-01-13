@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { Download, Flame, FlaskConical, Plus, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -9,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { dashboardKeys, setUseApi, shouldUseApi } from '../api/dashboard';
+import { setUseApi, useApiToggle } from '../api/dashboard';
 import { addActivity, addCapture, exportEventsNdjson, resetTelemetry } from '../telemetry/actions';
 import { useTelemetrySnapshot } from '../telemetry/hooks';
 
@@ -27,19 +26,15 @@ const MINUTES_ID = 'telemetry-minutes';
 const DEV_MODE = import.meta.env.DEV;
 
 export function TelemetryControls() {
-	const queryClient = useQueryClient();
 	const { events, timezone } = useTelemetrySnapshot();
 	const [url, setUrl] = useState<string>(QUICK_SOURCES[0].url);
 	const [minutes, setMinutes] = useState('15');
-	const [useApi, setUseApiState] = useState(shouldUseApi);
+	const useApi = useApiToggle();
 
 	const eventCount = events.length;
 
 	const handleApiToggle = (checked: boolean) => {
 		setUseApi(checked);
-		setUseApiState(checked);
-		// Invalidate dashboard queries to trigger refetch
-		queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
 		toast.success(checked ? 'Switched to API mode' : 'Switched to local simulator');
 	};
 
