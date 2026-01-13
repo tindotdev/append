@@ -31,3 +31,4 @@ Rules:
 - `0019-e2e-auth-bootstrap-preview.md` — E2E auth bootstrap endpoint for preview + Playwright (non-prod only)
 - `0020-events-first-learning-telemetry.md` — Events-first learning telemetry (WakaTime-for-learning)
 - `0021-extension-device-token-auth.md` — Extension auth via device tokens (bearer)
+- `0022-m1-dashboard-read-models-and-export.md` — M1 dashboard read models + raw events export

@@ -7,6 +7,7 @@ import { acceptRoutes } from './features/accept/routes';
 import { batchRoutes } from './features/batch/routes';
 import { bucketRoutes } from './features/bucket/routes';
 import { candidateRoutes } from './features/candidate/routes';
+import { dashboardRoutes } from './features/dashboard/routes';
 import { deviceTokenRoutes } from './features/device-tokens/routes';
 import { eventsRoutes } from './features/events/routes';
 import { exportRoutes } from './features/export/routes';
@@ -107,6 +108,9 @@ app.onError((err, c) => {
 	}
 
 	console.error('API error:', err);
+	if (err.cause) {
+		console.error('Error cause:', err.cause);
+	}
 
 	// JSON parsing errors
 	if (err instanceof SyntaxError && err.message.includes('JSON')) {
@@ -380,6 +384,7 @@ const apiRoutes = app
 	.route('/api/batch', batchRoutes)
 	.route('/api/bucket', bucketRoutes)
 	.route('/api/candidate', candidateRoutes)
+	.route('/api/dashboard', dashboardRoutes)
 	.route('/api/device-tokens', deviceTokenRoutes)
 	.route('/api/export', exportRoutes)
 	.route('/api/import', importRoutes)

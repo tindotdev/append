@@ -56,7 +56,8 @@ export const event = sqliteTable(
 	},
 	(table) => [
 		primaryKey({ columns: [table.userId, table.deviceId, table.eventId] }),
-		index('event_user_emitted_idx').on(table.userId, table.emittedAt),
+		// Dashboard queries: WHERE userId + emittedAt range, ORDER BY emittedAt, deviceId, eventId (cursor pagination)
+		index('event_user_emitted_device_event_idx').on(table.userId, table.emittedAt, table.deviceId, table.eventId),
 		index('event_user_artifact_emitted_idx').on(table.userId, table.artifactUrlHash, table.emittedAt),
 	]
 );
