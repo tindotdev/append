@@ -14,10 +14,13 @@ import { useOutboxSafe } from '@/features/outbox';
 import { ApiRequestError } from '@/lib/api-rpc';
 import { UNDO_GRACE_MS } from '@/lib/outbox-adapter';
 import { acceptBatch } from '../api/accept-batch';
+import { bulkAcceptBatches } from '../api/bulk-accept';
+import { bulkDeleteBatches } from '../api/bulk-delete';
 import { deleteBatch } from '../api/delete-batch';
 import { batchKeys, getBatch } from '../api/get-batch';
 import { type BatchesFilterOptions, useBatches } from '../api/list-batches';
 import { generateSuggestions } from '../api/retry-suggestions';
+import { BatchBulkActionBar } from '../components/BatchBulkActionBar';
 import { BatchTable } from '../components/BatchTable';
 import { type BatchColumnMeta, getBatchColumns } from '../components/batch-columns';
 import type { BatchListItem, BatchSortField, BatchSortOrder, BatchStatusFilter, Candidate } from '../types';
@@ -141,6 +144,12 @@ export function BatchNewPage() {
 
 	// Delete confirmation dialog state
 	const [batchToDelete, setBatchToDelete] = useState<BatchListItem | null>(null);
+
+	// Bulk operations state
+	const [isBulkAccepting, setIsBulkAccepting] = useState(false);
+	const [isBulkRetrying, setIsBulkRetrying] = useState(false);
+	const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+	const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
 	// Search, filter, and sort state
 	const [searchQuery, setSearchQuery] = useState('');
@@ -487,6 +496,124 @@ export function BatchNewPage() {
 		return data.candidates;
 	}, []);
 
+	// Get selected batch IDs from row selection
+	const selectedBatchIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+	const selectedCount = selectedBatchIds.length;
+
+	// Bulk action handlers
+	const handleBulkAcceptAllReady = useCallback(async () => {
+		if (selectedBatchIds.length === 0) return;
+		if (isBulkAccepting) return;
+
+		setIsBulkAccepting(true);
+
+		try {
+			const summary = await bulkAcceptBatches(selectedBatchIds);
+
+			// Show appropriate toast based on results
+			if (summary.failureCount === 0) {
+				const totalAccepted = summary.results.reduce((acc, r) => acc + (r.acceptedCount ?? 0), 0);
+				const totalTermsCreated = summary.results.reduce((acc, r) => acc + (r.termCreatedCount ?? 0), 0);
+				toast.success(`Accepted ${totalAccepted} terms across ${summary.successCount} batches (${totalTermsCreated} new terms created)`);
+			} else if (summary.successCount === 0) {
+				toast.error('Failed to accept all batches. Please check individual batch status.');
+			} else {
+				const totalAccepted = summary.results.reduce((acc, r) => acc + (r.acceptedCount ?? 0), 0);
+				toast.warning(`Accepted ${totalAccepted} terms in ${summary.successCount} batches, ${summary.failureCount} failed`);
+			}
+
+			// Clear selection and refresh
+			setRowSelection({});
+			await queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
+		} catch {
+			toast.error('Failed to accept batches. Please try again.');
+		} finally {
+			setIsBulkAccepting(false);
+		}
+	}, [selectedBatchIds, isBulkAccepting, queryClient]);
+
+	const handleBulkRetry = useCallback(async () => {
+		if (selectedBatchIds.length === 0) return;
+		if (isBulkRetrying) return;
+
+		setIsBulkRetrying(true);
+
+		let successCount = 0;
+		let failedCount = 0;
+		let totalGenerated = 0;
+
+		// Process batches sequentially using existing SSE endpoint
+		for (const batchId of selectedBatchIds) {
+			try {
+				await generateSuggestions(batchId, {
+					onCandidate: (event) => {
+						if (event.status === 'ok' || event.status === 'cached') totalGenerated++;
+					},
+					onDone: () => {
+						successCount++;
+					},
+					onError: () => {
+						failedCount++;
+					},
+				});
+			} catch {
+				failedCount++;
+			}
+		}
+
+		// Show appropriate toast
+		if (failedCount === 0) {
+			toast.success(`Generated suggestions for ${successCount} batches (${totalGenerated} candidates)`);
+		} else if (successCount === 0) {
+			toast.error('Failed to retry all batches. Please try again.');
+		} else {
+			toast.warning(`Retried ${successCount} batches, ${failedCount} failed`);
+		}
+
+		// Clear selection and refresh
+		setRowSelection({});
+		await queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
+		setIsBulkRetrying(false);
+	}, [selectedBatchIds, isBulkRetrying, queryClient]);
+
+	const handleBulkDeleteRequest = useCallback(() => {
+		if (selectedBatchIds.length === 0) return;
+		setShowBulkDeleteConfirm(true);
+	}, [selectedBatchIds]);
+
+	const handleBulkDeleteConfirm = useCallback(async () => {
+		if (selectedBatchIds.length === 0) return;
+		if (isBulkDeleting) return;
+
+		setShowBulkDeleteConfirm(false);
+		setIsBulkDeleting(true);
+
+		try {
+			const summary = await bulkDeleteBatches(selectedBatchIds);
+
+			// Show appropriate toast based on results
+			if (summary.failureCount === 0) {
+				toast.success(`Deleted ${summary.successCount} batches`);
+			} else if (summary.successCount === 0) {
+				toast.error('Failed to delete all batches. Please try again.');
+			} else {
+				toast.warning(`Deleted ${summary.successCount} batches, ${summary.failureCount} failed`);
+			}
+
+			// Clear selection and refresh
+			setRowSelection({});
+			await queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
+		} catch {
+			toast.error('Failed to delete batches. Please try again.');
+		} finally {
+			setIsBulkDeleting(false);
+		}
+	}, [selectedBatchIds, isBulkDeleting, queryClient]);
+
+	const handleClearSelection = useCallback(() => {
+		setRowSelection({});
+	}, []);
+
 	// Column metadata
 	const columnMeta: BatchColumnMeta = {
 		onViewDetails: handleViewDetails,
@@ -765,6 +892,39 @@ export function BatchNewPage() {
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+			{/* Bulk Delete Confirmation Dialog */}
+			<Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Delete {selectedCount} Batches</DialogTitle>
+						<DialogDescription>
+							Are you sure you want to delete {selectedCount} batch{selectedCount !== 1 ? 'es' : ''} and all their candidates? This action cannot
+							be undone.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<DialogClose asChild>
+							<Button variant="secondary">Cancel</Button>
+						</DialogClose>
+						<Button variant="destructive" onClick={handleBulkDeleteConfirm}>
+							Delete {selectedCount} Batches
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Bulk Action Bar */}
+			<BatchBulkActionBar
+				selectedCount={selectedCount}
+				isAccepting={isBulkAccepting}
+				isRetrying={isBulkRetrying}
+				isDeleting={isBulkDeleting}
+				onClear={handleClearSelection}
+				onAcceptAllReady={handleBulkAcceptAllReady}
+				onRetry={handleBulkRetry}
+				onDelete={handleBulkDeleteRequest}
+			/>
 		</div>
 	);
 }
