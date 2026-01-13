@@ -29,10 +29,22 @@ export interface BatchResponse {
 	candidates: Candidate[];
 }
 
+export interface StatusBreakdown {
+	ready: number;
+	pending: number;
+	accepted: number;
+	error: number;
+}
+
 export interface BatchListItem {
 	id: string;
 	status: 'captured' | 'suggested' | 'accepted';
 	candidateCount: number;
+	statusBreakdown: StatusBreakdown;
+	acceptanceRate: number; // 0-100
+	sampleTerms: string[];
+	hasErrors: boolean;
+	errorCount: number;
 	createdAt: number;
 	updatedAt: number;
 }

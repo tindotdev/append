@@ -1,4 +1,6 @@
-import { X } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
+import type { RowSelectionState } from '@tanstack/react-table';
+import { Loader2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -7,6 +9,10 @@ import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useOutboxSafe } from '@/features/outbox';
 import { UNDO_GRACE_MS } from '@/lib/outbox-adapter';
+import { useBatches } from '../api/list-batches';
+import { BatchTable } from '../components/BatchTable';
+import { type BatchColumnMeta, getBatchColumns } from '../components/batch-columns';
+import type { BatchListItem } from '../types';
 
 // --- Constants ---
 const TERM_MIN = 1;
@@ -113,9 +119,15 @@ function clearDraft(): void {
 export function BatchNewPage() {
 	// Use safe hook that won't throw during initialization
 	const outbox = useOutboxSafe();
+	const navigate = useNavigate();
 
 	const [rows, setRows] = useState<TermRow[]>(() => loadDraft());
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+	// Fetch batches for the table
+	const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useBatches();
+	const batches = data?.pages.flatMap((page) => page.batches) ?? [];
 
 	// Refs for focus management
 	const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
@@ -289,6 +301,39 @@ export function BatchNewPage() {
 		[canSubmit, handleSubmit]
 	);
 
+	// Batch table action handlers
+	const handleViewDetails = useCallback(
+		(batch: BatchListItem) => {
+			navigate({ to: '/batch/$batchId', params: { batchId: batch.id } });
+		},
+		[navigate]
+	);
+
+	const handleAcceptAllReady = useCallback((batch: BatchListItem) => {
+		// TODO: Implement accept all ready candidates
+		toast.info(`Accepting ${batch.statusBreakdown.ready} ready candidates...`);
+	}, []);
+
+	const handleRetry = useCallback((batch: BatchListItem) => {
+		// TODO: Implement retry failed suggestions
+		toast.info(`Retrying ${batch.errorCount} failed suggestions...`);
+	}, []);
+
+	const handleDelete = useCallback((batch: BatchListItem) => {
+		// TODO: Implement delete batch
+		toast.info('Delete batch functionality coming soon...');
+	}, []);
+
+	// Column metadata
+	const columnMeta: BatchColumnMeta = {
+		onViewDetails: handleViewDetails,
+		onAcceptAllReady: handleAcceptAllReady,
+		onRetry: handleRetry,
+		onDelete: handleDelete,
+	};
+
+	const columns = getBatchColumns(columnMeta);
+
 	return (
 		<div className="max-w-2xl">
 			<div className="flex items-center justify-between">
@@ -383,6 +428,58 @@ export function BatchNewPage() {
 					<Button onClick={handleSubmit} disabled={!canSubmit}>
 						{isSubmitting ? 'Submitting...' : 'Submit Batch'}
 					</Button>
+				</div>
+			</div>
+
+			{/* Separator */}
+			<div className="my-8 border-t border-zinc-800" />
+
+			{/* Recent Batches Section */}
+			<div>
+				<h3 className="text-lg font-semibold">Recent batches</h3>
+				<p className="mt-1 text-sm text-zinc-400">View and manage your submitted batches</p>
+
+				<div className="mt-4">
+					{isLoading ? (
+						// Loading state
+						<div className="flex items-center justify-center py-12">
+							<Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+						</div>
+					) : isError ? (
+						// Error state
+						<div className="flex flex-col items-center justify-center py-12 text-center">
+							<p className="text-zinc-400">Failed to load batches. Please try again.</p>
+							<Button variant="secondary" onClick={() => refetch()} className="mt-4">
+								Retry
+							</Button>
+						</div>
+					) : batches.length === 0 ? (
+						// Empty state
+						<div className="flex flex-col items-center justify-center py-12 text-center">
+							<p className="text-zinc-400">No batches yet. Submit your first batch above to get started.</p>
+						</div>
+					) : (
+						// Table with batches
+						<>
+							<BatchTable
+								columns={columns}
+								data={batches}
+								onRowClick={handleViewDetails}
+								rowSelection={rowSelection}
+								onRowSelectionChange={setRowSelection}
+							/>
+
+							{/* Load more button */}
+							{hasNextPage && (
+								<div className="mt-6 flex justify-center">
+									<Button variant="secondary" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+										{isFetchingNextPage && <Loader2 className="size-4 animate-spin mr-2" />}
+										Load more
+									</Button>
+								</div>
+							)}
+						</>
+					)}
 				</div>
 			</div>
 		</div>
