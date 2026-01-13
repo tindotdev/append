@@ -31,6 +31,49 @@ function firstIssueMessage(issues: v.BaseIssue<unknown>[] | undefined): string {
 	return issues?.[0]?.message ?? 'Validation failed';
 }
 
+function parsePositiveInt(value: string | undefined): number | null {
+	if (!value) return null;
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed)) return null;
+	const int = Math.floor(parsed);
+	if (int <= 0) return null;
+	return int;
+}
+
+function getExportConfig(env: Bindings): { pageSize: number; maxTotalRows: number } {
+	const pageSize = parsePositiveInt(env.EVENTS_EXPORT_PAGE_SIZE) ?? 1000;
+	const maxTotalRows = parsePositiveInt(env.EVENTS_EXPORT_MAX_TOTAL_ROWS) ?? 100_000;
+	return { pageSize, maxTotalRows };
+}
+
+function buildExportCursorWhere(opts: {
+	userId: string;
+	fromMs: number;
+	toMs: number;
+	cursor: { emittedAt: Date; deviceId: string; eventId: string } | null;
+}): WhereClause {
+	const baseWhere: WhereClause = and(
+		eq(eventTable.userId, opts.userId),
+		gte(eventTable.emittedAt, new Date(opts.fromMs)),
+		lte(eventTable.emittedAt, new Date(opts.toMs))
+	);
+
+	if (!opts.cursor) return baseWhere;
+
+	return and(
+		baseWhere,
+		or(
+			gt(eventTable.emittedAt, opts.cursor.emittedAt),
+			and(eq(eventTable.emittedAt, opts.cursor.emittedAt), gt(eventTable.deviceId, opts.cursor.deviceId)),
+			and(
+				eq(eventTable.emittedAt, opts.cursor.emittedAt),
+				eq(eventTable.deviceId, opts.cursor.deviceId),
+				gt(eventTable.eventId, opts.cursor.eventId)
+			)
+		)
+	);
+}
+
 export const eventsRoutes = app
 	.post('/ingest', async (c) => {
 		const userId = c.get('userId');
@@ -185,7 +228,10 @@ export const eventsRoutes = app
 	 * Uses composite cursor for pagination.
 	 *
 	 * Limits:
-	 * - Max 100,000 events per export request
+	 * - Max 100,000 events per export request (configurable via EVENTS_EXPORT_MAX_TOTAL_ROWS)
+	 *
+	 * Response (when truncated):
+	 * - Status: 206 Partial Content
 	 *
 	 * Response headers (when truncated):
 	 * - X-Export-Truncated: 'true' - indicates more data exists
@@ -226,72 +272,75 @@ export const eventsRoutes = app
 			};
 		}
 
-		const PAGE_SIZE = 1000;
-		const MAX_TOTAL_ROWS = 100_000;
+		const { pageSize: PAGE_SIZE, maxTotalRows: MAX_TOTAL_ROWS } = getExportConfig(c.env);
+
+		// Content type is part of the contract; set before constructing the Response.
+		c.header('Content-Type', 'application/x-ndjson');
+
+		// Determine truncation + continuation cursor up-front so headers/status are actually sent.
+		// Keep the NDJSON body "raw events only" (one event per line) per ADR 0022.
+		try {
+			const probeWhere = buildExportCursorWhere({ userId, fromMs, toMs, cursor: initialCursor });
+			const probe = await db
+				.select({ emittedAt: eventTable.emittedAt, deviceId: eventTable.deviceId, eventId: eventTable.eventId })
+				.from(eventTable)
+				.where(probeWhere)
+				.orderBy(eventTable.emittedAt, eventTable.deviceId, eventTable.eventId)
+				.limit(2)
+				.offset(MAX_TOTAL_ROWS - 1);
+
+			const lastIncluded = probe[0];
+			const hasMore = probe.length === 2;
+
+			if (hasMore && lastIncluded) {
+				c.header('X-Export-Truncated', 'true');
+				c.header('X-Export-Cursor', encodeCursor(lastIncluded.emittedAt.getTime(), lastIncluded.deviceId, lastIncluded.eventId));
+				// "Partial Content" is a useful signal for clients even if they ignore headers.
+				c.status(206);
+			}
+		} catch (e) {
+			// If we can't safely determine truncation up-front, fail loudly instead of streaming a misleading response.
+			console.error('Export truncation probe failed:', e);
+			return apiError(c, 500, 'INTERNAL_ERROR', 'Failed to start export');
+		}
 
 		return stream(c, async (s) => {
-			// Set content type for NDJSON
-			c.header('Content-Type', 'application/x-ndjson');
-
-			let cursor: { emittedAt: Date; deviceId: string; eventId: string } | null = initialCursor;
-			let hasMore = true;
-			let totalExported = 0;
-			let headerSet = false;
+			let aborted = false;
+			const abortListener = () => {
+				aborted = true;
+				s.abort();
+			};
 
 			try {
-				while (hasMore && totalExported < MAX_TOTAL_ROWS) {
-					const baseWhere: WhereClause = and(
-						eq(eventTable.userId, userId),
-						gte(eventTable.emittedAt, new Date(fromMs)),
-						lte(eventTable.emittedAt, new Date(toMs))
-					);
+				c.req.raw.signal.addEventListener('abort', abortListener, { once: true });
+			} catch {
+				// Ignore if the runtime doesn't support AbortSignal listeners.
+			}
 
-					const cursorWhere: WhereClause = cursor
-						? and(
-								baseWhere,
-								or(
-									gt(eventTable.emittedAt, cursor.emittedAt),
-									and(eq(eventTable.emittedAt, cursor.emittedAt), gt(eventTable.deviceId, cursor.deviceId)),
-									and(eq(eventTable.emittedAt, cursor.emittedAt), eq(eventTable.deviceId, cursor.deviceId), gt(eventTable.eventId, cursor.eventId))
-								)
-							)
-						: baseWhere;
+			s.onAbort(() => {
+				aborted = true;
+			});
 
-					// Fetch one extra row to accurately detect if more data exists
+			let cursor: { emittedAt: Date; deviceId: string; eventId: string } | null = initialCursor;
+			let totalExported = 0;
+
+			try {
+				while (!aborted && totalExported < MAX_TOTAL_ROWS) {
+					const remainingCapacity = MAX_TOTAL_ROWS - totalExported;
+					const limit = Math.min(PAGE_SIZE, remainingCapacity);
+					const cursorWhere = buildExportCursorWhere({ userId, fromMs, toMs, cursor });
+
 					const rows: EventRow[] = await db
 						.select()
 						.from(eventTable)
 						.where(cursorWhere)
 						.orderBy(eventTable.emittedAt, eventTable.deviceId, eventTable.eventId)
-						.limit(PAGE_SIZE + 1);
+						.limit(limit);
 
-					if (rows.length === 0) {
-						hasMore = false;
-						break;
-					}
+					if (rows.length === 0 || aborted) break;
 
-					// Check if there's more data beyond this page
-					const hasMoreInDb = rows.length > PAGE_SIZE;
-					const pageRows = hasMoreInDb ? rows.slice(0, PAGE_SIZE) : rows;
-
-					// Determine how many rows we can process without exceeding the limit
-					const remainingCapacity = MAX_TOTAL_ROWS - totalExported;
-					const toProcess: EventRow[] = pageRows.slice(0, remainingCapacity);
-
-					// Check if we're truncating: either we fetched more than capacity,
-					// or we're at capacity and there's confirmed more data in DB
-					const wouldTruncate = pageRows.length > remainingCapacity || (toProcess.length === remainingCapacity && hasMoreInDb);
-					if (wouldTruncate && !headerSet) {
-						c.header('X-Export-Truncated', 'true');
-						// Set continuation cursor to last row we'll process, so client can resume
-						const lastRow = toProcess[toProcess.length - 1];
-						if (lastRow) {
-							c.header('X-Export-Cursor', encodeCursor(lastRow.emittedAt.getTime(), lastRow.deviceId, lastRow.eventId));
-						}
-						headerSet = true;
-					}
-
-					for (const row of toProcess) {
+					for (const row of rows) {
+						if (aborted) break;
 						// Build event envelope (exclude user_id)
 						const artifact =
 							row.artifactHost && row.artifactUrlHash
@@ -314,37 +363,25 @@ export const eventsRoutes = app
 							payload: JSON.parse(row.payloadJson),
 						};
 
-						try {
-							await s.write(JSON.stringify(envelope) + '\n');
-							totalExported += 1;
-						} catch (writeError) {
-							// Client disconnected or write failed - abort stream gracefully
-							console.error('Stream write failed:', writeError);
-							hasMore = false;
-							break;
-						}
+						await s.write(JSON.stringify(envelope) + '\n');
+						totalExported += 1;
+						cursor = { emittedAt: row.emittedAt, deviceId: row.deviceId, eventId: row.eventId };
 					}
 
-					// Update cursor for next page
-					if (!hasMoreInDb || toProcess.length < pageRows.length) {
-						// No more data in DB, or we couldn't process the full page (hit limit)
-						hasMore = false;
-					} else if (totalExported >= MAX_TOTAL_ROWS) {
-						// Reached max export limit - truncation header already set above if needed
-						hasMore = false;
-					} else {
-						const last: EventRow = toProcess[toProcess.length - 1]!;
-						cursor = { emittedAt: last.emittedAt, deviceId: last.deviceId, eventId: last.eventId };
-					}
+					// If the DB returned fewer rows than requested, we've reached the end.
+					if (rows.length < limit) break;
 				}
 			} catch (error) {
-				// Handle unexpected errors during query or processing
-				console.error('Stream processing failed:', error);
-				// Attempt to write error to stream if still connected
+				// Don't write non-event lines into the NDJSON stream; keep it "raw events only".
+				// If anything fails mid-export, abort the stream so callers don't treat a partial body as complete.
+				console.error('Export stream failed:', error);
+				s.abort();
+				throw error;
+			} finally {
 				try {
-					await s.write(JSON.stringify({ error: 'Stream processing failed' }) + '\n');
+					c.req.raw.signal.removeEventListener('abort', abortListener);
 				} catch {
-					// Client already disconnected, cleanup silently
+					// ignore
 				}
 			}
 		});

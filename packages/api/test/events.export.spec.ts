@@ -390,10 +390,8 @@ describe('GET /events/export', () => {
 	// Truncation header behavior
 	// ─────────────────────────────────────────────────────────────────────────
 	//
-	// NOTE: We test that X-Export-Truncated is NOT set for non-truncated exports.
-	// Testing the positive case (header IS set when exceeding MAX_TOTAL_ROWS=100k)
-	// is impractical in automated tests due to the time required to insert 100k+ rows.
-	// The truncation logic is verified through code review (see routes.ts:267-269).
+	// NOTE: In the test environment, EVENTS_EXPORT_MAX_TOTAL_ROWS is set to a small
+	// value (see vitest.config.mts) so we can cover truncation without inserting 100k+ rows.
 	// ─────────────────────────────────────────────────────────────────────────
 
 	it('does not set X-Export-Truncated header when all data is exported', async () => {
@@ -424,13 +422,54 @@ describe('GET /events/export', () => {
 		expect(res.headers.get('X-Export-Truncated')).toBeNull();
 	});
 
+	it('sets X-Export-Truncated and X-Export-Cursor when export exceeds max rows', async () => {
+		const maxTotalRows = Number(env.EVENTS_EXPORT_MAX_TOTAL_ROWS ?? 100_000);
+		expect(maxTotalRows).toBeGreaterThan(0);
+
+		const totalEvents = maxTotalRows + 50;
+		const deviceId = generateUUID();
+		const baseTime = Date.UTC(2026, 0, 5, 12, 0, 0);
+
+		// Ingest events in batches (ingest endpoint caps at 500 events per request)
+		const BATCH_SIZE = 500;
+		for (let offset = 0; offset < totalEvents; offset += BATCH_SIZE) {
+			const batchSize = Math.min(BATCH_SIZE, totalEvents - offset);
+			const batch = [];
+			for (let i = 0; i < batchSize; i++) {
+				const eventIndex = offset + i;
+				batch.push(
+					heartbeatEvent({
+						deviceId,
+						eventId: generateUUID(),
+						emittedAtMs: baseTime + eventIndex * 1000,
+					})
+				);
+			}
+			await ingestEvents(authCookie, batch);
+		}
+
+		const res1 = await authFetch('/events/export?from=2026-01-05&to=2026-01-05&format=ndjson', { cookie: authCookie });
+		expect(res1.status).toBe(206);
+		expect(res1.headers.get('X-Export-Truncated')).toBe('true');
+		const cursor = res1.headers.get('X-Export-Cursor');
+		expect(cursor).toBeTruthy();
+
+		const exported1 = (await parseNdjson(res1)) as any[];
+		expect(exported1).toHaveLength(maxTotalRows);
+
+		const res2 = await authFetch(`/events/export?from=2026-01-05&to=2026-01-05&format=ndjson&cursor=${cursor}`, { cookie: authCookie });
+		expect(res2.status).toBe(200);
+		expect(res2.headers.get('X-Export-Truncated')).toBeNull();
+
+		const exported2 = (await parseNdjson(res2)) as any[];
+		expect(exported2).toHaveLength(totalEvents - maxTotalRows);
+	});
+
 	it('does not set X-Export-Truncated header when result size equals PAGE_SIZE exactly', async () => {
-		// This test validates the fix for the false positive truncation issue.
-		// Previously, when the last page was exactly full (PAGE_SIZE rows),
-		// the code assumed there might be more data. Now we over-fetch by 1
-		// to accurately detect if more data exists.
+		// Ensure we don't falsely mark an export as truncated when the result size
+		// happens to exactly match the paging size.
 		//
-		// PAGE_SIZE in routes.ts is 1000, so we create exactly 1000 events.
+		// PAGE_SIZE in routes.ts defaults to 1000, so we create exactly 1000 events.
 		// We must batch ingests because the API limits batches to 500 events.
 		const deviceId = generateUUID();
 		const baseTime = Date.UTC(2026, 0, 5, 12, 0, 0);

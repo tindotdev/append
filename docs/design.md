@@ -104,6 +104,10 @@ Explicitly assigns a topic to an artifact (or to a capture) for a time range.
   - `scope`: `artifact | capture | time_range`
   - `starts_at?`, `ends_at?`
 
+Implementation note (current):
+
+- Server read-model queries currently consider only the **most recent 1,000** `topic_override` events per user (older overrides may be ignored).
+
 ### `aha_candidate` — optional (MVP-compatible, not required to ship)
 
 Marks a moment that looks like an “aha” (user-initiated or heuristic).
@@ -197,6 +201,10 @@ Guardrails (MVP):
   - User-owned export of raw events (portable, append-only).
   - Date semantics (default): `from`/`to` are interpreted as **UTC dates inclusive**.
   - Ordering: stable chronological order by `(emitted_at, device_id, event_id)`.
+  - Limit: maximum **100,000** events per request (default; configurable server-side).
+    - If more data exists, responds with **206 Partial Content** and sets:
+      - `X-Export-Truncated: true`
+      - `X-Export-Cursor: <cursor>` (use as `cursor=...` to resume from the last exported event)
 
 ## Data model (events-first; Cloudflare D1)
 
