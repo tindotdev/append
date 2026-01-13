@@ -17,7 +17,7 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
 	),
 });
 
-const { signInRoute } = createPublicRoutes(rootRoute);
+const { signInRoute, demoRoute } = createPublicRoutes(rootRoute);
 const { protectedRoute } = createProtectedRoutes(rootRoute);
 
-export const routeTree = rootRoute.addChildren([signInRoute, protectedRoute]);
+export const routeTree = rootRoute.addChildren([signInRoute, demoRoute, protectedRoute]);

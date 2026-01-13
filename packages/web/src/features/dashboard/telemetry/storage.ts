@@ -118,3 +118,13 @@ export function ensureTelemetryReady(): Promise<void> {
 
 	return initPromise;
 }
+
+export async function regenerateSampleEvents(): Promise<void> {
+	await ensureTelemetryReady();
+	const device_id = getOrCreateDeviceId();
+	const timezone = getTimezone();
+	const sample = await generateSampleEvents({ device_id, timezone });
+	cachedEvents = sample;
+	saveEventsToStorage();
+	notify();
+}

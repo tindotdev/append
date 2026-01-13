@@ -15,6 +15,7 @@ Append is **WakaTime-for-learning**:
 - Canonical store: events-first in `append` (append-only; derived rollups are rebuildable).
 - App architecture: SPA (React + TanStack Router) + Hono on Cloudflare Workers (ADR: `docs/adr/0004-spa-hono-workers.md`).
 - Auth/access: Google SSO allowlist (ADR: `docs/adr/0001-google-allowlist-auth.md`).
+- Public demo: `/demo` route uses synthetic local events (no auth, no writes).
 - Web UI: Linear-style sidebar layout (ADR: `docs/adr/0015-web-ui-linear-sidebar-layout.md`).
 - Capture UX: outbox-backed submit semantics (ADR: `docs/adr/0018-outbox-backed-capture-semantics.md`) applied to capture events (not Term entities).
 

@@ -1,4 +1,12 @@
-import { appendEvents, clearEvents, ensureTelemetryReady, getEvents, getOrCreateDeviceId, getTimezone } from './storage';
+import {
+	appendEvents,
+	clearEvents,
+	ensureTelemetryReady,
+	getEvents,
+	getOrCreateDeviceId,
+	getTimezone,
+	regenerateSampleEvents,
+} from './storage';
 import type { TelemetryEvent } from './types';
 import { isHttpUrl, urlToArtifact } from './url';
 
@@ -65,6 +73,10 @@ export async function addCapture(opts: { url?: string; capture_type: 'term' | 'q
 
 export function resetTelemetry() {
 	clearEvents();
+}
+
+export async function regenerateTelemetrySample() {
+	await regenerateSampleEvents();
 }
 
 export async function exportEventsNdjson() {
