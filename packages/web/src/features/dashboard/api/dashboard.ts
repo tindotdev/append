@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { api, parseRpcJson } from '../../../lib/api-rpc';
+import { useDashboardDataMode } from '../context/dashboard-data-mode';
 import { getBrowserTimezone } from '../telemetry/time';
 import type { HeatmapData, HeatmapStatsData } from '../types';
 
@@ -62,7 +63,8 @@ export function setUseApi(enabled: boolean): void {
  * Automatically re-renders when the toggle changes.
  */
 export function useApiToggle(): boolean {
-	return useSyncExternalStore(
+	const mode = useDashboardDataMode();
+	const auto = useSyncExternalStore(
 		(callback) => {
 			subscribers.add(callback);
 			return () => subscribers.delete(callback);
@@ -70,6 +72,10 @@ export function useApiToggle(): boolean {
 		shouldUseApi,
 		() => true // Server-side always returns true
 	);
+
+	if (mode === 'api') return true;
+	if (mode === 'local') return false;
+	return auto;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

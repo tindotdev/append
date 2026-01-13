@@ -32,7 +32,18 @@ function shouldHaveActivityToday() {
 	return Math.random() >= 0.4;
 }
 
-function sessionCountForDay() {
+function shouldHaveActivityForDay(daysAgo: number) {
+	// Demo/dev should almost always look "alive", especially for recent days.
+	// Guarantee activity for today and yesterday to avoid empty dashboard states.
+	if (daysAgo <= 1) return true;
+	// Encourage a mostly-active recent week.
+	if (daysAgo <= 6) return Math.random() >= 0.25;
+	return shouldHaveActivityToday();
+}
+
+function sessionCountForDay(daysAgo: number) {
+	// Keep today a bit calmer; allow occasional two-session days elsewhere.
+	if (daysAgo === 0) return 1;
 	return Math.random() < 0.25 ? 2 : 1;
 }
 
@@ -145,9 +156,9 @@ async function createDayEvents(opts: {
 	artifactCache: Map<string, Awaited<ReturnType<typeof urlToArtifact>>>;
 	daysAgo: number;
 }): Promise<TelemetryEvent[]> {
-	if (!shouldHaveActivityToday()) return [];
+	if (!shouldHaveActivityForDay(opts.daysAgo)) return [];
 	const dayBase = dateAtUtcNoonOffset(opts.daysAgo);
-	const sessions = sessionCountForDay();
+	const sessions = sessionCountForDay(opts.daysAgo);
 	const out: TelemetryEvent[] = [];
 	for (let s = 0; s < sessions; s += 1) {
 		out.push(...(await createSessionEvents({ device_id: opts.device_id, artifactCache: opts.artifactCache, dayBase })));
@@ -162,6 +173,26 @@ export async function generateSampleEvents(opts: { device_id: string; timezone: 
 
 	for (let daysAgo = SAMPLE_DAYS - 1; daysAgo >= 0; daysAgo -= 1) {
 		events.push(...(await createDayEvents({ device_id, artifactCache, daysAgo })));
+	}
+
+	// Guarantee at least one capture so the demo doesn't look "empty".
+	if (!events.some((e) => e.type === 'capture')) {
+		const artifact = await getArtifact({ cache: artifactCache, url: SAMPLE_SOURCES[1]?.url ?? 'https://react.dev/learn' });
+		const emitted_at = Date.now() - 5 * 60 * 1000;
+		events.push({
+			schema_version: 1,
+			event_id: crypto.randomUUID(),
+			device_id,
+			emitted_at,
+			received_at: emitted_at,
+			type: 'capture',
+			artifact,
+			payload: {
+				capture_type: 'term',
+				label: 'idempotency key',
+				note: 'Demo capture (synthetic)',
+			},
+		});
 	}
 
 	events.sort((a, b) => a.emitted_at - b.emitted_at);

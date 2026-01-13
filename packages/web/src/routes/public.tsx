@@ -1,6 +1,8 @@
 import { type AnyRoute, createRoute, redirect } from '@tanstack/react-router';
+import { GuestShell } from '@/components/layouts/GuestShell';
 import { SignInPage } from '@/features/auth';
 import type { AuthContextType } from '@/features/auth/hooks/use-auth';
+import { DemoDashboardPage } from '@/routes/demo/DemoDashboardPage';
 
 export function createPublicRoutes<TParentRoute extends AnyRoute>(rootRoute: TParentRoute) {
 	const signInRoute = createRoute({
@@ -15,5 +17,17 @@ export function createPublicRoutes<TParentRoute extends AnyRoute>(rootRoute: TPa
 		component: SignInPage,
 	});
 
-	return { signInRoute };
+	const demoRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		id: 'demo',
+		component: GuestShell,
+	});
+
+	const demoDashboardRoute = createRoute({
+		getParentRoute: () => demoRoute,
+		path: '/demo',
+		component: DemoDashboardPage,
+	});
+
+	return { signInRoute, demoRoute: demoRoute.addChildren([demoDashboardRoute]) };
 }
