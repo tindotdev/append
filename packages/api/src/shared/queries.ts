@@ -1,6 +1,6 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { batch, bucket, type schema, term } from '../db';
+import { batch, bucket, candidate, type schema, term } from '../db';
 
 export type OwnershipResult<T> = { ok: true; value: T } | { ok: false; error: 'not_found' | 'forbidden' };
 
@@ -113,4 +113,33 @@ export async function requireUserBucketBySlug(
 	}
 
 	return { ok: true, value: bucketRow };
+}
+
+/**
+ * Check if a candidate exists and user owns it (via batch ownership).
+ * Returns the full candidate row for use in accept/update operations.
+ */
+export async function requireCandidateOwned(
+	db: DrizzleD1Database<typeof schema>,
+	userId: string,
+	candidateId: string
+): Promise<{ ok: true; candidate: typeof candidate.$inferSelect } | { ok: false; error: 'not_found' | 'forbidden' }> {
+	// Fetch candidate with batch join to check ownership
+	const result = await db
+		.select()
+		.from(candidate)
+		.innerJoin(batch, eq(candidate.batchId, batch.id))
+		.where(eq(candidate.id, candidateId))
+		.limit(1);
+
+	if (result.length === 0) {
+		return { ok: false, error: 'not_found' };
+	}
+
+	const row = result[0];
+	if (row.batch.userId !== userId) {
+		return { ok: false, error: 'forbidden' };
+	}
+
+	return { ok: true, candidate: row.candidate };
 }

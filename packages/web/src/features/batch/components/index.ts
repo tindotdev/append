@@ -1,5 +1,10 @@
 export { BatchHeader } from './BatchHeader';
+export { CandidateBulkActionBar } from './CandidateBulkActionBar';
+export { CandidateDetailSheet } from './CandidateDetailSheet';
 export { CandidateList } from './CandidateList';
+export { CandidateTable } from './CandidateTable';
+export type { CandidateColumnMeta, CandidateStatus } from './candidate-columns';
+export { getCandidateColumns, getCandidateStatus, getEffectiveBucket, getEffectiveText } from './candidate-columns';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
 export { LoadingState } from './LoadingState';

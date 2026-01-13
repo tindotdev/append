@@ -33,3 +33,4 @@ Rules:
 - `0021-extension-device-token-auth.md` — Extension auth via device tokens (bearer)
 - `0022-m1-dashboard-read-models-and-export.md` — M1 dashboard read models + raw events export
 - `0023-term-archival-and-bulk-actions.md` — Term archival + bulk actions (delete/move)
+- `0024-accept-individual-candidates.md` — Accept individual candidates with data table UI
