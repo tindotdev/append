@@ -1,4 +1,4 @@
-import { Link, useLocation } from '@tanstack/react-router';
+import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import {
 	Archive,
 	ChevronDown,
@@ -13,7 +13,9 @@ import {
 	Shield,
 } from 'lucide-react';
 import * as React from 'react';
+import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
 	DropdownMenu,
@@ -31,14 +33,12 @@ import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
-	SidebarMenuSub,
-	SidebarMenuSubButton,
-	SidebarMenuSubItem,
 	SidebarRail,
 	useSidebar,
 } from '@/components/ui/sidebar';
 import { signOut, useAuth } from '@/features/auth';
-import { useUserBuckets } from '@/features/settings';
+import { useDeleteBucket, useUpdateBucket, useUserBuckets } from '@/features/settings';
+import { SidebarBucketItem } from './SidebarBucketItem';
 
 const NAV_ITEMS = [
 	{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, shortcut: undefined },
@@ -54,11 +54,15 @@ const UTILITY_ITEMS = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const location = useLocation();
+	const navigate = useNavigate();
 	const { data: session } = useAuth();
 	const { data: bucketsData } = useUserBuckets({ enabled: !!session });
 	const buckets = bucketsData?.buckets ?? [];
 	const { isMobile } = useSidebar();
 	const [bucketsOpen, setBucketsOpen] = React.useState(true);
+
+	const updateBucketMutation = useUpdateBucket();
+	const deleteBucketMutation = useDeleteBucket();
 
 	const user = session?.user;
 	const userInitials =
@@ -70,6 +74,53 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 			.slice(0, 2) ??
 		user?.email?.slice(0, 2).toUpperCase() ??
 		'U';
+
+	// Bucket action handlers
+	const handleEditBucket = (bucketId: string) => {
+		// TODO: Open edit sheet/modal
+		console.log('Edit bucket:', bucketId);
+	};
+
+	const handleColorChange = async (bucketId: string, color: string | null) => {
+		try {
+			await updateBucketMutation.mutateAsync({ id: bucketId, input: { color } });
+			toast.success('Bucket color updated');
+		} catch (_error) {
+			toast.error('Failed to update color');
+		}
+	};
+
+	const handleExportBucket = (bucketId: string) => {
+		// Navigate to export page with bucket filter
+		const bucket = buckets.find((b) => b.id === bucketId);
+		if (bucket) {
+			navigate({ to: '/export', search: { bucket: bucket.slug } });
+		}
+	};
+
+	const handleDeleteBucket = (bucketId: string) => {
+		const bucket = buckets.find((b) => b.id === bucketId);
+		if (!bucket) return;
+
+		if (bucket.senseCount > 0) {
+			toast.error(`Cannot delete bucket with ${bucket.senseCount} items`);
+			return;
+		}
+
+		// TODO: Replace with proper confirmation dialog
+		const confirmed = window.confirm(`Delete "${bucket.name}"?`);
+		if (confirmed) {
+			deleteBucketMutation.mutate(bucketId, {
+				onSuccess: () => toast.success('Bucket deleted'),
+				onError: () => toast.error('Failed to delete bucket'),
+			});
+		}
+	};
+
+	const handleQuickAdd = (bucketSlug: string) => {
+		// Navigate to capture page with bucket pre-selected
+		navigate({ to: '/batch/new', search: { bucket: bucketSlug } });
+	};
 
 	return (
 		<Sidebar collapsible="icon" {...props}>
@@ -158,24 +209,42 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 				{/* Buckets - Collapsible section (Linear-style) */}
 				<SidebarGroup className="group-data-[collapsible=icon]:hidden">
 					<Collapsible open={bucketsOpen} onOpenChange={setBucketsOpen}>
-						<CollapsibleTrigger asChild>
-							<SidebarGroupLabel className="cursor-pointer hover:text-sidebar-foreground/70">
-								<ChevronDown className={`mr-1 size-3 transition-transform duration-200 ${bucketsOpen ? '' : '-rotate-90'}`} />
-								Buckets
-							</SidebarGroupLabel>
-						</CollapsibleTrigger>
+						<div className="flex items-center justify-between px-2">
+							<CollapsibleTrigger asChild>
+								<SidebarGroupLabel className="cursor-pointer hover:text-sidebar-foreground/70 flex-1">
+									<ChevronDown className={`mr-1 size-3 transition-transform duration-200 ${bucketsOpen ? '' : '-rotate-90'}`} />
+									Buckets
+									<span className="ml-auto text-xs text-muted-foreground mr-2">({buckets.length}/20)</span>
+								</SidebarGroupLabel>
+							</CollapsibleTrigger>
+
+							{/* Quick create bucket button */}
+							<Button
+								variant="ghost"
+								size="icon"
+								className="h-5 w-5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity"
+								onClick={() => {
+									// TODO: Open create bucket sheet
+									console.log('Create new bucket');
+								}}
+							>
+								<Plus className="h-3.5 w-3.5" />
+								<span className="sr-only">Create bucket</span>
+							</Button>
+						</div>
 						<CollapsibleContent>
 							<SidebarMenu>
 								{buckets.length > 0 ? (
 									buckets.map((bucket) => (
-										<SidebarMenuItem key={bucket.id}>
-											<SidebarMenuButton asChild isActive={location.pathname === `/bucket/${bucket.slug}`}>
-												<Link to="/bucket/$slug" params={{ slug: bucket.slug }} search={{ term: undefined }}>
-													<FolderOpen className="size-4" />
-													<span>{bucket.name}</span>
-												</Link>
-											</SidebarMenuButton>
-										</SidebarMenuItem>
+										<SidebarBucketItem
+											key={bucket.id}
+											bucket={bucket}
+											onEdit={() => handleEditBucket(bucket.id)}
+											onColorChange={(color) => handleColorChange(bucket.id, color)}
+											onExport={() => handleExportBucket(bucket.id)}
+											onDelete={() => handleDeleteBucket(bucket.id)}
+											onQuickAdd={() => handleQuickAdd(bucket.slug)}
+										/>
 									))
 								) : (
 									<SidebarMenuItem>
