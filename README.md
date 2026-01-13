@@ -12,6 +12,42 @@ just help   # Show all available commands
 
 See `docs/runbook.md` for detailed setup and operations.
 
+## Development Setup
+
+First-time setup (including git worktrees):
+
+```bash
+pnpm setup
+```
+
+This will:
+1. Install dependencies
+2. Initialize the local D1 database with migrations
+
+Then start the development servers:
+
+```bash
+pnpm dev
+```
+
+This runs both the API (http://localhost:8787) and Web (http://localhost:5173) servers in parallel.
+
+## Deployment (Cloudflare)
+
+- API (Workers): `pnpm deploy:api`
+- Web (SPA): deploy `packages/web` to Cloudflare Pages (ADR `docs/adr/0004-spa-hono-workers.md`)
+  - Git-based Pages build: build output is `packages/web/dist`
+  - CLI upload: `pnpm --filter @append/web build` then `wrangler pages deploy packages/web/dist --project-name @append/web`
+
+## Secrets management
+
+Secrets are managed via Cloudflare's native tooling:
+
+- **Local dev**: `.dev.vars` in `packages/api/` (gitignored)
+- **Production**: `wrangler secret put <NAME>` (stored in Cloudflare)
+
+Required secrets for auth:
+
 ## Status
 
 Canonical docs live in `docs/`:

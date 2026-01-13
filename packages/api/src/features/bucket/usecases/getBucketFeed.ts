@@ -17,11 +17,13 @@ export interface BucketFeedItem {
 	termId: string;
 	displayTerm: string;
 	canonical: string;
+	termVersion: number;
 	primarySense: {
 		id: string;
 		bucket: string;
 		text: string;
 		createdAt: number;
+		version: number;
 	};
 }
 
@@ -90,10 +92,12 @@ export async function getBucketFeed(
 			termId: term.id,
 			displayTerm: term.displayTerm,
 			canonical: term.canonical,
+			termVersion: term.version,
 			senseId: termSense.id,
 			senseBucket: termSense.bucket,
 			senseText: termSense.text,
 			senseCreatedAt: termSense.createdAt,
+			senseVersion: termSense.version,
 		})
 		.from(term)
 		.innerJoin(termSense, eq(term.primarySenseId, termSense.id))
@@ -109,11 +113,13 @@ export async function getBucketFeed(
 		termId: row.termId,
 		displayTerm: row.displayTerm,
 		canonical: row.canonical,
+		termVersion: row.termVersion,
 		primarySense: {
 			id: row.senseId,
 			bucket: row.senseBucket,
 			text: row.senseText,
 			createdAt: row.senseCreatedAt.getTime(),
+			version: row.senseVersion,
 		},
 	}));
 

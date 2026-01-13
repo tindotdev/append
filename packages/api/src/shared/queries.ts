@@ -65,6 +65,30 @@ export async function requireTermOwned(
 	return { ok: true, value: termRow };
 }
 
+/**
+ * Check if a term exists and belongs to the user, including archived terms.
+ * Used by restore endpoints which need to work on archived terms.
+ */
+export async function requireTermOwnedIncludingArchived(
+	db: DrizzleD1Database<typeof schema>,
+	userId: string,
+	termId: string
+): Promise<OwnershipResult<typeof term.$inferSelect>> {
+	const termRow = await db.query.term.findFirst({
+		where: eq(term.id, termId),
+	});
+
+	if (!termRow) {
+		return { ok: false, error: 'not_found' };
+	}
+
+	if (termRow.userId !== userId) {
+		return { ok: false, error: 'forbidden' };
+	}
+
+	return { ok: true, value: termRow };
+}
+
 export async function findUserBucketBySlug(
 	db: DrizzleD1Database<typeof schema>,
 	userId: string,
