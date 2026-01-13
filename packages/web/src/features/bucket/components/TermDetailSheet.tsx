@@ -1,6 +1,7 @@
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -338,9 +339,13 @@ export function TermDetailSheet({ termId, onClose }: TermDetailSheetProps) {
 				)}
 
 				{error && (
-					<div className="flex flex-col items-center justify-center py-12 text-center">
-						<p className="text-zinc-400">Failed to load term details.</p>
-						<Button variant="ghost" onClick={() => refetch()} className="mt-2">
+					<div className="p-4">
+						<Alert variant="destructive" className="mb-4">
+							<XCircle className="size-4" />
+							<AlertTitle>Error</AlertTitle>
+							<AlertDescription>Failed to load term details.</AlertDescription>
+						</Alert>
+						<Button variant="secondary" onClick={() => refetch()} className="w-full">
 							Retry
 						</Button>
 					</div>

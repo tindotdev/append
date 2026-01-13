@@ -39,6 +39,9 @@ const SENDER_POLL_INTERVAL_MS = 5_000;
 // Debounce refresh to reduce cross-tab churn
 const REFRESH_DEBOUNCE_MS = 500;
 
+// Rate limit error toasts to avoid spam during transient network issues
+const ERROR_TOAST_RATE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
+
 // Default counts when not initialized
 const DEFAULT_COUNTS: OutboxCounts = { pending: 0, failed: 0, blocked_auth: 0 };
 
@@ -126,6 +129,9 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 	const isMountedRef = useRef(true);
 	const refreshCountsSequenceRef = useRef(0);
 	const resumeBlockedAuthSequenceRef = useRef(0);
+	const lastSenderErrorToastRef = useRef<number>(0);
+	const lastCountRefreshErrorToastRef = useRef<number>(0);
+	const lastResumeAuthErrorToastRef = useRef<number>(0);
 	const authSessionKey = useMemo(() => getAuthSessionKey(session), [session]);
 
 	// Refresh counts from store
@@ -139,6 +145,13 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 			}
 		} catch (err) {
 			console.warn('[Outbox] Failed to refresh counts:', err);
+
+			// Show rate-limited toast to notify user that sync status may be stale
+			const now = Date.now();
+			if (now - lastCountRefreshErrorToastRef.current > ERROR_TOAST_RATE_LIMIT_MS) {
+				lastCountRefreshErrorToastRef.current = now;
+				toast.warning('Unable to refresh sync status. Counts may be stale.');
+			}
 		}
 	}, []);
 
@@ -257,6 +270,14 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 				}
 			} catch (error) {
 				console.warn('Outbox sender loop failed; retrying soon.', error);
+
+				// Show rate-limited toast to notify user of sync issues
+				const now = Date.now();
+				if (now - lastSenderErrorToastRef.current > ERROR_TOAST_RATE_LIMIT_MS) {
+					lastSenderErrorToastRef.current = now;
+					toast.error('Sync temporarily unavailable. Retrying automatically.');
+				}
+
 				if (isMounted) {
 					senderLoopTimeoutId = setTimeout(runSenderLoop, SENDER_POLL_INTERVAL_MS);
 				}
@@ -395,8 +416,15 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 						outboxRef.current?.broadcast.publish({ type: 'kick' });
 					}
 				})
-				.catch(() => {
-					// Ignore errors while attempting to resume blocked items
+				.catch((err) => {
+					console.warn('[Outbox] Failed to resume blocked auth items:', err);
+
+					// Show rate-limited toast to notify user of auth recovery failure
+					const now = Date.now();
+					if (now - lastResumeAuthErrorToastRef.current > ERROR_TOAST_RATE_LIMIT_MS) {
+						lastResumeAuthErrorToastRef.current = now;
+						toast.warning('Unable to resume pending syncs. Please try again later.');
+					}
 				});
 		}
 
