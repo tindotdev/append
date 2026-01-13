@@ -13,6 +13,24 @@ export const MIN_LIMIT = 1;
 export const MAX_LIMIT = 100;
 
 /**
+ * Valid batch statuses for filtering.
+ */
+export const BATCH_STATUSES = ['captured', 'suggested', 'accepted'] as const;
+export type BatchStatusFilter = (typeof BATCH_STATUSES)[number];
+
+/**
+ * Valid sort fields.
+ */
+export const SORT_FIELDS = ['created', 'candidateCount', 'acceptanceRate'] as const;
+export type SortField = (typeof SORT_FIELDS)[number];
+
+/**
+ * Valid sort orders.
+ */
+export const SORT_ORDERS = ['asc', 'desc'] as const;
+export type SortOrder = (typeof SORT_ORDERS)[number];
+
+/**
  * Schema for list batches query parameters.
  */
 export const ListBatchesSchema = v.object({
@@ -28,6 +46,21 @@ export const ListBatchesSchema = v.object({
 		String(DEFAULT_LIMIT)
 	),
 	cursor: v.optional(v.string()),
+	// Search filter: searches batch sample terms
+	search: v.optional(v.pipe(v.string(), v.maxLength(200, 'search query too long'))),
+	// Status filter: filter by batch status
+	status: v.optional(v.picklist(BATCH_STATUSES, 'invalid status filter')),
+	// Error filter: filter batches with errors
+	hasErrors: v.optional(
+		v.pipe(
+			v.string(),
+			v.transform((s) => s === 'true')
+		)
+	),
+	// Sort field
+	sortBy: v.optional(v.picklist(SORT_FIELDS, 'invalid sort field')),
+	// Sort order
+	sortOrder: v.optional(v.picklist(SORT_ORDERS, 'invalid sort order')),
 });
 
 /**

@@ -9,6 +9,11 @@ export async function listBatches(options?: ListBatchesOptions): Promise<ListBat
 		query: {
 			limit: options?.limit !== undefined ? String(options.limit) : undefined,
 			cursor: options?.cursor,
+			search: options?.search,
+			status: options?.status,
+			hasErrors: options?.hasErrors !== undefined ? String(options.hasErrors) : undefined,
+			sortBy: options?.sortBy,
+			sortOrder: options?.sortOrder,
 		},
 	});
 
@@ -16,11 +21,29 @@ export async function listBatches(options?: ListBatchesOptions): Promise<ListBat
 	return parseRpcJson<ListBatchesResponse>(res);
 }
 
-// React Query hook with infinite scroll support
-export function useBatches() {
+// Filter options for the batches hook (excludes pagination params)
+export interface BatchesFilterOptions {
+	search?: string;
+	status?: ListBatchesOptions['status'];
+	hasErrors?: boolean;
+	sortBy?: ListBatchesOptions['sortBy'];
+	sortOrder?: ListBatchesOptions['sortOrder'];
+}
+
+// React Query hook with infinite scroll support and filtering
+export function useBatches(filters?: BatchesFilterOptions) {
 	return useInfiniteQuery({
-		queryKey: batchKeys.lists(),
-		queryFn: ({ pageParam }: QueryFunctionContext) => listBatches({ cursor: pageParam as string | undefined }),
+		// Include filters in queryKey so cache is properly keyed
+		queryKey: [...batchKeys.lists(), filters ?? {}],
+		queryFn: ({ pageParam }: QueryFunctionContext) =>
+			listBatches({
+				cursor: pageParam as string | undefined,
+				search: filters?.search,
+				status: filters?.status,
+				hasErrors: filters?.hasErrors,
+				sortBy: filters?.sortBy,
+				sortOrder: filters?.sortOrder,
+			}),
 		initialPageParam: undefined as string | undefined,
 		getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
 	});

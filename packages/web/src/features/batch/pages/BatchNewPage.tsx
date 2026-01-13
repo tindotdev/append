@@ -1,13 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import type { RowSelectionState } from '@tanstack/react-table';
-import { Loader2, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowDownAZ, ArrowUpAZ, Loader2, Search, X } from 'lucide-react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Kbd } from '@/components/ui/kbd';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useOutboxSafe } from '@/features/outbox';
 import { ApiRequestError } from '@/lib/api-rpc';
@@ -15,11 +16,11 @@ import { UNDO_GRACE_MS } from '@/lib/outbox-adapter';
 import { acceptBatch } from '../api/accept-batch';
 import { deleteBatch } from '../api/delete-batch';
 import { batchKeys, getBatch } from '../api/get-batch';
-import { useBatches } from '../api/list-batches';
+import { type BatchesFilterOptions, useBatches } from '../api/list-batches';
 import { generateSuggestions } from '../api/retry-suggestions';
 import { BatchTable } from '../components/BatchTable';
 import { type BatchColumnMeta, getBatchColumns } from '../components/batch-columns';
-import type { BatchListItem, Candidate } from '../types';
+import type { BatchListItem, BatchSortField, BatchSortOrder, BatchStatusFilter, Candidate } from '../types';
 
 // --- Constants ---
 const TERM_MIN = 1;
@@ -141,9 +142,39 @@ export function BatchNewPage() {
 	// Delete confirmation dialog state
 	const [batchToDelete, setBatchToDelete] = useState<BatchListItem | null>(null);
 
-	// Fetch batches for the table
-	const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useBatches();
+	// Search, filter, and sort state
+	const [searchQuery, setSearchQuery] = useState('');
+	const [statusFilter, setStatusFilter] = useState<BatchStatusFilter | 'all'>('all');
+	const [sortBy, setSortBy] = useState<BatchSortField>('created');
+	const [sortOrder, setSortOrder] = useState<BatchSortOrder>('desc');
+
+	// Defer search query to avoid blocking UI while typing
+	const deferredSearch = useDeferredValue(searchQuery);
+	const isSearching = searchQuery !== deferredSearch;
+
+	// Build filter options for the hook
+	const filterOptions = useMemo<BatchesFilterOptions>(
+		() => ({
+			search: deferredSearch || undefined,
+			status: statusFilter !== 'all' ? statusFilter : undefined,
+			sortBy,
+			sortOrder,
+		}),
+		[deferredSearch, statusFilter, sortBy, sortOrder]
+	);
+
+	// Fetch batches for the table with filters
+	const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useBatches(filterOptions);
 	const batches = data?.pages.flatMap((page) => page.batches) ?? [];
+
+	// Check if any filters are active
+	const hasActiveFilters = Boolean(deferredSearch) || statusFilter !== 'all';
+
+	// Clear all filters
+	const handleClearFilters = useCallback(() => {
+		setSearchQuery('');
+		setStatusFilter('all');
+	}, []);
 
 	// Refs for focus management
 	const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
@@ -571,8 +602,94 @@ export function BatchNewPage() {
 
 			{/* Recent Batches Section */}
 			<div>
-				<h3 className="text-lg font-semibold">Recent batches</h3>
-				<p className="mt-1 text-sm text-zinc-400">View and manage your submitted batches</p>
+				<div className="flex items-center justify-between">
+					<div>
+						<h3 className="text-lg font-semibold">Recent batches</h3>
+						<p className="mt-1 text-sm text-zinc-400">View and manage your submitted batches</p>
+					</div>
+				</div>
+
+				{/* Search and Filter Bar */}
+				<div className="mt-4 flex flex-wrap items-center gap-3">
+					{/* Search Input */}
+					<div className="relative flex-1 min-w-[200px]">
+						<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+						<Input
+							type="text"
+							placeholder="Search terms..."
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							className="pl-9 pr-8"
+						/>
+						{searchQuery && (
+							<button
+								type="button"
+								onClick={() => setSearchQuery('')}
+								className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+								aria-label="Clear search"
+							>
+								<X className="h-4 w-4" />
+							</button>
+						)}
+					</div>
+
+					{/* Status Filter */}
+					<Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as BatchStatusFilter | 'all')}>
+						<SelectTrigger className="w-[140px]" size="sm">
+							<SelectValue placeholder="Status" />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="all">All statuses</SelectItem>
+							<SelectItem value="captured">Captured</SelectItem>
+							<SelectItem value="suggested">Suggested</SelectItem>
+							<SelectItem value="accepted">Accepted</SelectItem>
+						</SelectContent>
+					</Select>
+
+					{/* Sort Options */}
+					<Select value={sortBy} onValueChange={(value) => setSortBy(value as BatchSortField)}>
+						<SelectTrigger className="w-[140px]" size="sm">
+							<SelectValue placeholder="Sort by" />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="created">Date created</SelectItem>
+							<SelectItem value="candidateCount">Term count</SelectItem>
+							<SelectItem value="acceptanceRate">Acceptance %</SelectItem>
+						</SelectContent>
+					</Select>
+
+					{/* Sort Order Toggle */}
+					<TooltipProvider delayDuration={300}>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<Button
+									variant="outline"
+									size="icon"
+									className="h-8 w-8"
+									onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
+								>
+									{sortOrder === 'desc' ? <ArrowDownAZ className="h-4 w-4" /> : <ArrowUpAZ className="h-4 w-4" />}
+								</Button>
+							</TooltipTrigger>
+							<TooltipContent>{sortOrder === 'desc' ? 'Descending' : 'Ascending'}</TooltipContent>
+						</Tooltip>
+					</TooltipProvider>
+
+					{/* Clear Filters */}
+					{hasActiveFilters && (
+						<Button variant="ghost" size="sm" onClick={handleClearFilters} className="text-zinc-500 hover:text-zinc-300">
+							Clear filters
+						</Button>
+					)}
+				</div>
+
+				{/* Search Status */}
+				{isSearching && (
+					<div className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
+						<Loader2 className="h-3 w-3 animate-spin" />
+						<span>Searching...</span>
+					</div>
+				)}
 
 				<div className="mt-4">
 					{isLoading ? (
@@ -591,7 +708,16 @@ export function BatchNewPage() {
 					) : batches.length === 0 ? (
 						// Empty state
 						<div className="flex flex-col items-center justify-center py-12 text-center">
-							<p className="text-zinc-400">No batches yet. Submit your first batch above to get started.</p>
+							{hasActiveFilters ? (
+								<>
+									<p className="text-zinc-400">No batches match your filters.</p>
+									<Button variant="secondary" onClick={handleClearFilters} className="mt-4">
+										Clear filters
+									</Button>
+								</>
+							) : (
+								<p className="text-zinc-400">No batches yet. Submit your first batch above to get started.</p>
+							)}
 						</div>
 					) : (
 						// Table with batches
