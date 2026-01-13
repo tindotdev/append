@@ -8,125 +8,12 @@
  * Computes in pages (month-by-month) to avoid huge memory use.
  */
 
-import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { type EventType, event as eventTable, type schema } from '../../../db';
+import type { schema } from '../../../db';
+import { fetchAllOverrides, fetchEventsPaged, MAX_EVENTS_PER_REQUEST, mergeWithOverrides } from '../data/event-fetcher';
 import { computeCreditIndex, IDLE_CUTOFF_MS, msToMinutes } from '../rollups/credit';
 import { daysInYear, formatDayKey, getYearBoundariesInTz } from '../rollups/time';
-import type { DashboardHeatmapResponse, DbEventRow, HeatmapDay } from '../rollups/types';
-
-const MAX_EVENTS_PER_REQUEST = 250_000;
-const PAGE_SIZE = 10_000;
-const MAX_OVERRIDES = 1_000;
-
-interface FetchEventsResult {
-	rows: DbEventRow[];
-	scanned: number;
-}
-
-/**
- * Fetch events with pagination, respecting scan limit.
- */
-async function fetchEventsPaged(
-	db: DrizzleD1Database<typeof schema>,
-	userId: string,
-	fromMs: number,
-	toMs: number,
-	types: readonly EventType[],
-	maxScan: number
-): Promise<FetchEventsResult> {
-	const rows: DbEventRow[] = [];
-	let cursor: { emittedAt: Date; deviceId: string; eventId: string } | null = null;
-	let scanned = 0;
-
-	while (scanned < maxScan) {
-		const remaining = Math.min(PAGE_SIZE, maxScan - scanned);
-
-		let query = db
-			.select()
-			.from(eventTable)
-			.where(
-				and(
-					eq(eventTable.userId, userId),
-					inArray(eventTable.type, types),
-					gte(eventTable.emittedAt, new Date(fromMs)),
-					lte(eventTable.emittedAt, new Date(toMs))
-				)
-			)
-			.orderBy(eventTable.emittedAt, eventTable.deviceId, eventTable.eventId)
-			.limit(remaining);
-
-		if (cursor) {
-			query = db
-				.select()
-				.from(eventTable)
-				.where(
-					and(
-						eq(eventTable.userId, userId),
-						inArray(eventTable.type, types),
-						gte(eventTable.emittedAt, new Date(fromMs)),
-						lte(eventTable.emittedAt, new Date(toMs)),
-						gte(eventTable.emittedAt, cursor.emittedAt)
-					)
-				)
-				.orderBy(eventTable.emittedAt, eventTable.deviceId, eventTable.eventId)
-				.limit(remaining + 100);
-		}
-
-		const page = await query;
-		if (page.length === 0) break;
-
-		let filtered = page;
-		if (cursor) {
-			filtered = page.filter((r) => {
-				const rMs = r.emittedAt.getTime();
-				const cMs = cursor!.emittedAt.getTime();
-				if (rMs > cMs) return true;
-				if (rMs < cMs) return false;
-				if (r.deviceId > cursor!.deviceId) return true;
-				if (r.deviceId < cursor!.deviceId) return false;
-				return r.eventId > cursor!.eventId;
-			});
-		}
-
-		if (filtered.length === 0) break;
-
-		const toTake = filtered.slice(0, remaining);
-		rows.push(...toTake);
-		scanned += toTake.length;
-
-		if (toTake.length < remaining) break;
-
-		const last = toTake[toTake.length - 1];
-		cursor = { emittedAt: last.emittedAt, deviceId: last.deviceId, eventId: last.eventId };
-	}
-
-	return { rows, scanned };
-}
-
-/**
- * Fetch all topic_override events for a user without date filter.
- * Used to ensure persistent overrides apply regardless of when they were emitted.
- * Order DESC so newest overrides are fetched first and kept when hitting the limit.
- * This ensures the latest override wins when resolving topics.
- */
-async function fetchAllOverrides(db: DrizzleD1Database<typeof schema>, userId: string): Promise<DbEventRow[]> {
-	return db
-		.select()
-		.from(eventTable)
-		.where(and(eq(eventTable.userId, userId), eq(eventTable.type, 'topic_override')))
-		.orderBy(desc(eventTable.emittedAt))
-		.limit(MAX_OVERRIDES);
-}
-
-/**
- * Merge overrides with other events, ensuring sorted order by emittedAt.
- */
-function mergeWithOverrides(events: DbEventRow[], overrides: DbEventRow[]): DbEventRow[] {
-	const eventIds = new Set(events.map((e) => e.eventId));
-	const uniqueOverrides = overrides.filter((o) => !eventIds.has(o.eventId));
-	return [...events, ...uniqueOverrides].sort((a, b) => a.emittedAt.getTime() - b.emittedAt.getTime());
-}
+import type { DashboardHeatmapResponse, HeatmapDay } from '../rollups/types';
 
 export async function getDashboardHeatmap(
 	db: DrizzleD1Database<typeof schema>,
