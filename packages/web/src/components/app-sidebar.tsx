@@ -1,3 +1,5 @@
+import { closestCenter, DndContext, type DragEndEvent, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import {
 	Archive,
@@ -40,7 +42,7 @@ import {
 	useSidebar,
 } from '@/components/ui/sidebar';
 import { signOut, useAuth } from '@/features/auth';
-import { type UserBucket, useDeleteBucket, useUpdateBucket, useUserBuckets } from '@/features/settings';
+import { type UserBucket, useDeleteBucket, useReorderBuckets, useUpdateBucket, useUserBuckets } from '@/features/settings';
 import { BucketCreateSheet } from '@/features/settings/components/BucketCreateSheet';
 import { BucketEditSheet } from '@/features/settings/components/BucketEditSheet';
 import { SidebarBucketItem } from './SidebarBucketItem';
@@ -74,6 +76,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
 	const updateBucketMutation = useUpdateBucket();
 	const deleteBucketMutation = useDeleteBucket();
+	const reorderBucketsMutation = useReorderBuckets();
+
+	// DnD sensors for drag-and-drop
+	const sensors = useSensors(
+		useSensor(PointerSensor, {
+			activationConstraint: {
+				distance: 8, // 8px movement required before drag starts
+			},
+		}),
+		useSensor(KeyboardSensor)
+	);
 
 	const user = session?.user;
 	const userInitials =
@@ -101,6 +114,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 		} catch (_error) {
 			toast.error('Failed to update color');
 		}
+	};
+
+	const handleIconChange = async (bucketId: string, icon: string | null) => {
+		await updateBucketMutation.mutateAsync({ id: bucketId, input: { icon } });
+	};
+
+	const handleNameChange = async (bucketId: string, name: string) => {
+		await updateBucketMutation.mutateAsync({ id: bucketId, input: { name } });
 	};
 
 	const handleExportBucket = (bucketId: string) => {
@@ -138,6 +159,30 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const handleQuickAdd = (bucketSlug: string) => {
 		// Navigate to capture page with bucket pre-selected
 		navigate({ to: '/batch/new', search: { bucket: bucketSlug } });
+	};
+
+	const handleDragEnd = async (event: DragEndEvent) => {
+		const { active, over } = event;
+
+		if (!over || active.id === over.id) return;
+
+		// Find the indices of the dragged and target buckets
+		const oldIndex = buckets.findIndex((b) => b.id === active.id);
+		const newIndex = buckets.findIndex((b) => b.id === over.id);
+
+		if (oldIndex === -1 || newIndex === -1) return;
+
+		// Reorder the buckets array
+		const reorderedBuckets = [...buckets];
+		const [removed] = reorderedBuckets.splice(oldIndex, 1);
+		reorderedBuckets.splice(newIndex, 0, removed);
+
+		// Optimistically update UI and persist to backend
+		try {
+			await reorderBucketsMutation.mutateAsync(reorderedBuckets.map((b) => b.id));
+		} catch (_error) {
+			toast.error('Failed to reorder buckets');
+		}
 	};
 
 	// Keyboard navigation for sidebar items
@@ -320,22 +365,28 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 							</Button>
 						</div>
 						<CollapsibleContent>
-							<SidebarMenu>
+							<SidebarMenu role="tree" aria-label="Buckets">
 								{buckets.length > 0 ? (
-									buckets.map((bucket, index) => (
-										<SidebarBucketItem
-											key={bucket.id}
-											bucket={bucket}
-											onEdit={() => handleEditBucket(bucket.id)}
-											onColorChange={(color) => handleColorChange(bucket.id, color)}
-											onExport={() => handleExportBucket(bucket.id)}
-											onDelete={() => handleDeleteBucket(bucket.id)}
-											onQuickAdd={() => handleQuickAdd(bucket.slug)}
-											ref={(el) => {
-												menuItemsRef.current[NAV_ITEMS.length + index] = el;
-											}}
-										/>
-									))
+									<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+										<SortableContext items={buckets.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+											{buckets.map((bucket, index) => (
+												<SidebarBucketItem
+													key={bucket.id}
+													bucket={bucket}
+													onEdit={() => handleEditBucket(bucket.id)}
+													onColorChange={(color) => handleColorChange(bucket.id, color)}
+													onIconChange={(icon) => handleIconChange(bucket.id, icon)}
+													onNameChange={(name) => handleNameChange(bucket.id, name)}
+													onExport={() => handleExportBucket(bucket.id)}
+													onDelete={() => handleDeleteBucket(bucket.id)}
+													onQuickAdd={() => handleQuickAdd(bucket.slug)}
+													ref={(el) => {
+														menuItemsRef.current[NAV_ITEMS.length + index] = el;
+													}}
+												/>
+											))}
+										</SortableContext>
+									</DndContext>
 								) : (
 									<SidebarMenuItem>
 										<SidebarMenuButton disabled className="text-sidebar-foreground/50">

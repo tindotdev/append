@@ -35,6 +35,15 @@ export const BucketColorSchema = v.optional(
 	v.pipe(v.string('Color must be a string'), v.regex(/^#[0-9A-Fa-f]{6}$/, 'Color must be a valid hex color (#RRGGBB)'))
 );
 
+/** Bucket icon: optional icon name (lucide component name). */
+export const BucketIconSchema = v.optional(
+	v.pipe(
+		v.string('Icon must be a string'),
+		v.minLength(1, 'Icon name cannot be empty'),
+		v.maxLength(50, 'Icon name must be at most 50 characters')
+	)
+);
+
 // =============================================================================
 // Create bucket schema
 // =============================================================================
@@ -44,6 +53,7 @@ export const CreateBucketSchema = v.object({
 	name: BucketNameSchema,
 	description: BucketDescriptionSchema,
 	color: BucketColorSchema,
+	icon: BucketIconSchema,
 });
 
 export type CreateBucketInput = v.InferOutput<typeof CreateBucketSchema>;
@@ -56,6 +66,7 @@ export const UpdateBucketSchema = v.object({
 	name: v.optional(BucketNameSchema),
 	description: v.optional(BucketDescriptionSchema),
 	color: v.optional(v.nullable(BucketColorSchema)),
+	icon: v.optional(v.nullable(BucketIconSchema)),
 });
 
 export type UpdateBucketInput = v.InferOutput<typeof UpdateBucketSchema>;
