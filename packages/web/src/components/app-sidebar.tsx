@@ -14,9 +14,11 @@ import {
 } from 'lucide-react';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -37,7 +39,7 @@ import {
 	useSidebar,
 } from '@/components/ui/sidebar';
 import { signOut, useAuth } from '@/features/auth';
-import { useDeleteBucket, useUpdateBucket, useUserBuckets } from '@/features/settings';
+import { type UserBucket, useDeleteBucket, useUpdateBucket, useUserBuckets } from '@/features/settings';
 import { SidebarBucketItem } from './SidebarBucketItem';
 
 const NAV_ITEMS = [
@@ -60,6 +62,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const buckets = bucketsData?.buckets ?? [];
 	const { isMobile } = useSidebar();
 	const [bucketsOpen, setBucketsOpen] = React.useState(true);
+	const [deleteTarget, setDeleteTarget] = React.useState<UserBucket | null>(null);
+	const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
 	const updateBucketMutation = useUpdateBucket();
 	const deleteBucketMutation = useDeleteBucket();
@@ -101,20 +105,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const handleDeleteBucket = (bucketId: string) => {
 		const bucket = buckets.find((b) => b.id === bucketId);
 		if (!bucket) return;
+		setDeleteTarget(bucket);
+	};
 
-		if (bucket.senseCount > 0) {
-			toast.error(`Cannot delete bucket with ${bucket.senseCount} items`);
-			return;
-		}
+	const confirmDelete = async () => {
+		if (!deleteTarget) return;
 
-		// TODO: Replace with proper confirmation dialog
-		const confirmed = window.confirm(`Delete "${bucket.name}"?`);
-		if (confirmed) {
-			deleteBucketMutation.mutate(bucketId, {
-				onSuccess: () => toast.success('Bucket deleted'),
-				onError: () => toast.error('Failed to delete bucket'),
-			});
+		try {
+			setDeleteError(null);
+			await deleteBucketMutation.mutateAsync(deleteTarget.id);
+			toast.success('Bucket deleted');
+			setDeleteTarget(null);
+		} catch (_error) {
+			setDeleteError('Failed to delete bucket');
 		}
+	};
+
+	const closeDeleteDialog = () => {
+		setDeleteTarget(null);
+		setDeleteError(null);
 	};
 
 	const handleQuickAdd = (bucketSlug: string) => {
@@ -278,6 +287,48 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 			</SidebarContent>
 
 			<SidebarRail />
+
+			{/* Delete confirmation dialog */}
+			<Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && closeDeleteDialog()}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Delete Bucket</DialogTitle>
+						<DialogDescription>
+							Are you sure you want to delete <strong className="text-foreground">{deleteTarget?.name}</strong>?
+						</DialogDescription>
+					</DialogHeader>
+
+					{deleteTarget && deleteTarget.senseCount > 0 && (
+						<Alert className="bg-yellow-900/20 border-yellow-800">
+							<AlertDescription className="text-yellow-300">
+								This bucket contains {deleteTarget.senseCount} item{deleteTarget.senseCount !== 1 ? 's' : ''}. You must move or delete all items
+								before deleting the bucket.
+							</AlertDescription>
+						</Alert>
+					)}
+
+					{deleteError && (
+						<Alert variant="destructive">
+							<AlertDescription>{deleteError}</AlertDescription>
+						</Alert>
+					)}
+
+					<DialogFooter>
+						<DialogClose asChild>
+							<Button variant="ghost" disabled={deleteBucketMutation.isPending}>
+								Cancel
+							</Button>
+						</DialogClose>
+						<Button
+							variant="destructive"
+							onClick={confirmDelete}
+							disabled={deleteBucketMutation.isPending || (deleteTarget?.senseCount ?? 0) > 0}
+						>
+							{deleteBucketMutation.isPending ? 'Deleting...' : 'Delete Bucket'}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</Sidebar>
 	);
 }
