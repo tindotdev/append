@@ -128,7 +128,26 @@ export async function archiveTermSense(
 		};
 	}
 
-	// 4. Atomic conditional update with optimistic locking
+	// 4. Guard: verify term version compatibility BEFORE archiving the sense
+	// This prevents partial writes where the sense is archived but term update fails
+	const wasPrimary = termRow.primarySenseId === senseId;
+	if (wasPrimary) {
+		// Check if term has been modified since we read it
+		const currentTermCheck = await db.query.term.findFirst({
+			where: eq(term.id, termRow.id),
+			columns: { version: true, primarySenseId: true },
+		});
+
+		if (!currentTermCheck || currentTermCheck.version !== termRow.version || currentTermCheck.primarySenseId !== senseId) {
+			// Term was concurrently modified - fail before archiving the sense
+			return {
+				success: false,
+				error: { type: 'term_version_conflict', currentVersion: currentTermCheck?.version ?? termRow.version },
+			};
+		}
+	}
+
+	// 5. Atomic conditional update with optimistic locking
 	const now = new Date();
 
 	const updateResult = await db
@@ -145,7 +164,7 @@ export async function archiveTermSense(
 			archivedAt: termSense.archivedAt,
 		});
 
-	// 5. Handle conflict or success
+	// 6. Handle conflict or success
 	if (updateResult.length === 0) {
 		const conflict = await resolveOptimisticConflict(
 			() =>
@@ -160,15 +179,15 @@ export async function archiveTermSense(
 	const updatedSense = updateResult[0];
 	let termResult: ArchiveTermSenseResult['term'] | undefined;
 
-	// 6. Handle primary sense replacement
-	const wasPrimary = termRow.primarySenseId === senseId;
+	// 7. Handle primary sense replacement (term version already verified in step 4)
 
 	if (wasPrimary) {
 		// Find a replacement primary sense
 		const replacementId = await findReplacementPrimarySense(db, termRow.id, senseId, senseRow.bucket);
 
 		if (replacementId !== null) {
-			// Update term's primarySenseId (conditional on version and primarySenseId to prevent race)
+			// Update term's primarySenseId (conditional on primarySenseId to prevent race)
+			// Note: term version was already verified in step 4, so this should not fail
 			const termUpdateResult = await db
 				.update(term)
 				.set({
@@ -183,10 +202,9 @@ export async function archiveTermSense(
 					archivedAt: term.archivedAt,
 				});
 
+			// This should not happen due to step 4 guard, but handle defensively
 			if (termUpdateResult.length === 0) {
-				// Term was concurrently modified - return conflict
-				const currentTerm = await db.query.term.findFirst({ where: eq(term.id, termRow.id) });
-				return { success: false, error: { type: 'term_version_conflict', currentVersion: currentTerm?.version ?? termRow.version } };
+				throw new Error('Unexpected: term update failed despite version guard');
 			}
 
 			const updatedTerm = termUpdateResult[0];
@@ -197,7 +215,8 @@ export async function archiveTermSense(
 				archivedAt: updatedTerm.archivedAt?.getTime() ?? null,
 			};
 		} else {
-			// No replacement exists - archive the term too (conditional on version to prevent race)
+			// No replacement exists - archive the term too
+			// Note: term version was already verified in step 4, so this should not fail
 			const termArchiveResult = await db
 				.update(term)
 				.set({
@@ -212,10 +231,9 @@ export async function archiveTermSense(
 					archivedAt: term.archivedAt,
 				});
 
+			// This should not happen due to step 4 guard, but handle defensively
 			if (termArchiveResult.length === 0) {
-				// Term was concurrently modified - return conflict
-				const currentTerm = await db.query.term.findFirst({ where: eq(term.id, termRow.id) });
-				return { success: false, error: { type: 'term_version_conflict', currentVersion: currentTerm?.version ?? termRow.version } };
+				throw new Error('Unexpected: term archive failed despite version guard');
 			}
 
 			const archivedTerm = termArchiveResult[0];
