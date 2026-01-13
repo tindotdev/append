@@ -41,6 +41,11 @@ export type Bindings = {
 
 	// Extension Security - Allowlist of Chrome extension IDs that can access /events/* endpoints
 	ALLOWED_EXTENSION_IDS?: string; // Comma-separated list of 32-char extension IDs
+
+	// Events export tuning
+	// NOTE: Values are strings in CF bindings; parse as integers in code.
+	EVENTS_EXPORT_PAGE_SIZE?: string; // default: 1000
+	EVENTS_EXPORT_MAX_TOTAL_ROWS?: string; // default: 100000
 };
 
 export type Variables = {
