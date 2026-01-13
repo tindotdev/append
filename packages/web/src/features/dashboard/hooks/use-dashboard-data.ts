@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { shouldUseApi, useDashboardToday, useDashboardWeek } from '../api/dashboard';
+import { useApiToggle, useDashboardToday, useDashboardWeek } from '../api/dashboard';
 import { useTelemetrySnapshot } from '../telemetry/hooks';
 import { computeDashboardData } from '../telemetry/rollups';
 import { addDays, getTodayKey } from '../telemetry/time';
@@ -41,7 +41,7 @@ const EMPTY_TOP_TOPIC: TopTopicData = { topic: '', minutes: 0, weeklyTotalMinute
 
 export function useTodayHeroData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
-	const useApi = shouldUseApi();
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
 	const apiQuery = useDashboardToday(timezone);
 
@@ -65,7 +65,7 @@ export function useTodayHeroData(options: UseDashboardDataOptions = {}) {
 
 export function useTodayBreakdownData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
-	const useApi = shouldUseApi();
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
 	const apiQuery = useDashboardToday(timezone);
 
@@ -89,7 +89,7 @@ export function useTodayBreakdownData(options: UseDashboardDataOptions = {}) {
 
 export function useWeekBarChartData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
-	const useApi = shouldUseApi();
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
 	const weekStart = addDays(getTodayKey(timezone), -6);
 	const apiQuery = useDashboardWeek(weekStart, timezone);
@@ -114,7 +114,7 @@ export function useWeekBarChartData(options: UseDashboardDataOptions = {}) {
 
 export function useTodayCapturesData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
-	const useApi = shouldUseApi();
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
 	const apiQuery = useDashboardToday(timezone);
 
@@ -138,7 +138,7 @@ export function useTodayCapturesData(options: UseDashboardDataOptions = {}) {
 
 export function useStreakData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
-	const useApi = shouldUseApi();
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
 	const apiQuery = useDashboardToday(timezone);
 
@@ -162,7 +162,7 @@ export function useStreakData(options: UseDashboardDataOptions = {}) {
 
 export function useTopSourceData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
-	const useApi = shouldUseApi();
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
 	const apiQuery = useDashboardToday(timezone);
 
@@ -186,7 +186,7 @@ export function useTopSourceData(options: UseDashboardDataOptions = {}) {
 
 export function useTopTopicData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
-	const useApi = shouldUseApi();
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
 	const apiQuery = useDashboardToday(timezone);
 

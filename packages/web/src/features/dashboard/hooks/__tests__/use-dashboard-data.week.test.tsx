@@ -7,7 +7,7 @@ vi.mock('../../api/dashboard', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../../api/dashboard')>();
 	return {
 		...actual,
-		shouldUseApi: vi.fn(() => true),
+		useApiToggle: vi.fn(() => true),
 		useDashboardToday: vi.fn(),
 		useDashboardWeek: vi.fn(),
 	};
