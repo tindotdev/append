@@ -2,14 +2,14 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext } from '@/features/auth/hooks/use-auth';
-import { createLeadershipProvider, createOutbox, generateTabId } from '@/lib/outbox';
+import { createAppOutbox, createLeadershipProvider, generateTabId } from '@/lib/outbox-adapter';
 import { OutboxProvider } from '../OutboxProvider';
 
-vi.mock('@/lib/outbox', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('@/lib/outbox')>();
+vi.mock('@/lib/outbox-adapter', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@/lib/outbox-adapter')>();
 	return {
 		...actual,
-		createOutbox: vi.fn(),
+		createAppOutbox: vi.fn(),
 		createLeadershipProvider: vi.fn(),
 		deleteOutboxDatabase: vi.fn(),
 		generateTabId: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock('@/lib/outbox', async (importOriginal) => {
 });
 
 describe('OutboxProvider', () => {
-	const mockCreateOutbox = vi.mocked(createOutbox);
+	const mockCreateOutbox = vi.mocked(createAppOutbox);
 	const mockCreateLeadershipProvider = vi.mocked(createLeadershipProvider);
 	const mockGenerateTabId = vi.mocked(generateTabId);
 
@@ -46,6 +46,7 @@ describe('OutboxProvider', () => {
 			broadcast: {
 				subscribe: vi.fn(() => () => {}),
 				publish,
+				close: vi.fn(),
 			},
 			senderLoop: {
 				processOnce: vi.fn().mockResolvedValue(false),
@@ -53,6 +54,8 @@ describe('OutboxProvider', () => {
 			},
 			enqueue: vi.fn(),
 			undo: vi.fn(),
+			retry: vi.fn(),
+			close: vi.fn(),
 		});
 
 		mockCreateLeadershipProvider.mockReturnValue({

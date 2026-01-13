@@ -2,6 +2,16 @@
 
 `append` is the concept that builds on top of eng-log.
 
+## Quick Start
+
+```bash
+just setup  # First-time setup: deps, secrets, migrations
+just dev    # Start development servers
+just help   # Show all available commands
+```
+
+See `docs/runbook.md` for detailed setup and operations.
+
 ## Development Setup
 
 First-time setup (including git worktrees):
@@ -37,17 +47,6 @@ Secrets are managed via Cloudflare's native tooling:
 - **Production**: `wrangler secret put <NAME>` (stored in Cloudflare)
 
 Required secrets for auth:
-
-```bash
-cd packages/api
-pnpm wrangler secret put GOOGLE_CLIENT_ID
-pnpm wrangler secret put GOOGLE_CLIENT_SECRET
-pnpm wrangler secret put BETTER_AUTH_SECRET
-pnpm wrangler secret put BETTER_AUTH_URL      # https://api.append.tindev.dev
-pnpm wrangler secret put ALLOWED_SUB          # or ALLOWED_EMAIL for bootstrap
-```
-
-See `docs/runbook.md` for detailed auth setup.
 
 ## Status
 

@@ -30,7 +30,7 @@ jobs:
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - uses: actions/cache@v5
         with:
@@ -42,9 +42,42 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Run preview tests
+        run: pnpm --filter @append/api test:preview
+
       - name: Apply D1 migrations to preview
         working-directory: packages/api
         run: pnpm exec wrangler d1 migrations apply append-db-preview --remote --config wrangler.jsonc --env preview
+
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@v3
+
+      - name: Sync secrets from Doppler to Cloudflare
+        working-directory: packages/api
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PREVIEW_APPEND }}
+        run: |
+          # Sync all secrets from Doppler to Cloudflare Worker (preview environment)
+          # This makes Doppler the canonical source of truth for secrets
+          set -euo pipefail
+
+          set +e
+          doppler secrets --json | \
+            jq -c 'with_entries(.value = .value.computed) | del(.DOPPLER_PROJECT, .DOPPLER_CONFIG, .DOPPLER_ENVIRONMENT, .DOPPLER_ENVIRONMENT_SLUG, .DOPPLER_PROJECT_NAME, .DOPPLER_CONFIG_NAME)' | \
+            pnpm exec wrangler secret bulk --env preview --config wrangler.jsonc
+          SYNC_EXIT_CODE=$?
+          set -e
+
+          if [ $SYNC_EXIT_CODE -ne 0 ]; then
+            echo "::warning::Secret sync failed (preview Worker may not exist yet). Deploying once to create the Worker, then retrying secret sync."
+            # Note: This intermediate deployment creates the Worker without E2E_AUTH_EMAIL.
+            # This transient state is acceptable for preview - the secret is set in the next step
+            # and validated before the final deployment. No public traffic reaches this intermediate state.
+            pnpm exec wrangler deploy --env preview --config wrangler.jsonc
+            doppler secrets --json | \
+              jq -c 'with_entries(.value = .value.computed) | del(.DOPPLER_PROJECT, .DOPPLER_CONFIG, .DOPPLER_ENVIRONMENT, .DOPPLER_ENVIRONMENT_SLUG, .DOPPLER_PROJECT_NAME, .DOPPLER_CONFIG_NAME)' | \
+              pnpm exec wrangler secret bulk --env preview --config wrangler.jsonc
+          fi
 
       - name: Set PR-specific E2E auth email
         working-directory: packages/api
@@ -52,16 +85,67 @@ jobs:
           # Set E2E_AUTH_EMAIL with PR-specific suffix for environment isolation
           # This is the canonical place where preview E2E_AUTH_EMAIL is set.
           # This matches the wildcard pattern in ALLOWED_EMAIL (e2e-bot+*@append.test)
+          set -euo pipefail
+
+          set +e
           echo "e2e-bot+pr-${{ github.event.pull_request.number }}@append.test" | \
-            pnpm exec wrangler secret put E2E_AUTH_EMAIL -e preview --config wrangler.jsonc
+            pnpm exec wrangler secret put E2E_AUTH_EMAIL --env preview --config wrangler.jsonc
+          PUT_EXIT_CODE=$?
+          set -e
+
+          if [ $PUT_EXIT_CODE -ne 0 ]; then
+            echo "::error::Failed to set E2E_AUTH_EMAIL secret for preview Worker."
+            exit 1
+          fi
+
+      - name: Verify required Worker secrets exist (no values)
+        working-directory: packages/api
+        run: |
+          set -euo pipefail
+
+          SECRETS_JSON="$(pnpm exec wrangler secret list --format json --env preview --config wrangler.jsonc)"
+          export SECRETS_JSON
+
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          required = [
+              "GOOGLE_CLIENT_ID",
+              "GOOGLE_CLIENT_SECRET",
+              "BETTER_AUTH_SECRET",
+              "E2E_AUTH_SECRET",
+              "E2E_AUTH_EMAIL",
+          ]
+
+          # At least one allowlist mechanism must be configured
+          allowlist = ["ALLOWED_SUB", "ALLOWED_EMAIL"]
+
+          secrets = json.loads(os.environ["SECRETS_JSON"])
+          names = {s.get("name") for s in secrets if isinstance(s, dict)}
+
+          missing = [name for name in required if name not in names]
+          if missing:
+              print(f"::error::Missing Worker secrets (names only): {', '.join(missing)}")
+              sys.exit(1)
+
+          # Check that at least one allowlist secret exists
+          allowlist_present = [name for name in allowlist if name in names]
+          if not allowlist_present:
+              print(f"::error::Missing allowlist configuration: at least one of {', '.join(allowlist)} must be present")
+              sys.exit(1)
+
+          print("✓ Required Worker secrets present")
+          print(f"✓ Allowlist configured: {', '.join(allowlist_present)}")
+          PY
 
       - name: Deploy Worker API Preview
         id: deploy
         working-directory: packages/api
         run: |
-          # Deploy to preview environment
           set +e  # Don't exit on error yet
-          DEPLOYMENT_OUTPUT=$(pnpm exec wrangler deploy -e preview --config wrangler.jsonc 2>&1)
+          DEPLOYMENT_OUTPUT=$(pnpm exec wrangler deploy --env preview --config wrangler.jsonc 2>&1)
           EXIT_CODE=$?
           echo "$DEPLOYMENT_OUTPUT"
 
@@ -71,8 +155,9 @@ jobs:
           fi
 
           # Extract deployment URL from output (strip ANSI codes first)
+          # shellcheck disable=SC2001
           DEPLOYMENT_URL=$(echo "$DEPLOYMENT_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' | grep -oP 'https://[^\s]+\.workers\.dev' | head -1)
-          echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo "deployment-url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
 
   preview-web:
     runs-on: ubuntu-latest
@@ -95,7 +180,7 @@ jobs:
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - uses: actions/cache@v5
         with:
@@ -116,12 +201,15 @@ jobs:
       - name: Deploy web preview to Pages
         id: deploy
         working-directory: packages/web
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
         run: |
           # Deploy to preview environment and capture URL
-          DEPLOY_OUTPUT=$(pnpm exec wrangler pages deploy dist --project-name "append-web" --branch "${{ github.head_ref }}" 2>&1)
+          DEPLOY_OUTPUT=$(pnpm exec wrangler pages deploy dist --project-name "append-web" --branch "$BRANCH_NAME" 2>&1)
           echo "$DEPLOY_OUTPUT"
 
           # Extract URLs (strip ANSI codes first)
+          # shellcheck disable=SC2001
           CLEAN_OUTPUT=$(echo "$DEPLOY_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g')
 
           # Get the alias URL (branch-specific) if available, otherwise get the primary URL
@@ -136,7 +224,7 @@ jobs:
           fi
 
           # Use ::set-output to avoid secret masking issues
-          echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo "deployment-url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
 
   e2e-tests:
     runs-on: ubuntu-latest
@@ -157,7 +245,7 @@ jobs:
 
       - name: Get pnpm store directory
         shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
       - uses: actions/cache@v5
         with:
@@ -180,7 +268,8 @@ jobs:
             echo "To set it up:"
             echo "  1. Generate a 32+ character random secret: openssl rand -base64 32"
             echo "  2. Add it to GitHub Actions secrets as E2E_AUTH_SECRET"
-            echo "  3. Add the same secret to the preview Worker via: wrangler secret put E2E_AUTH_SECRET -e preview"
+            echo "  3. Add the same secret to Doppler: doppler secrets set E2E_AUTH_SECRET --project apps --config prv_append"
+            echo "     (The Doppler sync step will deploy it to Cloudflare)"
             exit 1
           fi
           echo "✓ E2E_AUTH_SECRET is configured"
@@ -194,7 +283,7 @@ jobs:
         run: pnpm test:e2e
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: playwright-report

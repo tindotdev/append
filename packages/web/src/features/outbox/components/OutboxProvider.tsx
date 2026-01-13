@@ -16,16 +16,16 @@ import { useAuth } from '@/features/auth';
 import type { AuthContextType } from '@/features/auth/hooks/use-auth';
 import { batchKeys } from '@/features/batch/api/get-batch';
 import {
+	createAppOutbox,
 	createLeadershipProvider,
-	createOutbox,
 	deleteOutboxDatabase,
 	generateTabId,
 	type LeadershipProvider,
 	type OutboxBroadcastMessage,
+	type OutboxBroadcastResult,
 	type OutboxCounts,
-	type OutboxInstance,
 	type OutboxStatus,
-} from '@/lib/outbox';
+} from '@/lib/outbox-adapter';
 import { queryClient } from '@/lib/query-client';
 import { OutboxContext } from '../hooks/use-outbox';
 import type { OutboxContextValue } from '../types';
@@ -48,6 +48,9 @@ const BATCH_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-
 // In-memory fallback for tab ID when sessionStorage is unavailable
 let inMemoryTabId: string | null = null;
 
+// Type for the outbox instance returned by createAppOutbox
+type AppOutboxInstance = ReturnType<typeof createAppOutbox>;
+
 interface OutboxProviderProps {
 	children: React.ReactNode;
 }
@@ -60,18 +63,19 @@ interface OutboxProviderProps {
  */
 function getTabId(): string {
 	try {
-		let tabId = sessionStorage.getItem(TAB_ID_KEY);
-		if (!tabId) {
-			tabId = generateTabId();
-			sessionStorage.setItem(TAB_ID_KEY, tabId);
+		const existingTabId = sessionStorage.getItem(TAB_ID_KEY);
+		if (existingTabId) {
+			return existingTabId;
 		}
-		return tabId;
+		const newTabId = generateTabId();
+		sessionStorage.setItem(TAB_ID_KEY, newTabId);
+		return newTabId;
 	} catch {
 		// Storage unavailable - use in-memory fallback (won't survive refresh)
 		if (!inMemoryTabId) {
 			inMemoryTabId = generateTabId();
 		}
-		return inMemoryTabId;
+		return inMemoryTabId as string;
 	}
 }
 
@@ -112,7 +116,7 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 	const [isReady, setIsReady] = useState(false);
 
 	// Refs for StrictMode-safe initialization (avoid double-init)
-	const outboxRef = useRef<OutboxInstance | null>(null);
+	const outboxRef = useRef<AppOutboxInstance | null>(null);
 	const leadershipRef = useRef<LeadershipProvider | null>(null);
 	const cleanupRef = useRef<(() => void) | null>(null);
 	const initUserScopeRef = useRef<string | null>(null);
@@ -194,10 +198,9 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 
 		const clock = { now: () => Date.now() };
 
-		// Create outbox instance
-		const outbox = createOutbox({
+		// Create outbox instance using the app adapter
+		const outbox = createAppOutbox({
 			userScope,
-			clock,
 			onAuthBlocked: () => {
 				// Could show a toast or trigger sign-in prompt
 				toast.warning('Sign-in required to sync');
@@ -270,7 +273,7 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 
 		// Handle broadcast messages
 		// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: broadcast handler is a small switch-based router
-		function handleBroadcast(msg: OutboxBroadcastMessage) {
+		function handleBroadcast(msg: OutboxBroadcastMessage<OutboxBroadcastResult>) {
 			if (!isMounted) return;
 
 			switch (msg.type) {
@@ -290,16 +293,16 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 					}
 					break;
 
-				case 'outbox_result':
+				case 'outbox_result': {
 					// T12: Show "Batch ready" toast on successful send
 					if (msg.userScope === userScope) {
 						// Invalidate batch queries
 						queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
 
-						// Show toast with Open action
+						// Show toast with Open action (msg.result is now properly typed as OutboxBroadcastResult)
 						const batchId = msg.result.batchId;
-						const isSafeBatchId = BATCH_ID_PATTERN.test(batchId);
-						if (!isSafeBatchId) {
+						const isSafeBatchId = batchId && BATCH_ID_PATTERN.test(batchId);
+						if (batchId && !isSafeBatchId) {
 							console.warn('[Outbox] Ignoring invalid batchId in outbox_result:', batchId);
 						}
 
@@ -315,6 +318,7 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 						});
 					}
 					break;
+				}
 			}
 		}
 
@@ -325,7 +329,7 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 		// (covers both initial load with session and sign-in after sign-out)
 		Promise.all([
 			refreshCounts(),
-			outbox.store.resumeBlockedAuth(userScope, clock.now()).then((count) => {
+			outbox.store.resumeBlockedAuth(userScope, clock.now()).then((count: number) => {
 				if (count > 0 && isMounted) {
 					// Items were resumed - refresh counts and kick sender
 					refreshCounts();
@@ -382,7 +386,7 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 			const sequence = ++resumeBlockedAuthSequenceRef.current;
 			outboxRef.current.store
 				.resumeBlockedAuth(userId, Date.now())
-				.then((count) => {
+				.then((count: number) => {
 					if (sequence !== resumeBlockedAuthSequenceRef.current || !isMountedRef.current) {
 						return;
 					}

@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useOutboxSafe } from '../hooks/use-outbox';
-import type { OutboxItem } from '../types';
+import type { AppOutboxItem } from '../types';
 
 interface OutboxManagementProps {
 	open: boolean;
@@ -24,8 +24,8 @@ interface OutboxManagementProps {
 export function OutboxManagement({ open, onOpenChange }: OutboxManagementProps) {
 	const outbox = useOutboxSafe();
 	const navigate = useNavigate();
-	const [failedItems, setFailedItems] = useState<OutboxItem[]>([]);
-	const [blockedItems, setBlockedItems] = useState<OutboxItem[]>([]);
+	const [failedItems, setFailedItems] = useState<AppOutboxItem[]>([]);
+	const [blockedItems, setBlockedItems] = useState<AppOutboxItem[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 
 	// Refresh items from store

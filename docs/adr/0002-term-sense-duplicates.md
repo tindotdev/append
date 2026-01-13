@@ -1,7 +1,8 @@
 # ADR 0002 — Duplicates become senses (allowed-but-flagged)
 
-Status: Accepted
+Status: Superseded by ADR 0020
 Date: 2025-12-19
+Superseded: 2026-01-08
 
 ## Context
 
@@ -60,4 +61,3 @@ Represent concepts as:
 - Allow duplicates as separate Terms: noisy, hurts navigation and search.
 - Skip duplicates: loses useful context and can silently discard meaning.
 - Force sense tagging up front: slows down the brain-dump workflow.
-

@@ -43,6 +43,34 @@
       "when": 1767346924910,
       "tag": "0005_black_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1767889562588,
+      "tag": "0006_slim_callisto",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1768030148280,
+      "tag": "0007_sincere_red_wolf",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1768032776792,
+      "tag": "0008_smiling_deathstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1768191893771,
+      "tag": "0009_parched_colonel_america",
+      "breakpoints": true
     }
   ]
 }

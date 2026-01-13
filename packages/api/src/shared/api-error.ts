@@ -9,6 +9,7 @@ export type ApiErrorCode =
 	| 'VALIDATION_ERROR'
 	| 'INVALID_JSON'
 	| 'PAYLOAD_TOO_LARGE'
+	| 'RANGE_TOO_LARGE'
 	| 'UNAUTHORIZED'
 	| 'FORBIDDEN'
 	| 'ORIGIN_FORBIDDEN' // Origin validation failed (preview env only)
@@ -16,6 +17,7 @@ export type ApiErrorCode =
 	| 'VERSION_CONFLICT'
 	| 'BATCH_NOT_READY'
 	| 'IDEMPOTENCY_CONFLICT'
+	| 'RATE_LIMIT_EXCEEDED'
 	| 'SERVICE_UNAVAILABLE'
 	| 'CONFIGURATION_ERROR'
 	| 'INTERNAL_ERROR';

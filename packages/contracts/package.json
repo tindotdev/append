@@ -15,6 +15,10 @@
 		"./validators": {
 			"types": "./src/validators/index.ts",
 			"default": "./src/validators/index.ts"
+		},
+		"./url-normalization": {
+			"types": "./src/url-normalization.ts",
+			"default": "./src/url-normalization.ts"
 		}
 	},
 	"scripts": {

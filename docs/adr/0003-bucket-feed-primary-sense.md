@@ -1,7 +1,8 @@
 # ADR 0003 — Bucket feed shows primary sense by default
 
-Status: Accepted
+Status: Superseded by ADR 0020
 Date: 2025-12-19
+Superseded: 2026-01-08
 
 ## Context
 
@@ -32,4 +33,3 @@ We also need a way to surface conflicts/flagged items without polluting the ever
 
 - Show all senses by default: too noisy, duplicates feel like clutter.
 - Hide senses entirely: loses nuance and makes duplicates hard to manage.
-

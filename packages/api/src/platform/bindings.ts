@@ -8,17 +8,26 @@ export type Bindings = {
 	// R2 Object Storage
 	IMPORT_FILES: R2Bucket;
 
+	// Rate Limiting (distributed via CF Rate Limiting API)
+	INGEST_RATE_LIMITER: RateLimit;
+
 	// AI Gateway
 	CF_ACCOUNT_ID: string;
 	AI_GATEWAY_ID: string;
+	/** Optional AI Gateway token for unified billing (deprecated in favor of direct OpenAI API key) */
 	CF_AIG_TOKEN?: string;
 
-	// OpenAI API key - either:
-	// - Plain string from .dev.vars (local development)
-	// - SecretsStoreSecret from Secrets Store (production)
-	OPENAI_API_KEY?: string | SecretsStoreSecret;
+	/**
+	 * OpenAI API key (synced from Doppler at deploy time).
+	 *
+	 * REQUIRED when SUGGESTIONS_PROVIDER='openai' (production).
+	 * Optional when SUGGESTIONS_PROVIDER='stub' (preview/test).
+	 *
+	 * CI validates this is present in production deployments.
+	 */
+	OPENAI_API_KEY?: string;
 
-	// Suggestion provider: 'openai' | 'stub' | 'disabled'
+	/** Suggestion provider: 'openai' | 'stub' | 'disabled' */
 	SUGGESTIONS_PROVIDER?: string;
 
 	// Auth
@@ -35,13 +44,17 @@ export type Bindings = {
 	E2E_AUTH_SECRET?: string;
 	E2E_AUTH_SECRET_OLD?: string; // For zero-downtime secret rotation
 	E2E_AUTH_EMAIL?: string;
+
+	// Extension Security - Allowlist of Chrome extension IDs that can access /events/* endpoints
+	ALLOWED_EXTENSION_IDS?: string; // Comma-separated list of 32-char extension IDs
+
+	// Events export tuning
+	// NOTE: Values are strings in CF bindings; parse as integers in code.
+	EVENTS_EXPORT_PAGE_SIZE?: string; // default: 1000
+	EVENTS_EXPORT_MAX_TOTAL_ROWS?: string; // default: 100000
 };
 
 export type Variables = {
 	userId: string;
 	db: DrizzleD1Database<typeof schema>;
 };
-
-export interface SecretsStoreSecret {
-	get(): Promise<string>;
-}

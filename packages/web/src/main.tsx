@@ -2,6 +2,8 @@ import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 
+import '@fontsource-variable/inter';
+import '@fontsource/geist-mono';
 import './main.css';
 import { useAuth } from './features/auth';
 import { AppProvider } from './providers';

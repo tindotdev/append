@@ -1,22 +1,148 @@
 # Runbook
 
-## Secrets management
+## Developer setup
 
-Secrets are managed via Cloudflare's native tooling (no external tools like Doppler):
-
-- **Local dev**: `.dev.vars` in `packages/api/` (gitignored)
-- **Production**: `wrangler secret put <NAME>` (stored in Cloudflare)
-
-### Setting production secrets
+New machine setup:
 
 ```bash
-cd packages/api
-pnpm wrangler secret put GOOGLE_CLIENT_ID
-pnpm wrangler secret put GOOGLE_CLIENT_SECRET
-pnpm wrangler secret put BETTER_AUTH_SECRET
-pnpm wrangler secret put BETTER_AUTH_URL      # https://api.append.tindev.dev
-pnpm wrangler secret put ALLOWED_SUB          # or ALLOWED_EMAIL for bootstrap
+just setup  # Install deps, sync secrets from Doppler, run migrations
+just dev    # Start development servers
 ```
+
+See `justfile` for available commands.
+
+### Testing the Chrome extension locally
+
+**IMPORTANT**: To test the Chrome extension locally, you **must** configure `ALLOWED_EXTENSION_IDS` in Doppler before running `just setup`:
+
+```bash
+# Required for extension development
+doppler secrets set ALLOWED_EXTENSION_IDS="nnhipglpoenbcdonkbnfdcmfcfaggjle" --project apps --config dev_append
+just sync-secrets
+```
+
+Without this configuration, the extension's requests to `/events/*` will be **blocked by CORS** (secure by default per ADR 0021).
+
+See [Extension security configuration](#extension-security-configuration) for details.
+
+## Secrets management
+
+**Doppler is the canonical source of truth** for all secrets across all environments.
+Secrets are synced from Doppler to Cloudflare Workers at deploy time via GitHub Actions.
+
+- **Local dev**: `.dev.vars` in `packages/api/` (gitignored, synced via `just sync-secrets`)
+- **Preview**: Synced from Doppler `apps/prv_append` at deploy time
+- **Production**: Synced from Doppler `apps/prd_append` at deploy time
+
+### Doppler configs
+
+| Environment | Doppler Config    | Sync Method                             |
+| ----------- | ----------------- | --------------------------------------- |
+| Local dev   | `apps/dev_append` | `just sync-secrets` → `.dev.vars`       |
+| Preview     | `apps/prv_append` | GitHub Actions → `wrangler secret bulk` |
+| Production  | `apps/prd_append` | GitHub Actions → `wrangler secret bulk` |
+
+### Updating secrets
+
+**Local dev:**
+
+```bash
+doppler secrets set BETTER_AUTH_URL="http://localhost:8787" --project apps --config dev_append
+just sync-secrets
+```
+
+**Preview/Production:**
+
+```bash
+# Update in Doppler (secrets sync automatically on next deploy)
+doppler secrets set <SECRET_NAME> --project apps --config prv_append  # preview
+doppler secrets set <SECRET_NAME> --project apps --config prd_append  # production
+
+# To sync immediately without a code change, trigger a deploy manually
+```
+
+**Important:** Never use `wrangler secret put` directly — it will be overwritten on the next deploy.
+
+### Extension security configuration
+
+The API restricts `/events/*` access from Chrome extensions using two security measures (ADR 0021):
+
+1. **Extension ID allowlist**: Only specific extension IDs can make CORS requests
+2. **Required bearer auth**: Extensions must use device tokens; cookie auth is rejected
+
+**Secure by default**: If `ALLOWED_EXTENSION_IDS` is not set or empty, **all** chrome-extension:// origins are rejected by CORS. This prevents unauthorized extensions from accessing the API.
+
+**Test coverage**: The CORS behavior is verified by integration tests:
+
+- `packages/api/test/cors.spec.ts` — Tests rejection when `ALLOWED_EXTENSION_IDS` is not set
+- `packages/api/test/cors.extension.spec.ts` — Tests acceptance when configured (run via `pnpm test:extension`)
+
+#### Local development setup
+
+The local development extension has a stable ID: **`nnhipglpoenbcdonkbnfdcmfcfaggjle`**
+
+This ID is deterministic (generated from the public key in `packages/extension/src/manifest.ts`).
+
+**Required for local extension development**. Configure for local dev:
+
+```bash
+# Option 1: Via Doppler (recommended)
+doppler secrets set ALLOWED_EXTENSION_IDS="nnhipglpoenbcdonkbnfdcmfcfaggjle" --project apps --config dev_append
+just sync-secrets
+
+# Option 2: Manually add to packages/api/.dev.vars
+echo 'ALLOWED_EXTENSION_IDS=nnhipglpoenbcdonkbnfdcmfcfaggjle' >> packages/api/.dev.vars
+```
+
+#### Production setup (one-time)
+
+When you publish the extension to Chrome Web Store, it gets a **permanent ID** that never changes.
+
+**After first Chrome Web Store publish:**
+
+1. Get the production extension ID from Chrome Web Store developer dashboard or from `chrome://extensions/` after installing the published version
+
+2. Set it in Doppler (one-time):
+
+   ```bash
+   doppler secrets set ALLOWED_EXTENSION_IDS="<production-extension-id>" --project apps --config prd_append
+   ```
+
+3. Document the production ID in this runbook for reference:
+
+   ```bash
+   # Production extension ID: <paste-here-after-publishing>
+   ```
+
+**Important**: The production ID only needs to be set **once** when you first publish. It never changes after that, so you don't need to update it on every deploy.
+
+#### Preview environment
+
+For PR previews, use the local dev ID (same stable key):
+
+```bash
+doppler secrets set ALLOWED_EXTENSION_IDS="nnhipglpoenbcdonkbnfdcmfcfaggjle" --project apps --config prv_append
+```
+
+#### Verifying the extension ID
+
+To confirm your extension ID:
+
+1. Open `chrome://extensions/` in Chrome
+2. Enable "Developer mode" (toggle in top right)
+3. Look for the 32-character ID under the extension name
+
+For the local dev extension, it should always show: `nnhipglpoenbcdonkbnfdcmfcfaggjle`
+
+#### Multiple extensions (if needed)
+
+If you need to allow multiple extensions (e.g., local dev + production):
+
+```bash
+ALLOWED_EXTENSION_IDS=nnhipglpoenbcdonkbnfdcmfcfaggjle,<production-id>
+```
+
+If unset or empty, all extension requests are rejected (secure by default).
 
 ### Listing/verifying secrets
 
@@ -77,25 +203,92 @@ Required GitHub secrets:
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CF_PAGES_PROJECT` (Cloudflare Pages project name)
+- `DOPPLER_TOKEN_PROD_APPEND` (Doppler service token for production)
+- `DOPPLER_TOKEN_PREVIEW_APPEND` (Doppler service token for preview, used in `preview.yml`)
+- `E2E_AUTH_SECRET` (for E2E tests in preview workflow)
 
 Deploy order (automated):
 
-1. Apply D1 migrations (remote).
-2. Deploy the Worker API (Hono) to Cloudflare Workers.
-3. Build and deploy the SPA to Cloudflare Pages.
-4. Verify auth sign-in flow and basic API health.
+1. Sync Worker secrets from Doppler (production).
+2. Apply D1 migrations (remote).
+3. Deploy the Worker API (Hono) to Cloudflare Workers.
+4. Build and deploy the SPA to Cloudflare Pages.
+5. Verify auth sign-in flow and basic API health.
 
 Manual equivalent (from repo root):
 
 ```bash
-# API (migrations + deploy)
-pnpm --filter @append/api exec wrangler d1 migrations apply append-db --remote --config packages/api/wrangler.jsonc
-pnpm --filter @append/api run deploy -- --config packages/api/wrangler.jsonc
+# API (secrets + migrations + deploy)
+#
+# Note: In CI/CD, secrets sync is handled automatically via Doppler service tokens.
+# Manual sync is only needed for break-glass deploys or rotation verification.
+#
+# DOPPLER_TOKEN=... doppler secrets --json | \
+#   jq -c 'with_entries(.value = .value.computed)' | \
+#   pnpm --filter @append/api exec wrangler secret bulk --env production --config packages/api/wrangler.jsonc
+
+pnpm --filter @append/api exec wrangler d1 migrations apply append-db --remote --env production --config packages/api/wrangler.jsonc
+pnpm --filter @append/api run deploy -- --env production --config packages/api/wrangler.jsonc
 
 # Web (build + deploy)
 pnpm --filter @append/web run build
 pnpm --filter @append/web exec wrangler pages deploy packages/web/dist --project-name "$CF_PAGES_PROJECT"
 ```
+
+## Publishing Chrome Extension
+
+When publishing the extension to Chrome Web Store for the first time, follow this checklist:
+
+### Pre-publish checklist
+
+1. **Build the production extension** (strips dev key automatically):
+
+   ```bash
+   cd packages/extension
+   pnpm build:prod
+   # Creates release/release.zip ready for upload to Chrome Web Store
+   ```
+
+   The `build:prod` command automatically:
+   - Runs Vite in production mode (`--mode production`)
+   - Excludes the dev `key` field from the manifest via `defineManifest()`
+   - Creates a production-ready build that Chrome Web Store will accept
+
+   **Important:** Always use `build:prod` for publishing, not `build` (which includes the dev key for local testing).
+
+### Publishing steps
+
+1. Upload to [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
+
+2. **After first publish approval**, get the production extension ID:
+   - Install the published extension from Chrome Web Store
+   - Open `chrome://extensions/`
+   - Copy the 32-character extension ID
+
+3. **Set the extension ID in Doppler** (one-time):
+
+   ```bash
+   doppler secrets set ALLOWED_EXTENSION_IDS="<production-extension-id>" --project apps --config prd_append
+   ```
+
+4. **Document the production ID** in this runbook:
+
+   ```bash
+   # Production extension ID: <paste-production-id-here>
+   # (Set on: YYYY-MM-DD)
+   ```
+
+5. **Test the published extension**:
+   - Install from Chrome Web Store
+   - Verify it can connect to production API (`https://api.append.tindev.dev`)
+   - Check that event ingestion works
+
+### Important notes
+
+- **The production extension ID never changes** after first publish
+- You only need to set `ALLOWED_EXTENSION_IDS` once in Doppler
+- No need to update it on every deploy or extension update
+- For local development, continue using the stable dev ID: `nnhipglpoenbcdonkbnfdcmfcfaggjle`
 
 ## Preview deployments (PR environments)
 
@@ -135,11 +328,13 @@ These steps create the isolated preview infrastructure (already completed):
 When a PR is opened against `main`:
 
 1. GitHub Actions runs `.github/workflows/preview.yml`
-2. Migrations are applied to the preview database
-3. API deploys to the preview environment: `https://append-api-preview.tindotdev.workers.dev`
-4. Web builds with `VITE_API_URL` set to preview API
-5. Web deploys to Cloudflare Pages with branch-specific URL: `https://<branch>.<project>.pages.dev`
-6. Both URLs are posted as a comment on the PR (updated on subsequent pushes)
+2. Preview API tests run
+3. Migrations are applied to the preview database
+4. Secrets are synced from Doppler and `E2E_AUTH_EMAIL` is set for the PR
+5. API deploys to the preview environment: `https://append-api-preview.tindotdev.workers.dev`
+6. Web builds with `VITE_API_URL` set to preview API
+7. Web deploys to Cloudflare Pages with branch-specific URL: `https://<branch>.<project>.pages.dev`
+8. Both URLs are posted as a comment on the PR (updated on subsequent pushes)
 
 **API URL configuration:**
 
@@ -154,7 +349,7 @@ To deploy manually to preview environments:
 ```bash
 # API preview
 pnpm --filter @append/api exec wrangler d1 migrations apply append-db-preview --remote --env preview
-pnpm --filter @append/api exec wrangler deploy -e preview --config wrangler.jsonc
+pnpm --filter @append/api exec wrangler deploy --env preview --config wrangler.jsonc
 
 # Web preview (branch-specific)
 VITE_API_URL=https://append-api-preview.tindotdev.workers.dev pnpm --filter @append/web run build
@@ -163,19 +358,20 @@ pnpm --filter @append/web exec wrangler pages deploy dist --project-name "$CF_PA
 
 ### Preview environment secrets
 
-Preview environment has Google OAuth configured for authentication:
+Preview secrets are managed in Doppler (`apps/prv_append`) and synced automatically at deploy time.
 
 ```bash
-# Secrets are already set for preview environment
-pnpm --filter @append/api exec wrangler secret list --env preview
+# View preview secrets in Doppler
+doppler secrets --project apps --config prv_append
 ```
 
-Required secrets (already configured):
+Required secrets (configured in Doppler `apps/prv_append`):
 
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `BETTER_AUTH_SECRET`
-- `ALLOWED_SUB` (preferred) or `ALLOWED_EMAIL` (fallback)
+- `E2E_AUTH_SECRET`
+- `CF_AIG_TOKEN` (optional, preview uses stub AI provider)
 
 ### E2E authentication for Playwright (ADR 0019)
 
@@ -190,8 +386,8 @@ must allow the preview Pages origin and use preview-only cookie settings per ADR
 
 Required preview configuration for E2E tests (ADR 0019):
 
-- Secrets (preview Worker):
-  - `E2E_AUTH_SECRET` — secret required by `x-e2e-secret` header (set in Cloudflare)
+- Secrets (synced from Doppler `apps/prv_append`):
+  - `E2E_AUTH_SECRET` — secret required by `x-e2e-secret` header
   - `E2E_AUTH_EMAIL` — set dynamically by preview workflow per PR (e.g., `e2e-bot+pr-123@append.test`)
 - Vars (preview Worker) — already configured in `wrangler.jsonc`:
   - `APP_ENV=preview`
@@ -205,13 +401,15 @@ Required preview configuration for E2E tests (ADR 0019):
 `e2e-bot+pr-{PR_NUMBER}@append.test` for each PR. This provides environment isolation
 while using a single wildcard allowlist pattern.
 
-Set E2E secret (required for Playwright tests):
+**E2E secret setup:**
 
-```bash
-pnpm --filter @append/api exec wrangler secret put E2E_AUTH_SECRET --env preview
-```
+1. Set in Doppler (synced to Worker at deploy time):
 
-Also add `E2E_AUTH_SECRET` to GitHub Actions secrets for the workflow to use.
+   ```bash
+   doppler secrets set E2E_AUTH_SECRET --project apps --config prv_append
+   ```
+
+2. Also add `E2E_AUTH_SECRET` to GitHub Actions secrets (for Playwright to use directly).
 
 Note: `E2E_AUTH_EMAIL` is set automatically by the preview workflow — no manual configuration needed.
 
@@ -221,15 +419,21 @@ Note: `E2E_AUTH_EMAIL` is set automatically by the preview workflow — no manua
 2. Run:
 
    ```js
-   await fetch('https://append-api-preview.tindotdev.workers.dev/auth/e2e/login', {
-     method: 'POST',
-     headers: { 'x-e2e-secret': '<preview E2E_AUTH_SECRET>' },
-     credentials: 'include',
-   });
+   await fetch(
+    "https://append-api-preview.tindotdev.workers.dev/auth/e2e/login",
+    {
+     method: "POST",
+     headers: { "x-e2e-secret": "<preview E2E_AUTH_SECRET>" },
+     credentials: "include",
+    },
+   );
 
-   await fetch('https://append-api-preview.tindotdev.workers.dev/api/batch?limit=1', {
-     credentials: 'include',
-   });
+   await fetch(
+    "https://append-api-preview.tindotdev.workers.dev/api/batch?limit=1",
+    {
+     credentials: "include",
+    },
+   );
    ```
 
 3. Confirm the second request returns 200 and includes batches (or an empty list).
@@ -279,17 +483,19 @@ To rotate the E2E secret in preview:
 # Generate a new secret
 openssl rand -base64 32
 
-# Update in Cloudflare Worker
-pnpm --filter @append/api exec wrangler secret put E2E_AUTH_SECRET --env preview
+# Update in Doppler (will sync to Worker on next deploy)
+doppler secrets set E2E_AUTH_SECRET --project apps --config prv_append
 
 # Update in GitHub Actions secrets
 # (manual step in GitHub repository settings)
+
+# Trigger a deploy to sync the new secret (or wait for next PR push)
 ```
 
 Verify the old secret is rejected:
 
 ```bash
-curl -i -X POST "https://append-api-preview.tindotdev.workers.dev/auth/e2e/login" \\
+curl -i -X POST "https://append-api-preview.tindotdev.workers.dev/auth/e2e/login" \
   -H "x-e2e-secret: <old-secret>"
 # Expect HTTP 403
 ```
@@ -329,6 +535,19 @@ pnpm test
 ```
 
 API tests live under `packages/api/test/` and run via `pnpm test:api`.
+
+### Running all test suites
+
+```bash
+# Default tests (includes CORS tests without ALLOWED_EXTENSION_IDS)
+pnpm --filter @append/api test
+
+# Preview environment tests (APP_ENV=preview)
+pnpm --filter @append/api test:preview
+
+# Extension tests (ALLOWED_EXTENSION_IDS set)
+pnpm --filter @append/api test:extension
+```
 
 ### Test environment variables
 

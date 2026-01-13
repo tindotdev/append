@@ -1,10 +1,15 @@
+import { and, eq, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { deviceToken } from './db';
 // Feature routes (vertical slice architecture)
 import { acceptRoutes } from './features/accept/routes';
 import { batchRoutes } from './features/batch/routes';
 import { bucketRoutes } from './features/bucket/routes';
 import { candidateRoutes } from './features/candidate/routes';
+import { dashboardRoutes } from './features/dashboard/routes';
+import { deviceTokenRoutes } from './features/device-tokens/routes';
+import { eventsRoutes } from './features/events/routes';
 import { exportRoutes } from './features/export/routes';
 import { importRoutes } from './features/import/routes';
 import { suggestionsRoutes } from './features/suggestions/routes';
@@ -12,6 +17,7 @@ import { termRoutes } from './features/term/routes';
 import { termSenseRoutes } from './features/term-sense/routes';
 import { userBucketRoutes } from './features/user-bucket/routes';
 import { createAuth, getAllowedOrigins, isPreviewEnv } from './lib/auth';
+import { parseBearerToken, sha256Hex } from './lib/auth/device-token';
 import { e2eLoginRoute } from './lib/auth/e2e-login';
 import type { Variables as BaseVariables, Bindings } from './platform/bindings';
 import { attachDb } from './platform/context';
@@ -59,6 +65,32 @@ export function isOriginAllowed(origin: string, allowedOrigins: string[]): boole
 	return false;
 }
 
+/**
+ * Check if origin is from an allowed Chrome extension.
+ * Returns true only if:
+ * 1. Origin is a valid chrome-extension:// URL with a 32-char ID
+ * 2. The extension ID is in the allowlist (if allowlist is configured)
+ *
+ * @param origin - The origin header value
+ * @param allowedIds - Comma-separated list of allowed extension IDs (or undefined to allow none)
+ */
+function isChromeExtensionOrigin(origin: string | undefined | null, allowedIds: string | undefined): boolean {
+	if (!origin) return false;
+	if (!origin.startsWith('chrome-extension://')) return false;
+
+	// chrome-extension://<32-char-id>
+	const id = origin.slice('chrome-extension://'.length);
+	if (id.length !== 32) return false;
+	if (!/^[a-p]{32}$/.test(id)) return false;
+
+	// If no allowlist configured, reject all extensions (secure by default)
+	if (!allowedIds) return false;
+
+	// Check if this extension ID is in the allowlist
+	const allowed = allowedIds.split(',').map((s) => s.trim());
+	return allowed.includes(id);
+}
+
 type Variables = BaseVariables & {
 	auth: ReturnType<typeof createAuth>;
 };
@@ -71,11 +103,14 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 app.onError((err, c) => {
 	// Only apply contract error shape to /api/* routes
-	if (!c.req.path.startsWith('/api/')) {
+	if (!c.req.path.startsWith('/api/') && !c.req.path.startsWith('/events/')) {
 		throw err;
 	}
 
 	console.error('API error:', err);
+	if (err.cause) {
+		console.error('Error cause:', err.cause);
+	}
 
 	// JSON parsing errors
 	if (err instanceof SyntaxError && err.message.includes('JSON')) {
@@ -88,7 +123,7 @@ app.onError((err, c) => {
 
 app.notFound((c) => {
 	// Only apply contract error shape to /api/* routes
-	if (c.req.path.startsWith('/api/')) {
+	if (c.req.path.startsWith('/api/') || c.req.path.startsWith('/events/')) {
 		return apiError(c, 404, 'NOT_FOUND', 'Resource not found');
 	}
 	// Default behavior for non-API routes
@@ -126,9 +161,21 @@ app.use('/api/*', async (c, next) => {
 	})(c, next);
 });
 
+app.use('/events/*', async (c, next) => {
+	const allowedOrigins = getAllowedOrigins(c.env);
+	return cors({
+		origin: (origin) =>
+			isChromeExtensionOrigin(origin, c.env.ALLOWED_EXTENSION_IDS) || isOriginAllowed(origin, allowedOrigins) ? origin : null,
+		allowMethods: ['POST', 'GET', 'PUT', 'DELETE', 'OPTIONS'],
+		allowHeaders: ['Content-Type', 'Authorization', 'X-Import-Id'],
+		credentials: true,
+	})(c, next);
+});
+
 // Explicit OPTIONS preflight handler for /api/* (§3.1)
 // Prevents auth middleware from intercepting preflight requests
 app.options('/api/*', (c) => c.body(null, 204));
+app.options('/events/*', (c) => c.body(null, 204));
 
 // =============================================================================
 // Preview-only origin validation for state-changing requests (ADR 0019)
@@ -144,6 +191,38 @@ app.use('/api/*', async (c, next) => {
 	// Only apply to state-changing methods
 	const method = c.req.method;
 	if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+		return next();
+	}
+
+	// Require valid Origin header for POST/PUT/DELETE in preview
+	const origin = c.req.header('origin');
+	if (!origin) {
+		return apiError(c, 403, 'ORIGIN_FORBIDDEN', 'Origin header required');
+	}
+
+	const allowedOrigins = getAllowedOrigins(c.env);
+	if (!isOriginAllowed(origin, allowedOrigins)) {
+		return apiError(c, 403, 'ORIGIN_FORBIDDEN', 'Invalid origin');
+	}
+
+	return next();
+});
+
+app.use('/events/*', async (c, next) => {
+	// Only apply in preview environment
+	if (!isPreviewEnv(c.env)) {
+		return next();
+	}
+
+	// Only apply to state-changing methods
+	const method = c.req.method;
+	if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+		return next();
+	}
+
+	// Token-auth clients don't use cookies; skip Origin enforcement.
+	const bearer = parseBearerToken(c.req.header('authorization'));
+	if (bearer) {
 		return next();
 	}
 
@@ -200,6 +279,67 @@ app.use('/api/*', async (c, next) => {
 	await next();
 });
 
+// DB context for /events/* routes must be available for bearer token auth.
+app.use('/events/*', attachDb);
+
+app.use('/events/*', async (c, next) => {
+	const bearer = parseBearerToken(c.req.header('authorization'));
+	if (bearer) {
+		const db = c.get('db');
+		const tokenHash = await sha256Hex(bearer);
+		const now = new Date();
+
+		const [row] = await db
+			.select({ id: deviceToken.id, userId: deviceToken.userId, expiresAt: deviceToken.expiresAt })
+			.from(deviceToken)
+			.where(and(eq(deviceToken.tokenHash, tokenHash), isNull(deviceToken.revokedAt)))
+			.limit(1);
+
+		if (!row) {
+			return apiError(c, 401, 'UNAUTHORIZED', 'Invalid token');
+		}
+
+		// Check if token has expired
+		if (row.expiresAt && row.expiresAt < now) {
+			return apiError(c, 401, 'UNAUTHORIZED', 'Token expired');
+		}
+
+		c.set('userId', row.userId);
+		await db.update(deviceToken).set({ lastUsedAt: new Date() }).where(eq(deviceToken.id, row.id));
+		return next();
+	}
+
+	// Security: Extension origins MUST use bearer token auth, not cookie sessions
+	// This prevents arbitrary extensions from piggybacking the user's SSO cookies
+	const origin = c.req.header('origin');
+	if (isChromeExtensionOrigin(origin, c.env.ALLOWED_EXTENSION_IDS)) {
+		return apiError(c, 401, 'UNAUTHORIZED', 'Bearer token required for extension requests');
+	}
+
+	const auth = c.get('auth');
+
+	// Call getSession with returnHeaders to capture set-cookie for token refresh
+	const { headers, response: session } = await auth.api.getSession({
+		headers: c.req.raw.headers,
+		returnHeaders: true,
+	});
+
+	// Forward set-cookie headers for token refresh (use append semantics)
+	const setCookie = headers.get('set-cookie');
+	if (setCookie) {
+		c.res.headers.append('set-cookie', setCookie);
+	}
+
+	// 401 if no valid session
+	if (!session) {
+		return apiError(c, 401, 'UNAUTHORIZED', 'Authentication required');
+	}
+
+	// Set userId for downstream handlers
+	c.set('userId', session.user.id);
+	await next();
+});
+
 // =============================================================================
 // DB context for /api/* routes
 // =============================================================================
@@ -228,6 +368,12 @@ app.all('/auth/*', async (c) => {
 app.get('/', (c) => c.json({ status: 'ok' }));
 
 // =============================================================================
+// Events ingest (telemetry)
+// =============================================================================
+
+app.route('/events', eventsRoutes);
+
+// =============================================================================
 // API routes
 // =============================================================================
 
@@ -238,6 +384,8 @@ const apiRoutes = app
 	.route('/api/batch', batchRoutes)
 	.route('/api/bucket', bucketRoutes)
 	.route('/api/candidate', candidateRoutes)
+	.route('/api/dashboard', dashboardRoutes)
+	.route('/api/device-tokens', deviceTokenRoutes)
 	.route('/api/export', exportRoutes)
 	.route('/api/import', importRoutes)
 	.route('/api', suggestionsRoutes)
