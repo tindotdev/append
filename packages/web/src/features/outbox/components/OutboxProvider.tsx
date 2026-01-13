@@ -431,6 +431,22 @@ export function OutboxProvider({ children }: OutboxProviderProps) {
 		lastAuthSessionKeyRef.current = authSessionKey;
 	}, [authSessionKey, refreshCounts, userId]);
 
+	// Prevent browser close when items are pending sync
+	useEffect(() => {
+		if (!isReady || counts.pending === 0) return;
+
+		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+			event.preventDefault();
+			event.returnValue = '';
+		};
+
+		window.addEventListener('beforeunload', handleBeforeUnload);
+
+		return () => {
+			window.removeEventListener('beforeunload', handleBeforeUnload);
+		};
+	}, [isReady, counts.pending]);
+
 	const enqueue = useCallback((options: { terms: string }) => {
 		const outbox = outboxRef.current;
 		if (!outbox) return Promise.reject(new Error('Outbox not initialized'));
