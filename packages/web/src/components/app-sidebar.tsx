@@ -11,6 +11,7 @@ import {
 	Plus,
 	Search,
 	Settings,
+	Shield,
 } from 'lucide-react';
 import * as React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -50,6 +51,7 @@ const NAV_ITEMS = [
 const UTILITY_ITEMS = [
 	{ to: '/import', label: 'Import', icon: FileDown, shortcut: 'G I' },
 	{ to: '/export', label: 'Export', icon: FileUp, shortcut: 'G E' },
+	{ to: '/privacy', label: 'Privacy', icon: Shield, shortcut: undefined },
 ] as const;
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {

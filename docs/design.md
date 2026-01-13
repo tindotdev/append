@@ -195,10 +195,11 @@ Guardrails (MVP):
   - Details: `{ max_events_scanned: 250000 }`
 - Timezones: `tz` must be a valid IANA timezone string (400 `VALIDATION_ERROR` if invalid).
 
-### Export (MVP “don’t die” requirement)
+### Export (MVP "don't die" requirement)
 
 - `GET /events/export?from=YYYY-MM-DD&to=YYYY-MM-DD&format=ndjson`
   - User-owned export of raw events (portable, append-only).
+  - Available in-app via the Export page UI (supports date range selection and multi-part downloads).
   - Date semantics (default): `from`/`to` are interpreted as **UTC dates inclusive**.
   - Ordering: stable chronological order by `(emitted_at, device_id, event_id)`.
   - Limit: maximum **100,000** events per request (default; configurable server-side).
@@ -287,7 +288,7 @@ Defaults for MVP:
 ## Current stage
 
 - M0 is complete (extension heartbeats ingest end-to-end).
-- Building M1 (dashboard read models, captures, export, privacy statement).
+- M1 in progress: raw events export with in-app UX, privacy statement shipped; dashboard read models and captures remain.
 
 ### M0 — Instrumentation skeleton (extension + ingest)
 
@@ -314,8 +315,8 @@ Defaults for MVP:
 - [x] Chrome extension emits heartbeats reliably (foreground use).
 - [x] `/events/ingest` stores real events and dedupes by `(user_id, device_id, event_id)`.
 - [ ] Today/Week/Heatmap dashboards show real totals and breakdowns.
-- [ ] `/events/export` works and is documented in-app.
-- [ ] Privacy statement exists and matches actual collection.
+- [x] `/events/export` works and is documented in-app.
+- [x] Privacy statement exists and matches actual collection.
 
 ## Appendix — Legacy / optional enrichment: Term + TermSense
 

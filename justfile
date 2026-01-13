@@ -21,10 +21,8 @@ sync-secrets:
 # First-time setup: install deps, sync secrets, run migrations
 # Run this on a new machine after cloning the repo
 setup: sync-secrets
-  @echo "Installing dependencies..."
-  pnpm install
-  @echo "Running database migrations..."
-  pnpm --filter @append/api db:migrate:local
+  @echo "Installing dependencies and running migrations..."
+  pnpm setup:deps
   @echo "✓ Setup complete! Run 'just dev' to start development servers"
 
 # Start development servers (auto-syncs secrets if .dev.vars is missing)
@@ -35,4 +33,4 @@ dev:
     echo "⚠️  .dev.vars not found, syncing secrets from Doppler..."
     just sync-secrets
   fi
-  doppler run -- pnpm dev
+  doppler run -- pnpm dev:nosecrets

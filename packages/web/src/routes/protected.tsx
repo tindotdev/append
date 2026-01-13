@@ -6,6 +6,7 @@ import { BucketFeedPage } from '@/features/bucket';
 import { DashboardPage } from '@/features/dashboard';
 import { ExportPage } from '@/features/export';
 import { ImportPage } from '@/features/import';
+import { PrivacyPage } from '@/features/privacy';
 import { SettingsPage } from '@/features/settings';
 
 export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: TParentRoute) {
@@ -85,6 +86,12 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 		component: DashboardPage,
 	});
 
+	const privacyRoute = createRoute({
+		getParentRoute: () => protectedRoute,
+		path: '/privacy',
+		component: PrivacyPage,
+	});
+
 	const protectedRouteWithChildren = protectedRoute.addChildren([
 		indexRoute,
 		batchListRoute,
@@ -96,6 +103,7 @@ export function createProtectedRoutes<TParentRoute extends AnyRoute>(rootRoute: 
 		searchRoute,
 		settingsRoute,
 		dashboardRoute,
+		privacyRoute,
 	]);
 
 	return { protectedRoute: protectedRouteWithChildren };
