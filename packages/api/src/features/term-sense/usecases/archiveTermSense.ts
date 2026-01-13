@@ -187,6 +187,7 @@ export async function archiveTermSense(
 
 		if (replacementId !== null) {
 			// Update term's primarySenseId (conditional on primarySenseId to prevent race)
+			// Also verify the replacement sense is still active (not archived by a concurrent request)
 			// Note: term version was already verified in step 4, so this should not fail
 			const termUpdateResult = await db
 				.update(term)
@@ -194,7 +195,9 @@ export async function archiveTermSense(
 					primarySenseId: replacementId,
 					version: sql`${term.version} + 1`,
 				})
-				.where(sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId} AND ${term.version} = ${termRow.version}`)
+				.where(
+					sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId} AND ${term.version} = ${termRow.version} AND EXISTS (SELECT 1 FROM ${termSense} WHERE ${termSense.id} = ${replacementId} AND ${termSense.archivedAt} IS NULL)`
+				)
 				.returning({
 					id: term.id,
 					primarySenseId: term.primarySenseId,
@@ -202,18 +205,114 @@ export async function archiveTermSense(
 					archivedAt: term.archivedAt,
 				});
 
-			// This should not happen due to step 4 guard, but handle defensively
+			// If update failed, the replacement sense may have been archived concurrently
+			// Fall back to finding another replacement or archiving the term
 			if (termUpdateResult.length === 0) {
-				throw new Error('Unexpected: term update failed despite version guard');
-			}
+				// Re-fetch to determine why: term changed or replacement sense archived?
+				const currentTerm = await db.query.term.findFirst({
+					where: eq(term.id, termRow.id),
+					columns: { version: true, primarySenseId: true },
+				});
 
-			const updatedTerm = termUpdateResult[0];
-			termResult = {
-				id: updatedTerm.id,
-				primarySenseId: updatedTerm.primarySenseId,
-				version: updatedTerm.version,
-				archivedAt: updatedTerm.archivedAt?.getTime() ?? null,
-			};
+				if (!currentTerm || currentTerm.version !== termRow.version || currentTerm.primarySenseId !== senseId) {
+					// Term was concurrently modified - this is unexpected due to step 4 guard
+					throw new Error('Unexpected: term update failed despite version guard');
+				}
+
+				// Replacement sense was archived concurrently - retry finding another replacement
+				const newReplacementId = await findReplacementPrimarySense(db, termRow.id, senseId, senseRow.bucket);
+
+				if (newReplacementId !== null) {
+					// Try again with new replacement (recursive would be cleaner but keep it simple)
+					const retryResult = await db
+						.update(term)
+						.set({
+							primarySenseId: newReplacementId,
+							version: sql`${term.version} + 1`,
+						})
+						.where(
+							sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId} AND ${term.version} = ${termRow.version} AND EXISTS (SELECT 1 FROM ${termSense} WHERE ${termSense.id} = ${newReplacementId} AND ${termSense.archivedAt} IS NULL)`
+						)
+						.returning({
+							id: term.id,
+							primarySenseId: term.primarySenseId,
+							version: term.version,
+							archivedAt: term.archivedAt,
+						});
+
+					if (retryResult.length > 0) {
+						const updatedTerm = retryResult[0];
+						termResult = {
+							id: updatedTerm.id,
+							primarySenseId: updatedTerm.primarySenseId,
+							version: updatedTerm.version,
+							archivedAt: updatedTerm.archivedAt?.getTime() ?? null,
+						};
+					} else {
+						// Still failing - archive the term as fallback
+						const archiveResult = await db
+							.update(term)
+							.set({
+								archivedAt: now,
+								version: sql`${term.version} + 1`,
+							})
+							.where(sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId} AND ${term.version} = ${termRow.version}`)
+							.returning({
+								id: term.id,
+								primarySenseId: term.primarySenseId,
+								version: term.version,
+								archivedAt: term.archivedAt,
+							});
+
+						if (archiveResult.length === 0) {
+							throw new Error('Unexpected: term archive failed despite version guard');
+						}
+
+						const archivedTerm = archiveResult[0];
+						termResult = {
+							id: archivedTerm.id,
+							primarySenseId: archivedTerm.primarySenseId,
+							version: archivedTerm.version,
+							archivedAt: archivedTerm.archivedAt?.getTime() ?? null,
+						};
+					}
+				} else {
+					// No more replacements - archive the term
+					const archiveResult = await db
+						.update(term)
+						.set({
+							archivedAt: now,
+							version: sql`${term.version} + 1`,
+						})
+						.where(sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId} AND ${term.version} = ${termRow.version}`)
+						.returning({
+							id: term.id,
+							primarySenseId: term.primarySenseId,
+							version: term.version,
+							archivedAt: term.archivedAt,
+						});
+
+					if (archiveResult.length === 0) {
+						throw new Error('Unexpected: term archive failed despite version guard');
+					}
+
+					const archivedTerm = archiveResult[0];
+					termResult = {
+						id: archivedTerm.id,
+						primarySenseId: archivedTerm.primarySenseId,
+						version: archivedTerm.version,
+						archivedAt: archivedTerm.archivedAt?.getTime() ?? null,
+					};
+				}
+			} else {
+				const updatedTerm = termUpdateResult[0];
+				termResult = {
+					id: updatedTerm.id,
+					primarySenseId: updatedTerm.primarySenseId,
+					version: updatedTerm.version,
+					archivedAt: updatedTerm.archivedAt?.getTime() ?? null,
+				};
+			}
 		} else {
 			// No replacement exists - archive the term too
 			// Note: term version was already verified in step 4, so this should not fail
