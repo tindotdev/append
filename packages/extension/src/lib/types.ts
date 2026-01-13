@@ -24,7 +24,23 @@ export type ArtifactActiveEvent = {
 	};
 };
 
-export type TelemetryEvent = ArtifactActiveEvent;
+export type CaptureType = 'term' | 'question';
+
+export type CaptureEvent = {
+	schema_version: 1;
+	event_id: string;
+	device_id: string;
+	emitted_at: number;
+	type: 'capture';
+	artifact?: Artifact;
+	payload: {
+		capture_type: CaptureType;
+		label: string;
+		note?: string;
+	};
+};
+
+export type TelemetryEvent = ArtifactActiveEvent | CaptureEvent;
 
 export type IngestResponse =
 	| {

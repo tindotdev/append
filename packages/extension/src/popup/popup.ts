@@ -1,7 +1,9 @@
 import './popup.css';
+import { createCaptureEvent } from '../lib/capture';
 import { ensureDeviceId } from '../lib/device';
-import { clearDeadletter, type DeadletterItem, flushOutbox, getDeadletterItems, getOutboxCount } from '../lib/outbox';
+import { clearDeadletter, type DeadletterItem, enqueueEvent, flushOutbox, getDeadletterItems, getOutboxCount } from '../lib/outbox';
 import { getSettings, setSettings } from '../lib/settings';
+import type { CaptureType } from '../lib/types';
 
 function formatDeadletterItem(item: DeadletterItem): string {
 	const date = new Date(item.at_ms).toLocaleString();
@@ -35,6 +37,30 @@ async function main() {
 			</section>
 
 			<section class="section">
+				<h3 class="section-title">Quick Capture</h3>
+				<label class="field">
+					<span>Type</span>
+					<select id="captureType">
+						<option value="term">Term</option>
+						<option value="question">Question</option>
+					</select>
+				</label>
+				<label class="field">
+					<span>Label</span>
+					<input id="captureLabel" type="text" placeholder="e.g. idempotency key" />
+				</label>
+				<label class="field">
+					<span>Note (optional)</span>
+					<textarea id="captureNote" rows="2" placeholder="Short context to help future-you"></textarea>
+				</label>
+				<div class="actions">
+					<button id="captureBtn" class="primary">Capture</button>
+				</div>
+				<p id="captureStatus" class="status muted"></p>
+			</section>
+
+			<section class="section">
+				<h3 class="section-title">Settings</h3>
 				<label class="field">
 					<span>API base URL</span>
 					<input id="apiBaseUrl" type="url" placeholder="http://localhost:8787" />
@@ -127,6 +153,81 @@ async function main() {
 		setStatus('Flush complete (check Service Worker logs).');
 		// Refresh dead letter display after flush
 		await refreshDeadletter();
+	});
+
+	// Capture form
+	const captureTypeSelect = root.querySelector<HTMLSelectElement>('#captureType');
+	const captureLabelInput = root.querySelector<HTMLInputElement>('#captureLabel');
+	const captureNoteInput = root.querySelector<HTMLTextAreaElement>('#captureNote');
+	const captureBtn = root.querySelector<HTMLButtonElement>('#captureBtn');
+	const captureStatusEl = root.querySelector<HTMLParagraphElement>('#captureStatus');
+
+	const setCaptureStatus = (text: string) => {
+		if (captureStatusEl) captureStatusEl.textContent = text;
+	};
+
+	// Helper to update outbox count display
+	async function updateOutboxCount() {
+		const newCount = await getOutboxCount();
+		if (outboxCountEl) {
+			outboxCountEl.textContent = `${newCount} event${newCount !== 1 ? 's' : ''}`;
+			if (newCount >= 1000) {
+				outboxCountEl.style.color = '#dc2626';
+				outboxCountEl.style.fontWeight = 'bold';
+			} else if (newCount >= 100) {
+				outboxCountEl.style.color = '#f59e0b';
+				outboxCountEl.style.fontWeight = '';
+			} else {
+				outboxCountEl.style.color = '';
+				outboxCountEl.style.fontWeight = '';
+			}
+		}
+	}
+
+	captureBtn?.addEventListener('click', async () => {
+		const label = captureLabelInput?.value?.trim();
+		if (!label) {
+			setCaptureStatus('Label is required.');
+			return;
+		}
+
+		// Get the current tab URL
+		const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+		const url = tab?.url;
+		if (!url) {
+			setCaptureStatus('No active tab URL found.');
+			return;
+		}
+
+		const captureType = (captureTypeSelect?.value ?? 'term') as CaptureType;
+		const note = captureNoteInput?.value?.trim();
+
+		const event = await createCaptureEvent({
+			url,
+			capture_type: captureType,
+			label,
+			note: note || undefined,
+		});
+
+		if (!event) {
+			setCaptureStatus('Failed to create capture (URL may not be supported).');
+			return;
+		}
+
+		await enqueueEvent(event);
+		await updateOutboxCount();
+
+		// Clear form
+		if (captureLabelInput) captureLabelInput.value = '';
+		if (captureNoteInput) captureNoteInput.value = '';
+
+		setCaptureStatus(`Captured "${label}" — flushing...`);
+
+		// Auto-flush after capture
+		await flushOutbox();
+		await updateOutboxCount();
+
+		setCaptureStatus(`Captured "${label}" ✓`);
 	});
 
 	// Dead letter queue display

@@ -104,6 +104,10 @@ Explicitly assigns a topic to an artifact (or to a capture) for a time range.
   - `scope`: `artifact | capture | time_range`
   - `starts_at?`, `ends_at?`
 
+Implementation note (current):
+
+- Server read-model queries currently consider only the **most recent 1,000** `topic_override` events per user (older overrides may be ignored).
+
 ### `aha_candidate` — optional (MVP-compatible, not required to ship)
 
 Marks a moment that looks like an “aha” (user-initiated or heuristic).
@@ -174,21 +178,33 @@ Precedence (highest → lowest):
     - event-level dedupe is canonical: ignore duplicates by `(user_id, device_id, event_id)`
     - `client_batch_id` is optional "batch retry sugar" (not required if event-level dedupe is correct)
   - Rate limiting: per-user batch limiting via Cloudflare Rate Limiting API (100 batches/min); goal is abuse prevention, not precise metering.
-  - Response: `{ accepted, rejected, server_time_ms }`
+  - Response: `{ validated, inserted, rejected, server_time_ms }`
 
 ### Dashboard queries
 
-- `GET /dashboard/today?tz=Asia/Bangkok` (example; if omitted, default to the user’s configured timezone)
+- `GET /api/dashboard/today?tz=Asia/Bangkok` (example; if omitted, default to the user’s configured timezone)
   - Returns: today minutes, 7-day average, streak, today breakdown (topics + sources), today captures, top topic/source.
-- `GET /dashboard/week?start=YYYY-MM-DD&tz=...`
+- `GET /api/dashboard/week?start=YYYY-MM-DD&tz=...`
   - Returns: 7-day series + per-topic/per-source totals + top cards.
-- `GET /dashboard/heatmap?year=YYYY&tz=...`
+- `GET /api/dashboard/heatmap?year=YYYY&tz=...`
   - Returns: per-day minutes for the year + stats (total, avg/day, active days).
+
+Guardrails (MVP):
+
+- Range limits: endpoints may return **413** with error code `RANGE_TOO_LARGE` if the requested range would scan too many events.
+  - Details: `{ max_events_scanned: 250000 }`
+- Timezones: `tz` must be a valid IANA timezone string (400 `VALIDATION_ERROR` if invalid).
 
 ### Export (MVP “don’t die” requirement)
 
 - `GET /events/export?from=YYYY-MM-DD&to=YYYY-MM-DD&format=ndjson`
   - User-owned export of raw events (portable, append-only).
+  - Date semantics (default): `from`/`to` are interpreted as **UTC dates inclusive**.
+  - Ordering: stable chronological order by `(emitted_at, device_id, event_id)`.
+  - Limit: maximum **100,000** events per request (default; configurable server-side).
+    - If more data exists, responds with **206 Partial Content** and sets:
+      - `X-Export-Truncated: true`
+      - `X-Export-Cursor: <cursor>` (use as `cursor=...` to resume from the last exported event)
 
 ## Data model (events-first; Cloudflare D1)
 
@@ -236,7 +252,7 @@ Key cards (MVP):
 UX prototyping note:
 
 - The current web UX prototype includes a local telemetry simulator to drive these dashboards without any backend/API dependencies.
-- Production replaces this with the real `/dashboard/*` queries backed by ingested events.
+- Production replaces this with the real `/api/dashboard/*` queries backed by ingested events.
 
 ## Browser extension (emitter)
 

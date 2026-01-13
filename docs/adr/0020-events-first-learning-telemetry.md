@@ -27,7 +27,7 @@ Make the product core **events-first**:
   - optional: `topic_override`, `aha_candidate`
 - MVP API surface is centered on:
   - ingest: `POST /events/ingest`
-  - read models: `GET /dashboard/today`, `/dashboard/week`, `/dashboard/heatmap`
+  - read models: `GET /api/dashboard/today`, `/api/dashboard/week`, `/api/dashboard/heatmap`
   - portability: `GET /events/export`
 - Topics are a small fixed set for MVP (foundations/backend/frontend/dx-tooling/deep-concepts), with a pipeline that can evolve from rules → heuristics → async AI → manual overrides.
 - Term/TermSense becomes **legacy / optional enrichment** and must not block the telemetry MVP.
@@ -54,4 +54,3 @@ This decision supersedes (telemetry MVP no longer depends on these designs):
 - Continue term-first: rejects the dashboard-first value proposition and delays “always-on” telemetry.
 - Capture-only without heartbeats: too sparse to power reliable rollups and streaks.
 - Store full URLs by default: higher privacy risk; default should be host + URL hash with explicit opt-in for full URLs.
-

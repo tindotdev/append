@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
+import { useApiToggle, useDashboardToday, useDashboardWeek } from '../api/dashboard';
 import { useTelemetrySnapshot } from '../telemetry/hooks';
 import { computeDashboardData } from '../telemetry/rollups';
+import { addDays, getTodayKey } from '../telemetry/time';
 import type {
 	StreakData,
 	TodayBreakdownData,
@@ -39,84 +41,169 @@ const EMPTY_TOP_TOPIC: TopTopicData = { topic: '', minutes: 0, weeklyTotalMinute
 
 export function useTodayHeroData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
+	const apiQuery = useDashboardToday(timezone);
 
 	const data = useMemo<TodayHeroData>(() => {
-		if (forceLoading || !isReady || forceEmpty) return EMPTY_TODAY_HERO;
-		return getComputed(revision, events, timezone).todayHero;
-	}, [events, forceEmpty, forceLoading, isReady, revision, timezone]);
+		if (forceLoading) return EMPTY_TODAY_HERO;
+		if (forceEmpty) return EMPTY_TODAY_HERO;
 
-	return { data, isLoading: forceLoading || !isReady, isEmpty: forceEmpty || data.todayMinutes === 0 };
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.todayHero : EMPTY_TODAY_HERO;
+		}
+
+		// Not in API mode, use local computation
+		if (!isReady) return EMPTY_TODAY_HERO;
+		return getComputed(revision, events, timezone).todayHero;
+	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
+
+	const isLoading = forceLoading || (useApi ? apiQuery.isLoading : !isReady);
+	return { data, isLoading, isEmpty: forceEmpty || data.todayMinutes === 0 };
 }
 
 export function useTodayBreakdownData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
+	const apiQuery = useDashboardToday(timezone);
 
 	const data = useMemo<TodayBreakdownData>(() => {
-		if (forceLoading || !isReady || forceEmpty) return EMPTY_BREAKDOWN;
-		return getComputed(revision, events, timezone).todayBreakdown;
-	}, [events, forceEmpty, forceLoading, isReady, revision, timezone]);
+		if (forceLoading) return EMPTY_BREAKDOWN;
+		if (forceEmpty) return EMPTY_BREAKDOWN;
 
-	return { data, isLoading: forceLoading || !isReady, isEmpty: forceEmpty || data.topics.length === 0 };
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.todayBreakdown : EMPTY_BREAKDOWN;
+		}
+
+		// Not in API mode, use local computation
+		if (!isReady) return EMPTY_BREAKDOWN;
+		return getComputed(revision, events, timezone).todayBreakdown;
+	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
+
+	const isLoading = forceLoading || (useApi ? apiQuery.isLoading : !isReady);
+	return { data, isLoading, isEmpty: forceEmpty || data.topics.length === 0 };
 }
 
 export function useWeekBarChartData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
+	const weekStart = addDays(getTodayKey(timezone), -6);
+	const apiQuery = useDashboardWeek(weekStart, timezone);
 
 	const data = useMemo<WeekBarChartData>(() => {
-		if (forceLoading || !isReady || forceEmpty) return EMPTY_WEEK_DATA;
-		return getComputed(revision, events, timezone).week;
-	}, [events, forceEmpty, forceLoading, isReady, revision, timezone]);
+		if (forceLoading) return EMPTY_WEEK_DATA;
+		if (forceEmpty) return EMPTY_WEEK_DATA;
 
-	return { data, isLoading: forceLoading || !isReady, isEmpty: forceEmpty || data.days.length === 0 };
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.week : EMPTY_WEEK_DATA;
+		}
+
+		// Not in API mode, use local computation
+		if (!isReady) return EMPTY_WEEK_DATA;
+		return getComputed(revision, events, timezone).week;
+	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
+
+	const isLoading = forceLoading || (useApi ? apiQuery.isLoading : !isReady);
+	return { data, isLoading, isEmpty: forceEmpty || data.days.length === 0 };
 }
 
 export function useTodayCapturesData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
+	const apiQuery = useDashboardToday(timezone);
 
 	const data = useMemo<TodayCapturesData>(() => {
-		if (forceLoading || !isReady || forceEmpty) return EMPTY_CAPTURES;
-		return getComputed(revision, events, timezone).captures;
-	}, [events, forceEmpty, forceLoading, isReady, revision, timezone]);
+		if (forceLoading) return EMPTY_CAPTURES;
+		if (forceEmpty) return EMPTY_CAPTURES;
 
-	return { data, isLoading: forceLoading || !isReady, isEmpty: forceEmpty || data.count === 0 };
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.todayCaptures : EMPTY_CAPTURES;
+		}
+
+		// Not in API mode, use local computation
+		if (!isReady) return EMPTY_CAPTURES;
+		return getComputed(revision, events, timezone).captures;
+	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
+
+	const isLoading = forceLoading || (useApi ? apiQuery.isLoading : !isReady);
+	return { data, isLoading, isEmpty: forceEmpty || data.count === 0 };
 }
 
 export function useStreakData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
+	const apiQuery = useDashboardToday(timezone);
 
 	const data = useMemo<StreakData>(() => {
-		if (forceLoading || !isReady || forceEmpty) return EMPTY_STREAK;
-		return getComputed(revision, events, timezone).streak;
-	}, [events, forceEmpty, forceLoading, isReady, revision, timezone]);
+		if (forceLoading) return EMPTY_STREAK;
+		if (forceEmpty) return EMPTY_STREAK;
 
-	return { data, isLoading: forceLoading || !isReady, isEmpty: forceEmpty || data.currentStreak === 0 };
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.streak : EMPTY_STREAK;
+		}
+
+		// Not in API mode, use local computation
+		if (!isReady) return EMPTY_STREAK;
+		return getComputed(revision, events, timezone).streak;
+	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
+
+	const isLoading = forceLoading || (useApi ? apiQuery.isLoading : !isReady);
+	return { data, isLoading, isEmpty: forceEmpty || data.currentStreak === 0 };
 }
 
 export function useTopSourceData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
+	const apiQuery = useDashboardToday(timezone);
 
 	const data = useMemo<TopSourceData>(() => {
-		if (forceLoading || !isReady || forceEmpty) return EMPTY_TOP_SOURCE;
-		return getComputed(revision, events, timezone).topSource;
-	}, [events, forceEmpty, forceLoading, isReady, revision, timezone]);
+		if (forceLoading) return EMPTY_TOP_SOURCE;
+		if (forceEmpty) return EMPTY_TOP_SOURCE;
 
-	return { data, isLoading: forceLoading || !isReady, isEmpty: forceEmpty || !data.source };
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.topSource : EMPTY_TOP_SOURCE;
+		}
+
+		// Not in API mode, use local computation
+		if (!isReady) return EMPTY_TOP_SOURCE;
+		return getComputed(revision, events, timezone).topSource;
+	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
+
+	const isLoading = forceLoading || (useApi ? apiQuery.isLoading : !isReady);
+	return { data, isLoading, isEmpty: forceEmpty || !data.source };
 }
 
 export function useTopTopicData(options: UseDashboardDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
+	const apiQuery = useDashboardToday(timezone);
 
 	const data = useMemo<TopTopicData>(() => {
-		if (forceLoading || !isReady || forceEmpty) return EMPTY_TOP_TOPIC;
-		return getComputed(revision, events, timezone).topTopic;
-	}, [events, forceEmpty, forceLoading, isReady, revision, timezone]);
+		if (forceLoading) return EMPTY_TOP_TOPIC;
+		if (forceEmpty) return EMPTY_TOP_TOPIC;
 
-	return { data, isLoading: forceLoading || !isReady, isEmpty: forceEmpty || !data.topic };
+		// In API mode, only use API data (never fall back to simulator)
+		if (useApi) {
+			return apiQuery.data ? apiQuery.data.topTopic : EMPTY_TOP_TOPIC;
+		}
+
+		// Not in API mode, use local computation
+		if (!isReady) return EMPTY_TOP_TOPIC;
+		return getComputed(revision, events, timezone).topTopic;
+	}, [apiQuery.data, events, forceEmpty, forceLoading, isReady, revision, timezone, useApi]);
+
+	const isLoading = forceLoading || (useApi ? apiQuery.isLoading : !isReady);
+	return { data, isLoading, isEmpty: forceEmpty || !data.topic };
 }

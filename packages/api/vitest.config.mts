@@ -16,6 +16,8 @@ export default defineWorkersConfig({
 				miniflare: {
 					bindings: {
 						...getCommonTestBindings(migrations),
+						// Keep export truncation tests fast by lowering the max row cap in test only.
+						EVENTS_EXPORT_MAX_TOTAL_ROWS: '1200',
 						// Extension allowlist (ADR 0021) - explicitly empty to test secure-by-default behavior
 						ALLOWED_EXTENSION_IDS: '',
 					},

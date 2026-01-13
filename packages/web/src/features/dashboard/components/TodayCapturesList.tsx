@@ -1,4 +1,5 @@
 import { Bookmark } from 'lucide-react';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +7,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTodayCapturesData } from '../hooks/use-dashboard-data';
 import type { CaptureItem, CaptureType } from '../types';
+import { CapturesDrawer } from './CapturesDrawer';
 
 const CAPTURE_TYPE_LABELS: Record<CaptureType, string> = {
 	term: 'term',
@@ -67,6 +69,7 @@ function TodayCapturesListSkeleton() {
 }
 
 export function TodayCapturesList() {
+	const [drawerOpen, setDrawerOpen] = useState(false);
 	const { data, isLoading, isEmpty } = useTodayCapturesData();
 
 	if (isLoading) {
@@ -92,24 +95,41 @@ export function TodayCapturesList() {
 		);
 	}
 
-	const displayItems = data.items.slice(0, 5);
+	const displayItems = data.items.slice(0, 3);
+	const hasMore = data.items.length > 3;
 
 	return (
-		<Card className="@container/card gap-2 py-4">
-			<CardHeader className="gap-1 px-4">
-				<CardDescription className="text-xs">Captures today</CardDescription>
-				<CardTitle className="text-lg tabular-nums">{data.count}</CardTitle>
-				<CardAction>
-					<Bookmark className="size-4 text-zinc-500" />
-				</CardAction>
-			</CardHeader>
-			<CardContent className="px-4">
-				<div className="space-y-0.5">
-					{displayItems.map((item) => (
-						<CaptureListItem key={item.id} item={item} />
-					))}
-				</div>
-			</CardContent>
-		</Card>
+		<>
+			<Card className="@container/card gap-2 py-4">
+				<CardHeader className="gap-1 px-4">
+					<CardDescription className="text-xs">Captures today</CardDescription>
+					<CardTitle className="text-lg tabular-nums">{data.count}</CardTitle>
+					<CardAction>
+						<Bookmark className="size-4 text-zinc-500" />
+					</CardAction>
+				</CardHeader>
+				<CardContent className="px-4">
+					<div className="space-y-0.5">
+						{displayItems.map((item) => (
+							<CaptureListItem key={item.id} item={item} />
+						))}
+					</div>
+
+					{/* View all button */}
+					{hasMore && (
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => setDrawerOpen(true)}
+							className="mt-2 h-auto px-0 text-[12px] text-zinc-500 hover:bg-transparent hover:text-zinc-300"
+						>
+							+{data.count - 3} more · View all →
+						</Button>
+					)}
+				</CardContent>
+			</Card>
+
+			<CapturesDrawer open={drawerOpen} onOpenChange={setDrawerOpen} items={data.items} count={data.count} />
+		</>
 	);
 }
