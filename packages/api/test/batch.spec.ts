@@ -1595,3 +1595,522 @@ describe('DELETE /api/batch/:id', () => {
 		expect(body.error.code).toBe('NOT_FOUND');
 	});
 });
+
+// =============================================================================
+// POST /api/batch/bulk/accept tests
+// =============================================================================
+
+describe('POST /api/batch/bulk/accept', () => {
+	/**
+	 * Helper to create a batch with suggested candidates (ready for accept)
+	 */
+	async function createSuggestedBatch(termCount: number = 5): Promise<string> {
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms: generateTerms(termCount),
+				clientRequestId: generateUUID(),
+			}),
+		});
+		expect(createRes.status).toBe(201);
+		const { id: batchId } = (await createRes.json()) as any;
+
+		// Generate suggestions
+		const suggestRes = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
+			method: 'POST',
+			headers: { cookie: authCookie },
+		});
+		expect(suggestRes.status).toBe(200);
+		await suggestRes.text(); // Consume SSE stream
+
+		return batchId;
+	}
+
+	it('returns 401 when unauthenticated', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/accept', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ batchIds: [generateUUID()] }),
+		});
+
+		expect(res.status).toBe(401);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('UNAUTHORIZED');
+	});
+
+	it('returns 400 for empty batchIds array', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/accept', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ batchIds: [] }),
+		});
+
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+	});
+
+	it('returns 400 for too many batchIds (> 50)', async () => {
+		const batchIds = Array.from({ length: 51 }, () => generateUUID());
+
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/accept', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ batchIds }),
+		});
+
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+	});
+
+	it('returns 200 with successful bulk accept', async () => {
+		// Create 3 suggested batches
+		const batchId1 = await createSuggestedBatch(3);
+		const batchId2 = await createSuggestedBatch(4);
+		const batchId3 = await createSuggestedBatch(5);
+
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/accept', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ batchIds: [batchId1, batchId2, batchId3] }),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		expect(body.successCount).toBe(3);
+		expect(body.failureCount).toBe(0);
+		expect(body.results).toHaveLength(3);
+
+		// All should be successful
+		for (const result of body.results) {
+			expect(result.success).toBe(true);
+			expect(result.acceptedCount).toBeGreaterThan(0);
+		}
+
+		// Verify batches are now accepted in DB
+		for (const batchId of [batchId1, batchId2, batchId3]) {
+			const batchRow = await (db.query as any).batch.findFirst({
+				where: eq(batch.id, batchId),
+			});
+			expect(batchRow.status).toBe('accepted');
+		}
+	});
+
+	it('handles partial failures (some batches not found)', async () => {
+		const batchId1 = await createSuggestedBatch(3);
+		const nonExistentBatchId = generateUUID();
+
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/accept', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ batchIds: [batchId1, nonExistentBatchId] }),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		expect(body.successCount).toBe(1);
+		expect(body.failureCount).toBe(1);
+		expect(body.results).toHaveLength(2);
+
+		// Find the successful and failed results
+		const successResult = body.results.find((r: any) => r.batchId === batchId1);
+		const failResult = body.results.find((r: any) => r.batchId === nonExistentBatchId);
+
+		expect(successResult.success).toBe(true);
+		expect(failResult.success).toBe(false);
+		expect(failResult.error.code).toBe('NOT_FOUND');
+	});
+
+	it('handles partial failures (some batches not ready)', async () => {
+		// Create one suggested batch and one unsugggested batch
+		const suggestedBatchId = await createSuggestedBatch(3);
+
+		// Create unsugggested batch
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms: generateTerms(3),
+				clientRequestId: generateUUID(),
+			}),
+		});
+		expect(createRes.status).toBe(201);
+		const { id: unsuggestedBatchId } = (await createRes.json()) as any;
+
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/accept', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ batchIds: [suggestedBatchId, unsuggestedBatchId] }),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		expect(body.successCount).toBe(1);
+		expect(body.failureCount).toBe(1);
+
+		const successResult = body.results.find((r: any) => r.batchId === suggestedBatchId);
+		const failResult = body.results.find((r: any) => r.batchId === unsuggestedBatchId);
+
+		expect(successResult.success).toBe(true);
+		expect(failResult.success).toBe(false);
+		expect(failResult.error.code).toBe('MISSING_EFFECTIVE_FIELDS');
+	});
+
+	it('fails all for non-owned batches', async () => {
+		// Create a foreign user with batches
+		const foreignUserId = generateUUID();
+		const foreignBatchId = generateUUID();
+		const now = new Date();
+
+		await db.insert(user).values({
+			id: foreignUserId,
+			name: 'Foreign User',
+			email: 'foreign-bulk-accept@example.com',
+			emailVerified: false,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		await db.insert(batch).values({
+			id: foreignBatchId,
+			userId: foreignUserId,
+			status: 'suggested',
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/accept', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ batchIds: [foreignBatchId] }),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		expect(body.successCount).toBe(0);
+		expect(body.failureCount).toBe(1);
+		expect(body.results[0].success).toBe(false);
+		expect(body.results[0].error.code).toBe('FORBIDDEN');
+
+		// Clean up
+		await db.delete(batch).where(eq(batch.id, foreignBatchId));
+		await db.delete(user).where(eq(user.id, foreignUserId));
+	});
+});
+
+// =============================================================================
+// POST /api/batch/bulk/delete tests
+// =============================================================================
+
+describe('POST /api/batch/bulk/delete', () => {
+	it('returns 401 when unauthenticated', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/delete', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ batchIds: [generateUUID()] }),
+		});
+
+		expect(res.status).toBe(401);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('UNAUTHORIZED');
+	});
+
+	it('returns 400 for empty batchIds array', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/delete', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ batchIds: [] }),
+		});
+
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+	});
+
+	it('returns 400 for too many batchIds (> 50)', async () => {
+		const batchIds = Array.from({ length: 51 }, () => generateUUID());
+
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/delete', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ batchIds }),
+		});
+
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('VALIDATION_ERROR');
+	});
+
+	it('returns 200 with successful bulk delete', async () => {
+		// Create 3 batches
+		const batchIds: string[] = [];
+		for (let i = 0; i < 3; i++) {
+			const createRes = await SELF.fetch('https://example.com/api/batch', {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json',
+					cookie: authCookie,
+				},
+				body: JSON.stringify({
+					terms: generateTerms(3),
+					clientRequestId: generateUUID(),
+				}),
+			});
+			expect(createRes.status).toBe(201);
+			const { id } = (await createRes.json()) as any;
+			batchIds.push(id);
+		}
+
+		// Verify batches exist
+		for (const batchId of batchIds) {
+			const batchRow = await (db.query as any).batch.findFirst({
+				where: eq(batch.id, batchId),
+			});
+			expect(batchRow).toBeDefined();
+		}
+
+		// Bulk delete
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/delete', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ batchIds }),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		expect(body.successCount).toBe(3);
+		expect(body.failureCount).toBe(0);
+		expect(body.results).toHaveLength(3);
+
+		// All should be successful
+		for (const result of body.results) {
+			expect(result.success).toBe(true);
+		}
+
+		// Verify batches are deleted from DB
+		for (const batchId of batchIds) {
+			const batchRow = await (db.query as any).batch.findFirst({
+				where: eq(batch.id, batchId),
+			});
+			expect(batchRow).toBeUndefined();
+		}
+	});
+
+	it('handles partial failures (some batches not found)', async () => {
+		// Create one batch
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms: generateTerms(3),
+				clientRequestId: generateUUID(),
+			}),
+		});
+		expect(createRes.status).toBe(201);
+		const { id: existingBatchId } = (await createRes.json()) as any;
+
+		const nonExistentBatchId = generateUUID();
+
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/delete', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ batchIds: [existingBatchId, nonExistentBatchId] }),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		expect(body.successCount).toBe(1);
+		expect(body.failureCount).toBe(1);
+
+		const successResult = body.results.find((r: any) => r.batchId === existingBatchId);
+		const failResult = body.results.find((r: any) => r.batchId === nonExistentBatchId);
+
+		expect(successResult.success).toBe(true);
+		expect(failResult.success).toBe(false);
+		expect(failResult.error.code).toBe('NOT_FOUND');
+
+		// Verify the existing batch was actually deleted
+		const batchRow = await (db.query as any).batch.findFirst({
+			where: eq(batch.id, existingBatchId),
+		});
+		expect(batchRow).toBeUndefined();
+	});
+
+	it('fails all for non-owned batches', async () => {
+		// Create a foreign user with a batch
+		const foreignUserId = generateUUID();
+		const foreignBatchId = generateUUID();
+		const now = new Date();
+
+		await db.insert(user).values({
+			id: foreignUserId,
+			name: 'Foreign User',
+			email: 'foreign-bulk-delete@example.com',
+			emailVerified: false,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		await db.insert(batch).values({
+			id: foreignBatchId,
+			userId: foreignUserId,
+			status: 'captured',
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/delete', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({ batchIds: [foreignBatchId] }),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		expect(body.successCount).toBe(0);
+		expect(body.failureCount).toBe(1);
+		expect(body.results[0].success).toBe(false);
+		expect(body.results[0].error.code).toBe('FORBIDDEN');
+
+		// Verify batch still exists (wasn't deleted)
+		const batchRow = await (db.query as any).batch.findFirst({
+			where: eq(batch.id, foreignBatchId),
+		});
+		expect(batchRow).toBeDefined();
+
+		// Clean up
+		await db.delete(batch).where(eq(batch.id, foreignBatchId));
+		await db.delete(user).where(eq(user.id, foreignUserId));
+	});
+
+	it('handles mixed success and failure across multiple batches', async () => {
+		// Create 2 owned batches
+		const ownedBatchIds: string[] = [];
+		for (let i = 0; i < 2; i++) {
+			const createRes = await SELF.fetch('https://example.com/api/batch', {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json',
+					cookie: authCookie,
+				},
+				body: JSON.stringify({
+					terms: generateTerms(3),
+					clientRequestId: generateUUID(),
+				}),
+			});
+			expect(createRes.status).toBe(201);
+			const { id } = (await createRes.json()) as any;
+			ownedBatchIds.push(id);
+		}
+
+		// Create a foreign user with a batch
+		const foreignUserId = generateUUID();
+		const foreignBatchId = generateUUID();
+		const nonExistentBatchId = generateUUID();
+		const now = new Date();
+
+		await db.insert(user).values({
+			id: foreignUserId,
+			name: 'Foreign User',
+			email: 'foreign-bulk-mixed@example.com',
+			emailVerified: false,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		await db.insert(batch).values({
+			id: foreignBatchId,
+			userId: foreignUserId,
+			status: 'captured',
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		// Try to delete all: 2 owned + 1 foreign + 1 non-existent
+		const res = await SELF.fetch('https://example.com/api/batch/bulk/delete', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				batchIds: [...ownedBatchIds, foreignBatchId, nonExistentBatchId],
+			}),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+
+		expect(body.successCount).toBe(2); // Only owned batches succeed
+		expect(body.failureCount).toBe(2); // Foreign + non-existent fail
+
+		// Verify owned batches are deleted
+		for (const batchId of ownedBatchIds) {
+			const batchRow = await (db.query as any).batch.findFirst({
+				where: eq(batch.id, batchId),
+			});
+			expect(batchRow).toBeUndefined();
+		}
+
+		// Verify foreign batch still exists
+		const foreignBatchRow = await (db.query as any).batch.findFirst({
+			where: eq(batch.id, foreignBatchId),
+		});
+		expect(foreignBatchRow).toBeDefined();
+
+		// Clean up
+		await db.delete(batch).where(eq(batch.id, foreignBatchId));
+		await db.delete(user).where(eq(user.id, foreignUserId));
+	});
+});
