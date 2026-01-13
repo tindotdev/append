@@ -271,7 +271,8 @@ export function BucketFeedPage() {
 					expectedVersion: item.termVersion,
 				});
 				results.push({ termId: item.termId, version: result.term.version });
-			} catch {
+			} catch (error) {
+				console.error('Failed to archive term:', item.termId, error);
 				failedCount++;
 			}
 		}
@@ -357,7 +358,8 @@ export function BucketFeedPage() {
 					previousBucket: item.primarySense.bucket,
 					version: result.sense.version,
 				});
-			} catch {
+			} catch (error) {
+				console.error('Failed to move term sense:', item.primarySense.id, error);
 				failedCount++;
 			}
 		}
