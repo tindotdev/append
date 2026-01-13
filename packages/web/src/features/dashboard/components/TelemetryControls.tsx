@@ -73,6 +73,9 @@ export function TelemetryControls() {
 		setCaptureNote('');
 	};
 
+	// Hide entire component in production - simulator is dev-only
+	if (!DEV_MODE) return null;
+
 	return (
 		<Sheet>
 			<SheetTrigger asChild>
@@ -80,15 +83,15 @@ export function TelemetryControls() {
 					variant="outline"
 					size="icon"
 					className="fixed bottom-4 right-4 z-40 size-9 rounded-full border-zinc-800 bg-zinc-950/80 shadow-sm backdrop-blur-sm hover:bg-zinc-900"
-					title="Open telemetry controls"
+					title="Open telemetry controls (dev only)"
 				>
 					<FlaskConical className="size-4" />
 				</Button>
 			</SheetTrigger>
 			<SheetContent className="w-full overflow-y-auto sm:max-w-md">
 				<SheetHeader>
-					<SheetTitle>Telemetry Controls</SheetTitle>
-					<SheetDescription>Local simulator for driving the dashboard with event data</SheetDescription>
+					<SheetTitle>Telemetry Controls (Dev Only)</SheetTitle>
+					<SheetDescription>Local simulator for driving the dashboard with event data. Production uses the API.</SheetDescription>
 				</SheetHeader>
 
 				<div className="mt-6 flex flex-col gap-6 px-4 pb-6">
@@ -209,7 +212,7 @@ export function TelemetryControls() {
 								<div className="flex flex-col gap-2">
 									<Button variant="outline" onClick={() => exportEventsNdjson()} className="w-full justify-start">
 										<Download className="mr-2 size-4" />
-										Export events (ndjson)
+										Export simulated events (ndjson)
 									</Button>
 									<Button
 										variant="outline"

@@ -1,4 +1,4 @@
-# ADR 0020 — Term archival + bulk actions (delete/move)
+# ADR 0023 — Term archival + bulk actions (delete/move)
 
 Status: Accepted  
 Date: 2026-01-05

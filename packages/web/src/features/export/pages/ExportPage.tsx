@@ -1,7 +1,14 @@
 import { BUCKET_TITLES, BUCKETS, type Bucket } from '@append/contracts/types';
+import { Link } from '@tanstack/react-router';
+import { Download, Minus, Shield } from 'lucide-react';
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type DownloadResult, downloadBucketExport } from '../api/download-export';
+import { BucketDetailDrawer } from '../components/BucketDetailDrawer';
 import { ExportHistory } from '../components/ExportHistory';
+import { RawEventsExport } from '../components/RawEventsExport';
 
 type BucketResult = DownloadResult | null;
 
@@ -22,6 +29,7 @@ const initialState: ExportState = {
 
 export function ExportPage() {
 	const [state, setState] = useState<ExportState>(initialState);
+	const [selectedBucket, setSelectedBucket] = useState<Bucket | null>(null);
 
 	const downloadSingle = async (bucket: Bucket) => {
 		setState((prev) => ({
@@ -76,92 +84,134 @@ export function ExportPage() {
 	const failureCount = Object.values(state.results).filter((r) => r && !r.success).length;
 
 	return (
-		<div className="max-w-2xl">
-			<h2 className="text-xl font-semibold">Export</h2>
-			<p className="text-sm text-zinc-500 mt-1">Download your terms as markdown files, one per bucket.</p>
-
-			{/* Download All button */}
-			<div className="mt-6">
-				<button
-					type="button"
-					onClick={downloadAll}
-					disabled={state.isDownloading}
-					className="w-full px-4 py-3 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-				>
-					{state.isDownloading && state.currentBucket === null ? (
-						<>
-							<span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-							Starting download...
-						</>
-					) : state.isDownloading ? (
-						<>
-							<span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-							Downloading {BUCKET_TITLES[state.currentBucket as keyof typeof BUCKET_TITLES]}...
-						</>
-					) : (
-						<>Download all ({BUCKETS.length} files)</>
-					)}
-				</button>
-			</div>
-
-			{/* Summary after Download All */}
-			{hasAnyResults && !state.isDownloading && (
-				<div className="mt-4 p-3 rounded-lg bg-zinc-900 border border-zinc-800">
-					<p className="text-sm text-zinc-400">
-						{failureCount === 0 ? (
-							<span className="text-green-400">All {successCount} files downloaded successfully.</span>
-						) : (
-							<>
-								<span className="text-green-400">{successCount} succeeded</span>
-								{', '}
-								<span className="text-red-400">{failureCount} failed</span>
-							</>
-						)}
-					</p>
+		<div className="max-w-2xl space-y-4">
+			<div>
+				<h2 className="text-2xl font-semibold">Export</h2>
+				<div className="flex items-center justify-between">
+					<p className="text-sm text-muted-foreground mt-1">Export your data in various formats.</p>
+					<Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5">
+						<Shield className="size-3.5" />
+						Privacy
+					</Link>
 				</div>
-			)}
-
-			{/* Per-bucket download buttons */}
-			<div className="mt-6 border border-zinc-800 rounded-lg divide-y divide-zinc-800">
-				{BUCKETS.map((bucket) => {
-					const result = state.results[bucket];
-					const isCurrentlyDownloading = state.isDownloading && state.currentBucket === bucket;
-
-					return (
-						<div key={bucket} className="p-4 flex items-center justify-between">
-							<div>
-								<p className="text-white font-medium">{BUCKET_TITLES[bucket]}</p>
-								<p className="text-zinc-500 text-sm">{bucket}.md</p>
-								{result && (
-									<p className={`text-xs mt-1 ${result.success ? 'text-green-400' : 'text-red-400'}`}>
-										{result.success ? 'Downloaded' : result.error}
-									</p>
-								)}
-							</div>
-							<button
-								type="button"
-								onClick={() => downloadSingle(bucket)}
-								disabled={state.isDownloading}
-								className="px-3 py-1.5 text-sm bg-zinc-800 text-white rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-							>
-								{isCurrentlyDownloading ? (
-									<>
-										<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
-										Downloading...
-									</>
-								) : (
-									'Download'
-								)}
-							</button>
-						</div>
-					);
-				})}
 			</div>
+
+			{/* Raw Events Export */}
+			<RawEventsExport />
+
+			{/* Terms Bucket Export */}
+			<Card>
+				<CardHeader>
+					<CardTitle>Terms (Markdown)</CardTitle>
+					<CardDescription>Download your terms as markdown files, one per bucket.</CardDescription>
+					<CardAction>
+						<Button
+							size="sm"
+							onClick={downloadAll}
+							disabled={state.isDownloading}
+							title={
+								state.isDownloading && state.currentBucket === null
+									? 'Starting download...'
+									: state.isDownloading
+										? `Downloading ${BUCKET_TITLES[state.currentBucket as keyof typeof BUCKET_TITLES]}...`
+										: `Download all ${BUCKETS.length} files`
+							}
+						>
+							{state.isDownloading && state.currentBucket === null ? (
+								<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+							) : state.isDownloading ? (
+								<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+							) : (
+								<>
+									<Download className="size-3.5" />({BUCKETS.length})
+								</>
+							)}
+						</Button>
+					</CardAction>
+				</CardHeader>
+				<CardContent className="space-y-4">
+					{/* Summary after Download All */}
+					{hasAnyResults && !state.isDownloading && (
+						<p className="text-sm text-muted-foreground">
+							{failureCount === 0 ? (
+								<span className="text-green-400">✓ All {successCount} files downloaded</span>
+							) : (
+								<>
+									<span className="text-green-400">{successCount} ✓</span>
+									{', '}
+									<span className="text-red-400">{failureCount} ✗</span>
+								</>
+							)}
+						</p>
+					)}
+
+					{/* Per-bucket table */}
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead className="w-[200px]">Bucket</TableHead>
+								<TableHead>File</TableHead>
+								<TableHead>Status</TableHead>
+								<TableHead className="text-right">Action</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{BUCKETS.map((bucket) => {
+								const result = state.results[bucket];
+								const isCurrentlyDownloading = state.isDownloading && state.currentBucket === bucket;
+
+								return (
+									<TableRow key={bucket} onClick={() => setSelectedBucket(bucket)} className="cursor-pointer">
+										<TableCell className="font-medium">{BUCKET_TITLES[bucket]}</TableCell>
+										<TableCell className="text-xs text-muted-foreground">{bucket}.md</TableCell>
+										<TableCell>
+											{result ? (
+												<span className={`text-xs ${result.success ? 'text-green-400' : 'text-red-400'}`}>
+													{result.success ? '✓ Downloaded' : result.error}
+												</span>
+											) : (
+												<Minus className="size-3.5 text-muted-foreground/40" />
+											)}
+										</TableCell>
+										<TableCell className="text-right">
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={(e) => {
+													e.stopPropagation();
+													downloadSingle(bucket);
+												}}
+												disabled={state.isDownloading}
+												title={isCurrentlyDownloading ? 'Downloading...' : 'Download'}
+											>
+												{isCurrentlyDownloading ? (
+													<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+												) : (
+													<Download className="size-4" />
+												)}
+											</Button>
+										</TableCell>
+									</TableRow>
+								);
+							})}
+						</TableBody>
+					</Table>
+				</CardContent>
+			</Card>
 
 			{/* Export History */}
-			<div className="mt-8">
-				<ExportHistory />
-			</div>
+			<ExportHistory />
+
+			{/* Bucket Detail Drawer */}
+			<BucketDetailDrawer
+				bucket={selectedBucket}
+				onClose={() => setSelectedBucket(null)}
+				onDownload={(bucket) => {
+					setSelectedBucket(null);
+					downloadSingle(bucket);
+				}}
+				isDownloading={state.isDownloading}
+			/>
 		</div>
 	);
 }

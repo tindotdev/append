@@ -4,14 +4,26 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Download, FileText } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatRelativeTime } from '@/lib/format-relative-time';
 import { type ExportHistoryItem, getExportHistory } from '../api/get-export-history';
 
-function ExportHistoryItemRow({ item }: { item: ExportHistoryItem }) {
+interface ExportHistoryItemRowProps {
+	item: ExportHistoryItem;
+	onClick?: (item: ExportHistoryItem) => void;
+}
+
+function ExportHistoryItemRow({ item, onClick }: ExportHistoryItemRowProps) {
+	const handleClick = () => onClick?.(item);
+
 	return (
-		<div className="py-3 border-b border-border last:border-0">
+		<Button
+			variant="ghost"
+			className="w-full h-auto text-left py-3 border-b border-border last:border-0 justify-start rounded-sm px-2 -mx-2 font-normal"
+			onClick={handleClick}
+		>
 			<div className="flex items-start justify-between gap-4">
 				<div className="flex items-start gap-3 min-w-0 flex-1">
 					<Download className="size-4 text-muted-foreground mt-0.5" />
@@ -28,7 +40,7 @@ function ExportHistoryItemRow({ item }: { item: ExportHistoryItem }) {
 				</div>
 				<span className="text-xs text-muted-foreground whitespace-nowrap">{formatRelativeTime(item.createdAt)}</span>
 			</div>
-		</div>
+		</Button>
 	);
 }
 
@@ -59,8 +71,9 @@ export function ExportHistory() {
 	if (isLoading) {
 		return (
 			<Card>
-				<CardHeader className="pb-3">
-					<CardTitle className="text-sm">Recent Exports</CardTitle>
+				<CardHeader>
+					<CardTitle>Export History</CardTitle>
+					<CardDescription>View past exports and re-download files.</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<ExportHistorySkeleton />
@@ -72,8 +85,9 @@ export function ExportHistory() {
 	if (error) {
 		return (
 			<Card>
-				<CardHeader className="pb-3">
-					<CardTitle className="text-sm">Recent Exports</CardTitle>
+				<CardHeader>
+					<CardTitle>Export History</CardTitle>
+					<CardDescription>View past exports and re-download files.</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<p className="text-sm text-muted-foreground">Failed to load export history.</p>
@@ -85,8 +99,9 @@ export function ExportHistory() {
 	if (!data || data.items.length === 0) {
 		return (
 			<Card>
-				<CardHeader className="pb-3">
-					<CardTitle className="text-sm">Recent Exports</CardTitle>
+				<CardHeader>
+					<CardTitle>Export History</CardTitle>
+					<CardDescription>View past exports and re-download files.</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<p className="text-sm text-muted-foreground">No exports yet. Download a bucket to see your export history.</p>
@@ -97,13 +112,14 @@ export function ExportHistory() {
 
 	return (
 		<Card>
-			<CardHeader className="pb-3">
-				<CardTitle className="text-sm">Recent Exports</CardTitle>
+			<CardHeader>
+				<CardTitle>Export History</CardTitle>
+				<CardDescription>View past exports and re-download files.</CardDescription>
 			</CardHeader>
 			<CardContent>
 				<div className="divide-y divide-border">
 					{data.items.map((item) => (
-						<ExportHistoryItemRow key={item.id} item={item} />
+						<ExportHistoryItemRow key={item.id} item={item} onClick={(item) => console.log('Export history item clicked:', item)} />
 					))}
 				</div>
 				{data.hasMore && <p className="text-xs text-muted-foreground text-center mt-3">Showing last {data.items.length} exports</p>}
