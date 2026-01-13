@@ -1428,3 +1428,170 @@ describe('POST /api/batch/:id/accept', () => {
 		expect(sense.text).toBe('Custom definition override');
 	});
 });
+
+// =============================================================================
+// DELETE /api/batch/:id tests
+// =============================================================================
+
+describe('DELETE /api/batch/:id', () => {
+	it('returns 401 when unauthenticated', async () => {
+		const res = await SELF.fetch('https://example.com/api/batch/some-id', {
+			method: 'DELETE',
+		});
+
+		expect(res.status).toBe(401);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('UNAUTHORIZED');
+	});
+
+	it('returns 404 for non-existent batch', async () => {
+		const res = await SELF.fetch(`https://example.com/api/batch/${generateUUID()}`, {
+			method: 'DELETE',
+			headers: { cookie: authCookie },
+		});
+
+		expect(res.status).toBe(404);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('NOT_FOUND');
+	});
+
+	it('returns 403 for non-owner', async () => {
+		// Seed a "foreign" user + batch + candidate directly via Drizzle
+		const foreignUserId = generateUUID();
+		const foreignBatchId = generateUUID();
+		const foreignCandidateId = generateUUID();
+		const now = new Date();
+
+		// Create foreign user
+		await db.insert(user).values({
+			id: foreignUserId,
+			name: 'Foreign User',
+			email: 'foreign-delete@example.com',
+			emailVerified: false,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		// Create foreign batch
+		await db.insert(batch).values({
+			id: foreignBatchId,
+			userId: foreignUserId,
+			status: 'captured',
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		// Create foreign candidate
+		await db.insert(candidate).values({
+			id: foreignCandidateId,
+			batchId: foreignBatchId,
+			position: 0,
+			term: 'foreign-term',
+			normalizedTerm: 'foreign-term',
+			status: 'captured',
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		// Try to delete the foreign user's batch as the authenticated test user
+		const res = await SELF.fetch(`https://example.com/api/batch/${foreignBatchId}`, {
+			method: 'DELETE',
+			headers: { cookie: authCookie },
+		});
+
+		expect(res.status).toBe(403);
+		const body = (await res.json()) as any;
+		expect(body.error.code).toBe('FORBIDDEN');
+
+		// Verify batch still exists
+		const batchRow = await (db.query as any).batch.findFirst({
+			where: eq(batch.id, foreignBatchId),
+		});
+		expect(batchRow).toBeDefined();
+
+		// Clean up foreign user data
+		await db.delete(candidate).where(eq(candidate.id, foreignCandidateId));
+		await db.delete(batch).where(eq(batch.id, foreignBatchId));
+		await db.delete(user).where(eq(user.id, foreignUserId));
+	});
+
+	it('returns 204 and deletes batch with all candidates', async () => {
+		// Create a batch with multiple candidates
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms: generateTerms(5),
+				clientRequestId: generateUUID(),
+			}),
+		});
+
+		expect(createRes.status).toBe(201);
+		const { id: batchId, candidateCount } = (await createRes.json()) as any;
+		expect(candidateCount).toBe(5);
+
+		// Verify batch and candidates exist before deletion
+		const batchBefore = await (db.query as any).batch.findFirst({
+			where: eq(batch.id, batchId),
+		});
+		expect(batchBefore).toBeDefined();
+
+		const candidatesBefore = await db.select().from(candidate).where(eq(candidate.batchId, batchId));
+		expect(candidatesBefore.length).toBe(5);
+
+		// Delete the batch
+		const deleteRes = await SELF.fetch(`https://example.com/api/batch/${batchId}`, {
+			method: 'DELETE',
+			headers: { cookie: authCookie },
+		});
+
+		expect(deleteRes.status).toBe(204);
+
+		// Verify batch is deleted
+		const batchAfter = await (db.query as any).batch.findFirst({
+			where: eq(batch.id, batchId),
+		});
+		expect(batchAfter).toBeUndefined();
+
+		// Verify candidates are cascade-deleted
+		const candidatesAfter = await db.select().from(candidate).where(eq(candidate.batchId, batchId));
+		expect(candidatesAfter.length).toBe(0);
+	});
+
+	it('returns 404 when deleting same batch twice', async () => {
+		// Create a batch
+		const createRes = await SELF.fetch('https://example.com/api/batch', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: authCookie,
+			},
+			body: JSON.stringify({
+				terms: generateTerms(3),
+				clientRequestId: generateUUID(),
+			}),
+		});
+
+		expect(createRes.status).toBe(201);
+		const { id: batchId } = (await createRes.json()) as any;
+
+		// Delete the batch first time
+		const deleteRes1 = await SELF.fetch(`https://example.com/api/batch/${batchId}`, {
+			method: 'DELETE',
+			headers: { cookie: authCookie },
+		});
+		expect(deleteRes1.status).toBe(204);
+
+		// Try to delete the same batch again
+		const deleteRes2 = await SELF.fetch(`https://example.com/api/batch/${batchId}`, {
+			method: 'DELETE',
+			headers: { cookie: authCookie },
+		});
+		expect(deleteRes2.status).toBe(404);
+		const body = (await deleteRes2.json()) as any;
+		expect(body.error.code).toBe('NOT_FOUND');
+	});
+});

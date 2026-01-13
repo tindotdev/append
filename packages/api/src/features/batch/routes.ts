@@ -8,6 +8,7 @@ import { bodyLimit } from 'hono/body-limit';
 import type { Bindings, Variables } from '../../platform/env';
 import { apiError, apiErrorFrom, ownershipErrorMap, validationHook } from '../../shared/api-error';
 import { captureTerms } from './usecases/captureTerms';
+import { deleteBatch } from './usecases/deleteBatch';
 import { getBatch } from './usecases/getBatch';
 import { listBatches } from './usecases/listBatches';
 import { CaptureTermsSchema, MAX_BODY_SIZE } from './validation/captureTerms.schema';
@@ -22,6 +23,7 @@ const batchAccessErrors = ownershipErrorMap('Batch');
  * POST /api/batch - Create a new batch of candidates (idempotent)
  * GET /api/batch - List batches for the authenticated user
  * GET /api/batch/:id - Get a batch by ID (owner-only)
+ * DELETE /api/batch/:id - Delete a batch and all its candidates (owner-only)
  */
 export const batchRoutes = app
 	.post(
@@ -71,4 +73,19 @@ export const batchRoutes = app
 		}
 
 		return c.json(result.result);
+	})
+	.delete('/:id', async (c) => {
+		const userId = c.get('userId');
+		const batchId = c.req.param('id');
+		const db = c.get('db');
+
+		// Execute use case
+		const result = await deleteBatch(db, userId, batchId);
+
+		if (!result.success) {
+			return apiErrorFrom(c, result.error, batchAccessErrors);
+		}
+
+		// Return 204 No Content on successful delete
+		return c.body(null, 204);
 	});
