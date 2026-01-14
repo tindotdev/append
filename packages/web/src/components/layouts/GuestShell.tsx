@@ -31,7 +31,7 @@ export function GuestShell() {
 					</header>
 
 					<main className="flex-1 overflow-auto p-6">
-						<div className="mx-auto max-w-7xl">
+						<div className="mx-auto max-w-7xl flex justify-center">
 							<Outlet />
 						</div>
 					</main>

@@ -42,7 +42,7 @@ const TELEMETRY_ITEMS = [
 
 export function PrivacyPage() {
 	return (
-		<div className="@container/main max-w-3xl">
+		<div className="@container/main w-full max-w-3xl">
 			{/* Header */}
 			<div className="mb-6">
 				<h1 className="text-xl font-semibold tracking-tight">Privacy</h1>
