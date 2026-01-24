@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { BatchListPage } from '@/features/batch';
+import { BatchNewPage } from '@/features/batch';
 
 export const Route = createFileRoute('/_protected/batch')({
-	component: BatchListPage,
+	component: BatchNewPage,
 });

@@ -84,7 +84,7 @@ export function ExportPage() {
 	const failureCount = Object.values(state.results).filter((r) => r && !r.success).length;
 
 	return (
-		<div className="max-w-2xl space-y-4">
+		<div className="w-full space-y-4">
 			<div>
 				<h2 className="text-2xl font-semibold">Export</h2>
 				<div className="flex items-center justify-between">

@@ -47,7 +47,7 @@ export function TopTopicCard() {
 						<EmptyDescription className="text-xs">Your most studied topic this week will appear here</EmptyDescription>
 					</EmptyHeader>
 					<Button variant="outline" size="sm" asChild>
-						<Link to="/batch/new">Start learning</Link>
+						<Link to="/batch">Start learning</Link>
 					</Button>
 				</Empty>
 			</Card>

@@ -1,19 +1,7 @@
 import { closestCenter, DndContext, type DragEndEvent, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
-import {
-	Archive,
-	ChevronDown,
-	FileDown,
-	FileUp,
-	FolderOpen,
-	LayoutDashboard,
-	LogOut,
-	PenSquare,
-	Plus,
-	Settings,
-	Shield,
-} from 'lucide-react';
+import { ChevronDown, FileDown, FileUp, FolderOpen, LayoutDashboard, LogOut, PenSquare, Plus, Settings, Shield } from 'lucide-react';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -49,8 +37,7 @@ import { SidebarBucketItem } from './SidebarBucketItem';
 
 const NAV_ITEMS = [
 	{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, shortcut: undefined },
-	{ to: '/batch/new', label: 'Capture', icon: Plus, shortcut: 'C' },
-	{ to: '/batch', label: 'Batches', icon: Archive, shortcut: 'G B' },
+	{ to: '/batch', label: 'Capture', icon: Plus, shortcut: 'C' },
 ] as const;
 
 const UTILITY_ITEMS = [
@@ -158,7 +145,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
 	const handleQuickAdd = (bucketSlug: string) => {
 		// Navigate to capture page with bucket pre-selected
-		navigate({ to: '/batch/new', search: { bucket: bucketSlug } });
+		navigate({ to: '/batch', search: { bucket: bucketSlug } });
 	};
 
 	const handleDragEnd = async (event: DragEndEvent) => {
@@ -320,7 +307,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 							<SidebarMenuItem key={item.to}>
 								<SidebarMenuButton
 									asChild
-									isActive={location.pathname === item.to || (item.to === '/batch/new' && location.pathname === '/')}
+									isActive={location.pathname === item.to || (item.to === '/batch' && location.pathname === '/')}
 									tooltip={item.label}
 								>
 									<Link

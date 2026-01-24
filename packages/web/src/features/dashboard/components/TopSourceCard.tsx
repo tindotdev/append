@@ -47,7 +47,7 @@ export function TopSourceCard() {
 						<EmptyDescription className="text-xs">Your most visited source this week will appear here</EmptyDescription>
 					</EmptyHeader>
 					<Button variant="outline" size="sm" asChild>
-						<Link to="/batch/new">Start learning</Link>
+						<Link to="/batch">Start learning</Link>
 					</Button>
 				</Empty>
 			</Card>

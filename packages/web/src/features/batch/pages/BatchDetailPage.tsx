@@ -541,12 +541,9 @@ export function BatchDetailPage() {
 					onRowClick={handleRowClick}
 				/>
 
-				<div className="mt-6 flex gap-4">
+				<div className="mt-6">
 					<Link to="/batch" className="text-zinc-400 hover:text-white transition-colors">
-						&larr; View all batches
-					</Link>
-					<Link to="/batch/new" className="text-zinc-400 hover:text-white transition-colors">
-						Create another batch
+						&larr; Back to batches
 					</Link>
 				</div>
 			</div>

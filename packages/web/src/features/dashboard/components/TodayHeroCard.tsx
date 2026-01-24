@@ -54,7 +54,7 @@ export function TodayHeroCard() {
 						<EmptyDescription className="text-xs">Start a session to track your learning</EmptyDescription>
 					</EmptyHeader>
 					<Button variant="outline" size="sm" asChild>
-						<Link to="/batch/new">Start session</Link>
+						<Link to="/batch">Start session</Link>
 					</Button>
 				</Empty>
 			</Card>

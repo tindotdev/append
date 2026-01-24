@@ -61,7 +61,7 @@ export function BatchListPage() {
 	// Loading state
 	if (isLoading) {
 		return (
-			<div className="max-w-4xl">
+			<div className="w-full">
 				<Skeleton className="h-7 w-32 mb-6" />
 				<div className="border border-zinc-800 rounded-lg divide-y divide-zinc-800">
 					{[1, 2, 3].map((i) => (
@@ -81,7 +81,7 @@ export function BatchListPage() {
 	// Error state
 	if (isError) {
 		return (
-			<div className="max-w-4xl">
+			<div className="w-full">
 				<h2 className="text-xl font-semibold">My Batches</h2>
 				<div className="flex flex-col items-center justify-center py-12 text-center">
 					<p className="text-zinc-400">Something went wrong. Please try again.</p>
@@ -96,12 +96,12 @@ export function BatchListPage() {
 	// Empty state
 	if (batches.length === 0) {
 		return (
-			<div className="max-w-4xl">
+			<div className="w-full">
 				<h2 className="text-xl font-semibold">My Batches</h2>
 				<div className="flex flex-col items-center justify-center py-12 text-center">
 					<p className="text-zinc-400">No batches yet.</p>
 					<Button asChild variant="secondary" className="mt-4">
-						<Link to="/batch/new">Create your first batch</Link>
+						<Link to="/batch">Create your first batch</Link>
 					</Button>
 				</div>
 			</div>
@@ -110,7 +110,7 @@ export function BatchListPage() {
 
 	// Batches list
 	return (
-		<div className="max-w-4xl">
+		<div className="w-full">
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="text-xl font-semibold">My Batches</h2>
@@ -120,7 +120,7 @@ export function BatchListPage() {
 					</p>
 				</div>
 				<Button asChild variant="secondary">
-					<Link to="/batch/new">New batch</Link>
+					<Link to="/batch">New batch</Link>
 				</Button>
 			</div>
 

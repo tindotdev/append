@@ -14,7 +14,7 @@ export function ErrorState({ error, onRetry }: { error: BatchError; onRetry: () 
 					</Button>
 				)}
 			</div>
-			<Link to="/batch/new" className="mt-4 inline-block text-muted-foreground hover:text-foreground transition-colors">
+			<Link to="/batch" className="mt-4 inline-block text-muted-foreground hover:text-foreground transition-colors">
 				&larr; Create new batch
 			</Link>
 		</div>

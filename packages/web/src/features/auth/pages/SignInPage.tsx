@@ -12,7 +12,7 @@ export function SignInPage() {
 	// Redirect to batch/new when authenticated
 	useEffect(() => {
 		if (!isPending && session) {
-			navigate({ to: '/batch/new' });
+			navigate({ to: '/batch' });
 		}
 	}, [isPending, session, navigate]);
 
@@ -39,7 +39,7 @@ export function SignInPage() {
 						onClick={() =>
 							signIn.social({
 								provider: 'google',
-								callbackURL: `${window.location.origin}/batch/new`,
+								callbackURL: `${window.location.origin}/batch`,
 							})
 						}
 					>
