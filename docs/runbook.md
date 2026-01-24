@@ -28,19 +28,17 @@ See [Extension security configuration](#extension-security-configuration) for de
 ## Secrets management
 
 **Doppler is the canonical source of truth** for all secrets across all environments.
-Secrets are synced from Doppler to Cloudflare Workers at deploy time via GitHub Actions.
+Secrets are synced from Doppler to Cloudflare Workers using local commands.
 
 - **Local dev**: `.dev.vars` in `packages/api/` (gitignored, synced via `just sync-secrets`)
-- **Preview**: Synced from Doppler `apps/prv_append` at deploy time
-- **Production**: Synced from Doppler `apps/prd_append` at deploy time
+- **Production**: Synced from Doppler `apps/prd_append` via `just secrets-prod` (or included in `just deploy`)
 
 ### Doppler configs
 
-| Environment | Doppler Config    | Sync Method                             |
-| ----------- | ----------------- | --------------------------------------- |
-| Local dev   | `apps/dev_append` | `just sync-secrets` → `.dev.vars`       |
-| Preview     | `apps/prv_append` | GitHub Actions → `wrangler secret bulk` |
-| Production  | `apps/prd_append` | GitHub Actions → `wrangler secret bulk` |
+| Environment | Doppler Config    | Sync Method                                         |
+| ----------- | ----------------- | --------------------------------------------------- |
+| Local dev   | `apps/dev_append` | `just sync-secrets` → `.dev.vars`                   |
+| Production  | `apps/prd_append` | `just secrets-prod` → `wrangler secret bulk`        |
 
 ### Updating secrets
 
@@ -51,17 +49,17 @@ doppler secrets set BETTER_AUTH_URL="http://localhost:8787" --project apps --con
 just sync-secrets
 ```
 
-**Preview/Production:**
+**Production:**
 
 ```bash
-# Update in Doppler (secrets sync automatically on next deploy)
-doppler secrets set <SECRET_NAME> --project apps --config prv_append  # preview
-doppler secrets set <SECRET_NAME> --project apps --config prd_append  # production
+# Update in Doppler
+doppler secrets set <SECRET_NAME> --project apps --config prd_append
 
-# To sync immediately without a code change, trigger a deploy manually
+# Sync immediately to production Worker (without full deploy)
+just secrets-prod
 ```
 
-**Important:** Never use `wrangler secret put` directly — it will be overwritten on the next deploy.
+**Important:** Never use `wrangler secret put` directly — it will be overwritten on the next secret sync.
 
 ### Extension security configuration
 
@@ -197,43 +195,77 @@ pnpm wrangler d1 execute append-db --remote --command "SELECT account_id FROM ac
 
 ## Deploy steps
 
-CI/CD uses GitHub Actions (`.github/workflows/deploy.yml`) and runs on pushes to `main`.
-Required GitHub secrets:
+**Deployments are local-first.** Use `just deploy` to deploy to production from your local machine.
 
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-- `CF_PAGES_PROJECT` (Cloudflare Pages project name)
-- `DOPPLER_TOKEN_PROD_APPEND` (Doppler service token for production)
-- `DOPPLER_TOKEN_PREVIEW_APPEND` (Doppler service token for preview, used in `preview.yml`)
-- `E2E_AUTH_SECRET` (for E2E tests in preview workflow)
+Required environment variables (set in your shell or use Doppler):
 
-Deploy order (automated):
+- `CLOUDFLARE_API_TOKEN` — Cloudflare API token with Workers and Pages permissions
+- `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account ID
+- `DOPPLER_TOKEN` (optional) — Doppler service token for `apps/prd_append`, or use `doppler login`
 
-1. Sync Worker secrets from Doppler (production).
-2. Apply D1 migrations (remote).
-3. Deploy the Worker API (Hono) to Cloudflare Workers.
-4. Build and deploy the SPA to Cloudflare Pages.
-5. Verify auth sign-in flow and basic API health.
-
-Manual equivalent (from repo root):
+### Production deploy (single command)
 
 ```bash
-# API (secrets + migrations + deploy)
-#
-# Note: In CI/CD, secrets sync is handled automatically via Doppler service tokens.
-# Manual sync is only needed for break-glass deploys or rotation verification.
-#
-# DOPPLER_TOKEN=... doppler secrets --json | \
-#   jq -c 'with_entries(.value = .value.computed)' | \
-#   pnpm --filter @append/api exec wrangler secret bulk --env production --config packages/api/wrangler.jsonc
+# Full production deploy (runs CI checks, prompts for confirmation)
+just deploy
 
-pnpm --filter @append/api exec wrangler d1 migrations apply append-db --remote --env production --config packages/api/wrangler.jsonc
-pnpm --filter @append/api run deploy -- --env production --config packages/api/wrangler.jsonc
+# Deploy without CI checks (use with caution)
+SKIP_CHECKS=1 just deploy
 
-# Web (build + deploy)
-pnpm --filter @append/web run build
-pnpm --filter @append/web exec wrangler pages deploy packages/web/dist --project-name "$CF_PAGES_PROJECT"
+# Deploy without confirmation (for automated contexts)
+SKIP_CONFIRMATION=1 just deploy
 ```
+
+### Deploy steps (what `just deploy` does)
+
+1. Run CI checks (`pnpm ci`) unless `SKIP_CHECKS=1`
+2. Sync Worker secrets from Doppler (`just secrets-prod`)
+3. Verify required secrets exist (names only, no values)
+4. Apply D1 migrations to production
+5. Deploy Worker API to production
+6. Build web app with production API URL
+7. Deploy web to Cloudflare Pages (production)
+
+### Secrets-only sync
+
+To sync secrets without deploying:
+
+```bash
+just secrets-prod
+```
+
+### Manual step-by-step (for debugging)
+
+If you need to run deploy steps individually:
+
+```bash
+# 1. Run CI checks
+just ci
+
+# 2. Sync secrets and verify
+just secrets-prod
+
+# 3. Apply migrations
+cd packages/api
+pnpm exec wrangler d1 migrations apply append-db --remote --env production --config wrangler.jsonc
+
+# 4. Deploy API Worker
+pnpm run deploy -- --env production --config wrangler.jsonc
+
+# 5. Build and deploy web
+cd ../web
+VITE_API_URL=https://api.append.tindev.dev pnpm run build
+pnpm exec wrangler pages deploy dist --project-name "append-web"
+```
+
+### GitHub Actions status
+
+GitHub Actions are disabled for deployment:
+
+- `.github/workflows/deploy.yml` — **Disabled** (use `just deploy` instead)
+- `.github/workflows/preview.yml` — **Disabled** (preview environment removed)
+- `.github/workflows/ci.yml` — Active as optional backstop (manual/on-demand)
+- `.github/workflows/auto-format.yml` — Active as safety net (should be no-op with local pre-commit)
 
 ## Publishing Chrome Extension
 
@@ -291,6 +323,13 @@ When publishing the extension to Chrome Web Store for the first time, follow thi
 - For local development, continue using the stable dev ID: `nnhipglpoenbcdonkbnfdcmfcfaggjle`
 
 ## Preview deployments (PR environments)
+
+> **Note**: Preview deployments are **disabled** as of the local-first CI/CD migration.
+> The preview workflow (`.github/workflows/preview.yml`) has been disabled.
+> Preview environment config remains in `wrangler.jsonc` for optional local testing only.
+
+<details>
+<summary>Legacy preview deployment documentation (for reference)</summary>
 
 PR previews use isolated Cloudflare resources to avoid affecting production:
 
@@ -522,16 +561,41 @@ For preview builds to call the correct API, `VITE_API_URL` must be set in **both
 
 **Recommended**: After merging the preview workflow to main, disable Cloudflare's automatic Git integration (Settings → Builds & deployments → Disconnect Git) to use only GitHub Actions for deployments.
 
+</details>
+
 ## Developer checks (local)
 
-From repo root:
+Run the full CI pipeline locally (matches what CI would run):
 
 ```bash
-pnpm docs:policy
-pnpm ci:lint
-pnpm lint:boundaries
-pnpm typecheck
-pnpm test
+# Full CI (all checks + tests)
+just ci
+# or
+pnpm ci
+
+# Fast CI (boundaries, docs, typecheck only - for inner loop)
+just ci-fast
+
+# CI with preview config tests
+just ci-all
+```
+
+Individual checks:
+
+```bash
+pnpm docs:policy        # Verify documentation completeness
+pnpm ci:lint            # Biome lint (read-only, CI mode)
+pnpm lint:boundaries    # Architectural boundaries
+pnpm typecheck          # Type-check all packages
+pnpm test               # Run all tests
+```
+
+Watch mode for iteration:
+
+```bash
+just test-watch         # Tests in watch mode
+just typecheck-watch    # Typecheck in watch mode
+just changed            # Format/lint changed files only
 ```
 
 API tests live under `packages/api/test/` and run via `pnpm test:api`.
