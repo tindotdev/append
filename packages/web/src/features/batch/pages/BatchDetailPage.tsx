@@ -87,7 +87,7 @@ function applySseEventToCandidate(batch: BatchResponse | null, event: SuggestCan
 }
 
 export function BatchDetailPage() {
-	const { batchId } = useParams({ from: '/protected/batch/$batchId' });
+	const { batchId } = useParams({ from: '/_protected/batch/$batchId' });
 	const [batch, setBatch] = useState<BatchResponse | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<BatchError | null>(null);
