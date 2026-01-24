@@ -193,8 +193,8 @@ interface MoveDialogState {
 }
 
 export function BucketFeedPage() {
-	const { slug } = useParams({ from: '/protected/bucket/$slug' });
-	const search = useSearch({ from: '/protected/bucket/$slug' });
+	const { slug } = useParams({ from: '/_protected/bucket/$slug' });
+	const search = useSearch({ from: '/_protected/bucket/$slug' });
 	const navigate = useNavigate();
 
 	const selectedTermId = search.term ?? null;
