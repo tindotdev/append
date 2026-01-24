@@ -218,7 +218,7 @@ SKIP_CONFIRMATION=1 just deploy
 
 ### Deploy steps (what `just deploy` does)
 
-1. Run CI checks (`pnpm ci`) unless `SKIP_CHECKS=1`
+1. Run CI checks (`pnpm run ci`) unless `SKIP_CHECKS=1`
 2. Sync Worker secrets from Doppler (`just secrets-prod`)
 3. Verify required secrets exist (names only, no values)
 4. Apply D1 migrations to production

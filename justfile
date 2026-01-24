@@ -43,17 +43,17 @@ dev:
 # Run full CI pipeline (matches GitHub Actions)
 ci:
   @echo "Running full CI pipeline..."
-  pnpm ci
+  pnpm run ci
 
 # Run CI with preview tests
 ci-all:
   @echo "Running full CI pipeline with preview tests..."
-  pnpm ci:all
+  pnpm run ci:all
 
 # Run fast CI for inner loop (boundaries, docs, typecheck only)
 ci-fast:
   @echo "Running fast CI checks..."
-  pnpm ci:fast
+  pnpm run ci:fast
 
 # Run tests in watch mode
 test-watch:

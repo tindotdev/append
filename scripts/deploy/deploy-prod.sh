@@ -76,7 +76,7 @@ if [ "$SKIP_CHECKS" != "1" ]; then
   echo "1️⃣  Running CI checks..."
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   cd "$REPO_ROOT"
-  pnpm ci
+  pnpm run ci
   echo ""
   echo "✓ CI checks passed"
   echo ""

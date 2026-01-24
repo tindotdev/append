@@ -67,7 +67,7 @@
 	},
 	"simple-git-hooks": {
 		"pre-commit": "pnpm nano-staged && pnpm lint:boundaries && pnpm docs:policy",
-		"pre-push": "pnpm ci"
+		"pre-push": "pnpm run ci"
 	},
 	"nano-staged": {
 		"*.{ts,tsx,js,jsx,json,jsonc,css}": [
