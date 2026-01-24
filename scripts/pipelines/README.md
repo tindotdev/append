@@ -16,7 +16,7 @@
 | Tests | `pnpm test` | Runs all unit tests |
 | Preview tests | `pnpm --filter @append/api test:preview` | Tests preview environment config |
 | Extension tests | `pnpm --filter @append/api test:extension` | Tests VS Code extension integration |
-| **Full CI** | `pnpm ci` or `just ci` | Runs all CI checks in sequence |
+| **Full CI** | `pnpm run ci` or `just ci` | Runs all CI checks in sequence |
 | **Auto-Format** | | |
 | Format + lint | `pnpm check` | Biome format + lint (writes fixes) |
 | **Deploy Workflow** | | |
@@ -33,15 +33,15 @@
 
 ```bash
 # Full CI pipeline (matches GitHub Actions)
-pnpm ci
+pnpm run ci
 just ci
 
 # CI with preview tests included
-pnpm ci:all
+pnpm run ci:all
 just ci-all
 
 # Fast CI for inner loop (skips slower checks)
-pnpm ci:fast
+pnpm run ci:fast
 just ci-fast
 ```
 
@@ -101,7 +101,7 @@ just secrets:prod
 Configured via `simple-git-hooks` + `nano-staged` in root `package.json`:
 
 - **pre-commit**: Format/lint staged files, check boundaries, verify docs policy
-- **pre-push** (optional): Run `pnpm ci:fast` before pushing
+- **pre-push**: Run `pnpm run ci` before pushing (full CI)
 
 ## Secrets Management
 
@@ -147,10 +147,11 @@ All production deployments happen via local `just deploy` command only.
 
 | Workflow | Status | Notes |
 |----------|--------|-------|
-| `.github/workflows/ci.yml` | Active (manual/backstop) | Runs on PR/push, provides safety net |
-| `.github/workflows/auto-format.yml` | Active (safety net) | Should be no-op if pre-commit works |
+| `.github/workflows/claude.yml` | Active | Responds to @claude mentions in issues/PRs |
+| `.github/workflows/ci.yml` | **Disabled** | Replaced by pre-push hook + `just ci` |
+| `.github/workflows/auto-format.yml` | **Disabled** | Replaced by pre-commit hook |
 | `.github/workflows/deploy.yml` | **Disabled** | Replaced by `just deploy` |
-| `.github/workflows/preview.yml` | **Removed** | Preview environment removed |
+| `.github/workflows/preview.yml` | **Disabled** | Preview environment disabled |
 
 ## Migration Notes
 
