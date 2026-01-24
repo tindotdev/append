@@ -86,7 +86,7 @@ export function ImportPage() {
 	};
 
 	return (
-		<div className="max-w-3xl">
+		<div className="w-full">
 			<h2 className="text-xl font-semibold">Import</h2>
 			<p className="text-sm text-zinc-500 mt-1">Import terms from ENG-LOG markdown files.</p>
 

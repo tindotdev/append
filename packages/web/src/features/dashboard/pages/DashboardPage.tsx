@@ -12,7 +12,7 @@ import {
 
 export function DashboardPage() {
 	return (
-		<div className="@container/main w-full max-w-5xl">
+		<div className="@container/main w-full">
 			{/* Header */}
 			<div className="mb-4">
 				<h2 className="text-xl font-semibold">Dashboard</h2>

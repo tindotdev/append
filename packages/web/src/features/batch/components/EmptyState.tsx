@@ -7,7 +7,7 @@ export function EmptyState() {
 			<div className="mt-6 flex flex-col items-center justify-center py-12 text-center">
 				<p className="text-zinc-400">No candidates in this batch.</p>
 			</div>
-			<Link to="/batch/new" className="mt-6 inline-block text-zinc-400 hover:text-white transition-colors">
+			<Link to="/batch" className="mt-6 inline-block text-zinc-400 hover:text-white transition-colors">
 				&larr; Create another batch
 			</Link>
 		</div>

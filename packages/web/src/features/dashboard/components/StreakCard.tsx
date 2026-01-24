@@ -36,7 +36,7 @@ export function StreakCard() {
 						<EmptyDescription className="text-xs">Learn for 10+ min daily to build a streak</EmptyDescription>
 					</EmptyHeader>
 					<Button variant="outline" size="sm" asChild>
-						<Link to="/batch/new">Start today</Link>
+						<Link to="/batch">Start today</Link>
 					</Button>
 				</Empty>
 			</Card>

@@ -55,7 +55,7 @@ export function AppShell() {
 				switch (e.key.toLowerCase()) {
 					case 'c':
 						e.preventDefault();
-						navigate({ to: '/batch/new' });
+						navigate({ to: '/batch' });
 						break;
 				}
 			}
@@ -99,7 +99,7 @@ export function AppShell() {
 					<CommandGroup heading="Navigation">
 						<CommandItem
 							onSelect={() => {
-								navigate({ to: '/batch/new' });
+								navigate({ to: '/batch' });
 								setCommandOpen(false);
 							}}
 						>

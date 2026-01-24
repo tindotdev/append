@@ -646,7 +646,7 @@ export function BatchNewPage() {
 
 	return (
 		<BatchErrorBoundary>
-			<div className="max-w-full px-4 sm:px-6 md:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto">
+			<div className="w-full">
 				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 					<div>
 						<h2 className="text-xl font-semibold">Capture</h2>

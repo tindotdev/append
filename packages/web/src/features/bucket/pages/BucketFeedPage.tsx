@@ -18,7 +18,7 @@ import type { BucketFeedItem } from '../types';
 
 function BucketLoadingState() {
 	return (
-		<div className="max-w-4xl">
+		<div className="w-full">
 			<div className="flex items-center justify-center py-12">
 				<span className="text-zinc-400">Loading...</span>
 			</div>
@@ -28,7 +28,7 @@ function BucketLoadingState() {
 
 function BucketNotFoundError({ userBuckets }: { userBuckets: Array<{ name: string }> }) {
 	return (
-		<div className="max-w-4xl">
+		<div className="w-full">
 			<div className="flex flex-col items-center justify-center py-12 text-center">
 				<p className="text-zinc-400">Bucket not found.</p>
 				{userBuckets.length > 0 && <p className="text-zinc-500 text-sm mt-2">Valid buckets: {userBuckets.map((b) => b.name).join(', ')}</p>}
@@ -39,7 +39,7 @@ function BucketNotFoundError({ userBuckets }: { userBuckets: Array<{ name: strin
 
 function FeedLoadingState({ title }: { title: string }) {
 	return (
-		<div className="max-w-4xl">
+		<div className="w-full">
 			<h2 className="text-xl font-semibold">{title}</h2>
 			<div className="flex items-center justify-center py-12">
 				<span className="text-zinc-400">Loading...</span>
@@ -55,7 +55,7 @@ function FeedErrorState({ title, error, onRetry }: { title: string; error: unkno
 			: 'Something went wrong. Please try again.';
 
 	return (
-		<div className="max-w-4xl">
+		<div className="w-full">
 			<h2 className="text-xl font-semibold">{title}</h2>
 			<div className="flex flex-col items-center justify-center py-12 text-center">
 				<p className="text-zinc-400">{errorMessage}</p>
@@ -69,7 +69,7 @@ function FeedErrorState({ title, error, onRetry }: { title: string; error: unkno
 
 function FeedEmptyState({ title }: { title: string }) {
 	return (
-		<div className="max-w-4xl">
+		<div className="w-full">
 			<h2 className="text-xl font-semibold">{title}</h2>
 			<div className="flex flex-col items-center justify-center py-12 text-center">
 				<p className="text-zinc-400">No items yet.</p>
@@ -128,7 +128,7 @@ function FeedContent({
 
 	return (
 		<>
-			<div className="max-w-4xl">
+			<div className="w-full">
 				<h2 className="text-xl font-semibold">{title}</h2>
 				<p className="text-sm text-zinc-500 mt-1">
 					{items.length} item{items.length !== 1 ? 's' : ''}
