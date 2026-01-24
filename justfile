@@ -39,3 +39,46 @@ dev:
     just sync-secrets
   fi
   doppler run -- pnpm dev:nosecrets
+
+# Run full CI pipeline (matches GitHub Actions)
+ci:
+  @echo "Running full CI pipeline..."
+  pnpm ci
+
+# Run CI with preview tests
+ci-all:
+  @echo "Running full CI pipeline with preview tests..."
+  pnpm ci:all
+
+# Run fast CI for inner loop (boundaries, docs, typecheck only)
+ci-fast:
+  @echo "Running fast CI checks..."
+  pnpm ci:fast
+
+# Run tests in watch mode
+test-watch:
+  @echo "Running tests in watch mode..."
+  pnpm test:watch
+
+# Run typecheck in watch mode
+typecheck-watch:
+  @echo "Running typecheck in watch mode..."
+  pnpm -r --parallel --if-present typecheck --watch
+
+# Format and lint changed files only (fast)
+changed:
+  @echo "Checking changed files..."
+  git diff --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx|js|jsx|json|jsonc|css)$' | xargs -r pnpm exec biome check --write --files-ignore-unknown=true --no-errors-on-unmatched || echo "No changed files to check"
+
+# Sync secrets from Doppler to production Worker (and verify)
+secrets-prod:
+  @bash scripts/deploy/sync-secrets-prod.sh
+
+# Deploy to production (runs CI first unless SKIP_CHECKS=1, requires confirmation unless SKIP_CONFIRMATION=1)
+deploy:
+  #!/usr/bin/env bash
+  SKIP_CHECKS="${SKIP_CHECKS:-0}"
+  SKIP_CONFIRMATION="${SKIP_CONFIRMATION:-0}"
+  bash scripts/deploy/deploy-prod.sh \
+    $([ "$SKIP_CHECKS" = "1" ] && echo "--skip-checks" || echo "") \
+    $([ "$SKIP_CONFIRMATION" = "1" ] && echo "--skip-confirmation" || echo "")

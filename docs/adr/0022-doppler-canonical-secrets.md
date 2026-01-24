@@ -5,6 +5,8 @@ Date: 2025-01-12
 
 Supersedes: ADR 0010 (OpenAI API key via Cloudflare Secrets Store)
 
+**Update (2025-01-24)**: Implementation migrated to local-first CI/CD. Preview environment disabled. Secrets sync now via `just secrets-prod` (local) instead of GitHub Actions. Core principle (Doppler as canonical) unchanged.
+
 ## Context
 
 We had multiple secret management approaches:
