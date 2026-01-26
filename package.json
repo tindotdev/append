@@ -28,7 +28,7 @@
 		"deploy:web": "pnpm --filter @append/web run deploy",
 		"deploy": "pnpm deploy:api && pnpm deploy:web",
 		"lab": "pnpm --filter @append/ai-gateway-lab lab",
-		"prepare": "simple-git-hooks",
+		"prepare": "prek install",
 		"cf-typegen": "pnpm -r --if-present cf-typegen"
 	},
 	"license": "MIT",
@@ -61,18 +61,6 @@
 		"@typescript-eslint/parser": "^8.50.1",
 		"eslint": "^9.39.2",
 		"eslint-import-resolver-typescript": "^4.4.4",
-		"eslint-plugin-boundaries": "^5.3.1",
-		"nano-staged": "^0.9.0",
-		"simple-git-hooks": "^2.13.1"
-	},
-	"simple-git-hooks": {
-		"pre-commit": "pnpm nano-staged && pnpm lint:boundaries && pnpm docs:policy",
-		"pre-push": "pnpm run ci"
-	},
-	"nano-staged": {
-		"*.{ts,tsx,js,jsx,json,jsonc,css}": [
-			"biome check --write --files-ignore-unknown=true --no-errors-on-unmatched",
-			"biome format --write --files-ignore-unknown=true --no-errors-on-unmatched"
-		]
+		"eslint-plugin-boundaries": "^5.3.1"
 	}
 }

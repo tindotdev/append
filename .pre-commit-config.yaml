@@ -1,0 +1,58 @@
+# Pre-commit configuration for prek
+# https://github.com/j178/prek
+#
+# This replaces simple-git-hooks + nano-staged with a Rust-based alternative.
+# Install: curl -LsSf https://prek.sh/install.sh | sh
+# Setup: prek install
+
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  # Biome - JavaScript/TypeScript linter and formatter
+  - repo: local
+    hooks:
+      # Format and lint staged files with Biome
+      - id: biome-check
+        name: Biome check (format + lint)
+        entry: pnpm biome check --write --files-ignore-unknown=true --no-errors-on-unmatched
+        language: system
+        types_or: [javascript, jsx, ts, tsx, json, css]
+        pass_filenames: true
+        stages: [pre-commit]
+
+  # Architectural boundaries check
+  - repo: local
+    hooks:
+      - id: lint-boundaries
+        name: Check architectural boundaries
+        entry: pnpm lint:boundaries
+        language: system
+        files: ".*"
+        pass_filenames: false
+        stages: [pre-commit]
+
+  # Documentation policy enforcement
+  - repo: local
+    hooks:
+      - id: docs-policy
+        name: Check documentation policy
+        entry: pnpm docs:policy
+        language: system
+        files: '^docs/.*\.md$'
+        pass_filenames: false
+        stages: [pre-commit]
+
+  # Full CI suite on push
+  - repo: local
+    hooks:
+      - id: ci-suite
+        name: Run full CI suite
+        entry: pnpm run ci
+        language: system
+        files: ".*"
+        pass_filenames: false
+        stages: [pre-push]
+        verbose: true
+
+# Performance: run hooks in parallel where possible
+# Prek automatically handles parallelization by priority levels
