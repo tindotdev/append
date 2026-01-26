@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Link, useLocation } from '@tanstack/react-router';
-import { Copy, Edit, ExternalLink, FileDown, GripVertical, Image, Link2, MoreHorizontal, Palette, Plus, Trash2 } from 'lucide-react';
+import { Copy, Edit, ExternalLink, FileDown, GripVertical, Image, Link2, MoreHorizontal, Palette, Trash2 } from 'lucide-react';
 import { forwardRef, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { BucketIconPicker } from '@/components/BucketIconPicker';
@@ -38,12 +38,11 @@ interface SidebarBucketItemProps {
 	onNameChange: (name: string) => void;
 	onExport: () => void;
 	onDelete: () => void;
-	onQuickAdd: () => void;
 	onDuplicate?: () => void;
 }
 
 export const SidebarBucketItem = forwardRef<HTMLAnchorElement, SidebarBucketItemProps>(
-	({ bucket, onEdit, onColorChange, onIconChange, onNameChange, onExport, onDelete, onQuickAdd, onDuplicate }, ref) => {
+	({ bucket, onEdit, onColorChange, onIconChange, onNameChange, onExport, onDelete, onDuplicate }, ref) => {
 		const location = useLocation();
 		const { isMobile } = useSidebar();
 		const [isHovered, setIsHovered] = useState(false);
@@ -296,21 +295,6 @@ export const SidebarBucketItem = forwardRef<HTMLAnchorElement, SidebarBucketItem
 								</DropdownMenuItem>
 							</DropdownMenuContent>
 						</DropdownMenu>
-
-						{/* Quick add button */}
-						<Button
-							variant="ghost"
-							size="icon"
-							className="h-6 w-6 rounded-sm hover:bg-sidebar-accent"
-							onClick={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								onQuickAdd();
-							}}
-						>
-							<Plus className="h-3.5 w-3.5" />
-							<span className="sr-only">Add to {bucket.name}</span>
-						</Button>
 					</div>
 				</SidebarMenuItem>
 			</BucketContextMenu>
