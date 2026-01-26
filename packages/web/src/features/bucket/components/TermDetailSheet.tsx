@@ -331,15 +331,15 @@ export function TermDetailSheet({ termId, onClose }: TermDetailSheetProps) {
 
 	return (
 		<Sheet open={!!termId} onOpenChange={(open) => !open && onClose()}>
-			<SheetContent side="right" className="sm:max-w-md overflow-y-auto">
+			<SheetContent side="right" className="sm:max-w-md overflow-y-auto px-0 flex flex-col">
 				{isLoading && (
-					<div className="flex items-center justify-center py-12">
+					<div className="flex items-center justify-center py-12 px-6">
 						<span className="text-zinc-400">Loading...</span>
 					</div>
 				)}
 
 				{error && (
-					<div className="p-4">
+					<div className="px-6 py-4">
 						<Alert variant="destructive" className="mb-4">
 							<XCircle className="size-4" />
 							<AlertTitle>Error</AlertTitle>
@@ -353,25 +353,14 @@ export function TermDetailSheet({ termId, onClose }: TermDetailSheetProps) {
 
 				{data && (
 					<>
-						<SheetHeader>
-							<div className="flex items-center justify-between">
-								<SheetTitle asChild>
-									<EditableTermName termId={data.term.id} displayTerm={data.term.displayTerm} version={data.term.version} onSaved={handleSaved} />
-								</SheetTitle>
-								<Button
-									size="icon"
-									variant="ghost"
-									className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-									onClick={handleDeleteTerm}
-									disabled={archiveTerm.isPending}
-								>
-									<Trash2 className="h-4 w-4" />
-								</Button>
-							</div>
+						<SheetHeader className="px-6 pb-6 pr-12">
+							<SheetTitle asChild>
+								<EditableTermName termId={data.term.id} displayTerm={data.term.displayTerm} version={data.term.version} onSaved={handleSaved} />
+							</SheetTitle>
 							<SheetDescription>Added {formatDate(data.term.createdAt)}</SheetDescription>
 						</SheetHeader>
 
-						<div className="mt-6 space-y-6">
+						<div className="px-6 space-y-6 pb-6 flex-1">
 							<div>
 								<h3 className="text-sm font-medium text-zinc-400 mb-3">
 									{data.senses.length === 1 ? 'Definition' : `Definitions (${data.senses.length})`}
@@ -391,6 +380,18 @@ export function TermDetailSheet({ termId, onClose }: TermDetailSheetProps) {
 									))}
 								</div>
 							</div>
+						</div>
+
+						<div className="px-6 py-4 border-t border-zinc-800 mt-auto">
+							<Button
+								variant="outline"
+								className="w-full text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/20 hover:border-red-500/30"
+								onClick={handleDeleteTerm}
+								disabled={archiveTerm.isPending}
+							>
+								<Trash2 className="h-4 w-4 mr-2" />
+								{archiveTerm.isPending ? 'Deleting...' : 'Delete Term'}
+							</Button>
 						</div>
 					</>
 				)}
