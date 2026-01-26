@@ -1,4 +1,6 @@
 .pnpm
+.claude
+.codex
 .pnpm-store
 node_modules
 dist/
