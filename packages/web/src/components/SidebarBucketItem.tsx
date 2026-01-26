@@ -207,7 +207,15 @@ export const SidebarBucketItem = forwardRef<HTMLAnchorElement, SidebarBucketItem
 												</Tooltip>
 											</TooltipProvider>
 										)}
-										<span className="text-[11px] text-muted-foreground tabular-nums flex-shrink-0">{bucket.senseCount}</span>
+										<span
+											className={cn(
+												'text-[11px] text-muted-foreground tabular-nums flex-shrink-0',
+												'transition-opacity duration-150 ease-out',
+												isMobile || isHovered || isActive ? 'opacity-0' : 'opacity-100'
+											)}
+										>
+											{bucket.senseCount}
+										</span>
 									</div>
 									{bucket.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{bucket.description}</p>}
 								</div>
@@ -218,7 +226,7 @@ export const SidebarBucketItem = forwardRef<HTMLAnchorElement, SidebarBucketItem
 					{/* Hover-triggered actions (Notion-style) */}
 					<div
 						className={cn(
-							'absolute right-1 top-1.5 flex items-center gap-0.5 bg-sidebar z-10',
+							'absolute right-1 top-1.5 flex items-center gap-0.5 z-10',
 							'transition-opacity duration-150 ease-out',
 							isMobile || isHovered || isActive ? 'opacity-100' : 'opacity-0 pointer-events-none'
 						)}
