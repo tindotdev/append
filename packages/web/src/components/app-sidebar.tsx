@@ -143,11 +143,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 		setDeleteError(null);
 	};
 
-	const handleQuickAdd = (bucketSlug: string) => {
-		// Navigate to capture page with bucket pre-selected
-		navigate({ to: '/batch', search: { bucket: bucketSlug } });
-	};
-
 	const handleDragEnd = async (event: DragEndEvent) => {
 		const { active, over } = event;
 
@@ -286,16 +281,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 							</DropdownMenu>
 						</SidebarMenuItem>
 					</SidebarMenu>
-					{/* Quick action icons (Linear-style) */}
-					<div className="flex items-center gap-0.5 pr-2 group-data-[collapsible=icon]:hidden">
-						<button
-							type="button"
-							className="flex size-7 items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-							title="Quick capture"
-						>
-							<PenSquare className="size-4" />
-						</button>
-					</div>
 				</div>
 			</SidebarHeader>
 
@@ -366,7 +351,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 													onNameChange={(name) => handleNameChange(bucket.id, name)}
 													onExport={() => handleExportBucket(bucket.id)}
 													onDelete={() => handleDeleteBucket(bucket.id)}
-													onQuickAdd={() => handleQuickAdd(bucket.slug)}
 													ref={(el) => {
 														menuItemsRef.current[NAV_ITEMS.length + index] = el;
 													}}
