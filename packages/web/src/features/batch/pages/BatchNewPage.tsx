@@ -240,7 +240,10 @@ export function BatchNewPage() {
 
 			// Scroll to batch list section
 			if (batchListRef.current) {
-				batchListRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				batchListRef.current.scrollIntoView({
+					behavior: 'smooth',
+					block: 'start',
+				});
 			}
 
 			// Reset the flag
@@ -646,131 +649,133 @@ export function BatchNewPage() {
 
 	return (
 		<BatchErrorBoundary>
-			<div className="w-full">
-				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-					<div>
-						<h2 className="text-xl font-semibold">Capture</h2>
-						<p className="mt-1 text-sm text-zinc-400">Enter terms, one per row. Brain dump welcome.</p>
+			<div className="w-full space-y-8">
+				{/* Capture Section */}
+				<div className="space-y-6">
+					{/* Header */}
+					<div className="flex items-start justify-between gap-4">
+						<div className="flex-1 space-y-1.5">
+							<h2 className="text-xl font-semibold tracking-tight">Capture</h2>
+							<p className="text-sm text-zinc-400">Enter terms, one per row. Brain dump welcome.</p>
+						</div>
+						{rows.some((r) => r.value.trim()) && (
+							<Button variant="ghost" size="sm" onClick={handleClearDraft} className="text-zinc-500 hover:text-zinc-300 shrink-0">
+								Clear draft
+							</Button>
+						)}
 					</div>
-					{rows.some((r) => r.value.trim()) && (
-						<Button variant="ghost" size="sm" onClick={handleClearDraft} className="text-zinc-500 hover:text-zinc-300 self-start sm:self-auto">
-							Clear draft
-						</Button>
-					)}
-				</div>
 
-				<div className="mt-6 space-y-2">
-					{rows.map((row, index) => {
-						const validation = validateTerm(row.value, termValues, index);
-						const hasError = validation.status === 'too-long' || validation.status === 'forbidden-delimiter';
-						const messageClass = validationMessageClass[validation.status];
-						const showMessage = Boolean(messageClass && validation.message);
-						const dotClass = validationDotClass[validation.status] ?? 'bg-zinc-600';
+					{/* Term Input Rows */}
+					<div className="space-y-2">
+						{rows.map((row, index) => {
+							const validation = validateTerm(row.value, termValues, index);
+							const hasError = validation.status === 'too-long' || validation.status === 'forbidden-delimiter';
+							const messageClass = validationMessageClass[validation.status];
+							const showMessage = Boolean(messageClass && validation.message);
+							const dotClass = validationDotClass[validation.status] ?? 'bg-zinc-600';
 
-						return (
-							<div key={row.id} className="group flex items-center gap-2">
-								<div className="flex h-8 w-8 shrink-0 items-center justify-center">
-									<span className={`h-2 w-2 rounded-full ${dotClass}`} />
+							return (
+								<div key={row.id} className="group flex items-center gap-2.5">
+									<div className="flex h-9 w-8 shrink-0 items-center justify-center">
+										<span className={`h-2 w-2 rounded-full transition-colors ${dotClass}`} />
+									</div>
+									<div className="relative flex-1">
+										<Input
+											ref={(el) => {
+												if (el) {
+													inputRefs.current.set(row.id, el);
+												} else {
+													inputRefs.current.delete(row.id);
+												}
+											}}
+											value={row.value}
+											onChange={(e) => handleRowChange(row.id, e.target.value)}
+											onPaste={(e) => handleRowPaste(row.id, e)}
+											onKeyDown={(e) => handleRowKeyDown(row.id, e)}
+											placeholder={index === 0 ? 'Type a term or paste many...' : ''}
+											disabled={isSubmitting}
+											className={getInputClassName(hasError)}
+											aria-invalid={hasError}
+										/>
+										{showMessage && (
+											<span className={`absolute right-10 top-1/2 -translate-y-1/2 text-xs ${messageClass}`}>{validation.message}</span>
+										)}
+									</div>
+									<TooltipProvider delayDuration={300}>
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<Button
+													variant="ghost"
+													size="icon"
+													className="h-9 w-9 shrink-0 text-zinc-500 opacity-0 transition-all hover:text-zinc-300 group-hover:opacity-100 focus:opacity-100"
+													onClick={() => handleRemoveRow(row.id)}
+													disabled={isSubmitting}
+													aria-label="Remove row"
+												>
+													<X className="h-4 w-4" />
+												</Button>
+											</TooltipTrigger>
+											<TooltipContent side="right">Remove</TooltipContent>
+										</Tooltip>
+									</TooltipProvider>
 								</div>
-								<div className="relative flex-1">
-									<Input
-										ref={(el) => {
-											if (el) {
-												inputRefs.current.set(row.id, el);
-											} else {
-												inputRefs.current.delete(row.id);
-											}
-										}}
-										value={row.value}
-										onChange={(e) => handleRowChange(row.id, e.target.value)}
-										onPaste={(e) => handleRowPaste(row.id, e)}
-										onKeyDown={(e) => handleRowKeyDown(row.id, e)}
-										placeholder={index === 0 ? 'Type a term or paste many...' : ''}
-										disabled={isSubmitting}
-										className={getInputClassName(hasError)}
-										aria-invalid={hasError}
-									/>
-									{showMessage && <span className={`absolute right-10 top-1/2 -translate-y-1/2 text-xs ${messageClass}`}>{validation.message}</span>}
-								</div>
-								<TooltipProvider delayDuration={300}>
-									<Tooltip>
-										<TooltipTrigger asChild>
-											<Button
-												variant="ghost"
-												size="icon"
-												className="h-8 w-8 shrink-0 text-zinc-500 opacity-0 transition-opacity hover:text-zinc-300 group-hover:opacity-100 focus:opacity-100"
-												onClick={() => handleRemoveRow(row.id)}
-												disabled={isSubmitting}
-												aria-label="Remove row"
-											>
-												<X className="h-4 w-4" />
-											</Button>
-										</TooltipTrigger>
-										<TooltipContent side="right">Remove</TooltipContent>
-									</Tooltip>
-								</TooltipProvider>
+							);
+						})}
+					</div>
+
+					{/* Bottom Actions Bar */}
+					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-zinc-800/50">
+						<div className="flex items-center gap-4">
+							<div className="text-sm text-zinc-500">
+								<span className={validTermCount < TERM_MIN || validTermCount > TERM_MAX ? 'text-amber-400 font-medium' : 'font-medium'}>
+									{validTermCount} term{validTermCount !== 1 ? 's' : ''}
+								</span>
+								<span className="mx-2 text-zinc-700">·</span>
+								<span className="text-zinc-600">
+									{TERM_MIN}–{TERM_MAX} allowed
+								</span>
 							</div>
-						);
-					})}
-				</div>
-
-				<div className="mt-4">
-					<Button variant="ghost" size="sm" onClick={handleAddRow} disabled={isSubmitting} className="text-zinc-400 hover:text-zinc-200">
-						+ Add term
-					</Button>
-				</div>
-
-				<div className="mt-6 flex items-center justify-between">
-					<div className="text-sm text-zinc-500">
-						<span className={validTermCount < TERM_MIN || validTermCount > TERM_MAX ? 'text-amber-400' : ''}>
-							{validTermCount} term{validTermCount !== 1 ? 's' : ''}
-						</span>
-						<span className="mx-2">·</span>
-						<span>
-							{TERM_MIN}–{TERM_MAX} allowed
-						</span>
-					</div>
-					<div className="flex items-center gap-3">
-						<span className="hidden text-xs text-zinc-500 sm:inline-flex sm:items-center sm:gap-1">
-							<Kbd>⌘</Kbd>
-							<Kbd>↵</Kbd>
-							<span className="ml-1">to submit</span>
-						</span>
-						<Button onClick={handleSubmit} disabled={!canSubmit}>
-							{isSubmitting ? 'Submitting...' : 'Submit Batch'}
-						</Button>
+							<Button variant="ghost" size="sm" onClick={handleAddRow} disabled={isSubmitting} className="text-zinc-400 hover:text-zinc-200 -ml-1">
+								+ Add term
+							</Button>
+						</div>
+						<div className="flex items-center gap-3">
+							<span className="hidden text-xs text-zinc-500 sm:inline-flex sm:items-center sm:gap-1.5">
+								<Kbd>⌘</Kbd>
+								<Kbd>↵</Kbd>
+								<span className="ml-1">to submit</span>
+							</span>
+							<Button onClick={handleSubmit} disabled={!canSubmit} size="default" className="shrink-0">
+								{isSubmitting ? 'Submitting...' : 'Submit Batch'}
+							</Button>
+						</div>
 					</div>
 				</div>
-
-				{/* Separator */}
-				<div className="my-8 border-t border-zinc-800" />
 
 				{/* Recent Batches Section */}
-				<div ref={batchListRef}>
-					<div className="flex items-center justify-between">
-						<div>
-							<h3 className="text-lg font-semibold">Recent batches</h3>
-							<p className="mt-1 text-sm text-zinc-400">View and manage your submitted batches</p>
-						</div>
+				<div ref={batchListRef} className="space-y-6 pt-4">
+					<div className="space-y-1.5">
+						<h3 className="text-lg font-semibold tracking-tight">Recent batches</h3>
+						<p className="text-sm text-zinc-400">View and manage your submitted batches</p>
 					</div>
 
 					{/* Search and Filter Bar */}
-					<div className="mt-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
+					<div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
 						{/* Search Input */}
-						<div className="relative flex-1 min-w-full sm:min-w-[200px]">
+						<div className="relative flex-1 min-w-full sm:min-w-[240px]">
 							<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
 							<Input
 								type="text"
 								placeholder="Search terms..."
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
-								className="pl-9 pr-8"
+								className="pl-9 pr-9"
 							/>
 							{searchQuery && (
 								<button
 									type="button"
 									onClick={() => setSearchQuery('')}
-									className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+									className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
 									aria-label="Clear search"
 								>
 									<X className="h-4 w-4" />
@@ -778,7 +783,7 @@ export function BatchNewPage() {
 							)}
 						</div>
 
-						<div className="flex items-center gap-3 flex-wrap">
+						<div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
 							{/* Status Filter */}
 							<Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as BatchStatusFilter | 'all')}>
 								<SelectTrigger className="w-full sm:w-[140px]" size="sm">
@@ -794,7 +799,7 @@ export function BatchNewPage() {
 
 							{/* Sort Options */}
 							<Select value={sortBy} onValueChange={(value) => setSortBy(value as BatchSortField)}>
-								<SelectTrigger className="w-full sm:w-[140px]" size="sm">
+								<SelectTrigger className="w-full sm:w-[150px]" size="sm">
 									<SelectValue placeholder="Sort by" />
 								</SelectTrigger>
 								<SelectContent>
@@ -811,7 +816,7 @@ export function BatchNewPage() {
 										<Button
 											variant="outline"
 											size="icon"
-											className="h-8 w-8"
+											className="h-9 w-9 shrink-0"
 											onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
 										>
 											{sortOrder === 'desc' ? <ArrowDownAZ className="h-4 w-4" /> : <ArrowUpAZ className="h-4 w-4" />}
@@ -823,7 +828,7 @@ export function BatchNewPage() {
 
 							{/* Clear Filters */}
 							{hasActiveFilters && (
-								<Button variant="ghost" size="sm" onClick={handleClearFilters} className="text-zinc-500 hover:text-zinc-300">
+								<Button variant="ghost" size="sm" onClick={handleClearFilters} className="text-zinc-500 hover:text-zinc-300 whitespace-nowrap">
 									Clear filters
 								</Button>
 							)}
@@ -832,13 +837,13 @@ export function BatchNewPage() {
 
 					{/* Search Status */}
 					{isSearching && (
-						<div className="mt-2 flex items-center gap-2 text-sm text-zinc-500">
-							<Loader2 className="h-3 w-3 animate-spin" />
+						<div className="flex items-center gap-2 text-sm text-zinc-500">
+							<Loader2 className="h-3.5 w-3.5 animate-spin" />
 							<span>Searching...</span>
 						</div>
 					)}
 
-					<div className="mt-4">
+					<div>
 						{isLoading ? (
 							// Loading skeleton
 							<BatchTableSkeleton rows={5} />
@@ -919,8 +924,8 @@ export function BatchNewPage() {
 						<DialogHeader>
 							<DialogTitle>Delete {selectedCount} Batches</DialogTitle>
 							<DialogDescription>
-								Are you sure you want to delete {selectedCount} batch{selectedCount !== 1 ? 'es' : ''} and all their candidates? This action cannot
-								be undone.
+								Are you sure you want to delete {selectedCount} batch
+								{selectedCount !== 1 ? 'es' : ''} and all their candidates? This action cannot be undone.
 							</DialogDescription>
 						</DialogHeader>
 						<DialogFooter>
