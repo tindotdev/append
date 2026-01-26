@@ -20,6 +20,7 @@ import { Route as ProtectedExportRouteImport } from './routes/_protected.export'
 import { Route as ProtectedDashboardRouteImport } from './routes/_protected.dashboard'
 import { Route as ProtectedBatchRouteImport } from './routes/_protected.batch'
 import { Route as DemoDemoRouteImport } from './routes/_demo.demo'
+import { Route as ProtectedBatchIndexRouteImport } from './routes/_protected.batch.index'
 import { Route as ProtectedBucketSlugRouteImport } from './routes/_protected.bucket.$slug'
 import { Route as ProtectedBatchBatchIdRouteImport } from './routes/_protected.batch.$batchId'
 
@@ -76,6 +77,11 @@ const DemoDemoRoute = DemoDemoRouteImport.update({
   path: '/demo',
   getParentRoute: () => DemoRoute,
 } as any)
+const ProtectedBatchIndexRoute = ProtectedBatchIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProtectedBatchRoute,
+} as any)
 const ProtectedBucketSlugRoute = ProtectedBucketSlugRouteImport.update({
   id: '/bucket/$slug',
   path: '/bucket/$slug',
@@ -99,12 +105,12 @@ export interface FileRoutesByFullPath {
   '/settings': typeof ProtectedSettingsRoute
   '/batch/$batchId': typeof ProtectedBatchBatchIdRoute
   '/bucket/$slug': typeof ProtectedBucketSlugRoute
+  '/batch/': typeof ProtectedBatchIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof ProtectedIndexRoute
   '/sign-in': typeof SignInRoute
   '/demo': typeof DemoDemoRoute
-  '/batch': typeof ProtectedBatchRouteWithChildren
   '/dashboard': typeof ProtectedDashboardRoute
   '/export': typeof ProtectedExportRoute
   '/import': typeof ProtectedImportRoute
@@ -112,6 +118,7 @@ export interface FileRoutesByTo {
   '/settings': typeof ProtectedSettingsRoute
   '/batch/$batchId': typeof ProtectedBatchBatchIdRoute
   '/bucket/$slug': typeof ProtectedBucketSlugRoute
+  '/batch': typeof ProtectedBatchIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -128,6 +135,7 @@ export interface FileRoutesById {
   '/_protected/': typeof ProtectedIndexRoute
   '/_protected/batch/$batchId': typeof ProtectedBatchBatchIdRoute
   '/_protected/bucket/$slug': typeof ProtectedBucketSlugRoute
+  '/_protected/batch/': typeof ProtectedBatchIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -143,12 +151,12 @@ export interface FileRouteTypes {
     | '/settings'
     | '/batch/$batchId'
     | '/bucket/$slug'
+    | '/batch/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/sign-in'
     | '/demo'
-    | '/batch'
     | '/dashboard'
     | '/export'
     | '/import'
@@ -156,6 +164,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/batch/$batchId'
     | '/bucket/$slug'
+    | '/batch'
   id:
     | '__root__'
     | '/_demo'
@@ -171,6 +180,7 @@ export interface FileRouteTypes {
     | '/_protected/'
     | '/_protected/batch/$batchId'
     | '/_protected/bucket/$slug'
+    | '/_protected/batch/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -258,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DemoDemoRouteImport
       parentRoute: typeof DemoRoute
     }
+    '/_protected/batch/': {
+      id: '/_protected/batch/'
+      path: '/'
+      fullPath: '/batch/'
+      preLoaderRoute: typeof ProtectedBatchIndexRouteImport
+      parentRoute: typeof ProtectedBatchRoute
+    }
     '/_protected/bucket/$slug': {
       id: '/_protected/bucket/$slug'
       path: '/bucket/$slug'
@@ -287,10 +304,12 @@ const DemoRouteWithChildren = DemoRoute._addFileChildren(DemoRouteChildren)
 
 interface ProtectedBatchRouteChildren {
   ProtectedBatchBatchIdRoute: typeof ProtectedBatchBatchIdRoute
+  ProtectedBatchIndexRoute: typeof ProtectedBatchIndexRoute
 }
 
 const ProtectedBatchRouteChildren: ProtectedBatchRouteChildren = {
   ProtectedBatchBatchIdRoute: ProtectedBatchBatchIdRoute,
+  ProtectedBatchIndexRoute: ProtectedBatchIndexRoute,
 }
 
 const ProtectedBatchRouteWithChildren = ProtectedBatchRoute._addFileChildren(

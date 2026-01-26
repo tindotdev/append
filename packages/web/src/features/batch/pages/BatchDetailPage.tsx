@@ -505,7 +505,7 @@ export function BatchDetailPage() {
 
 	return (
 		<>
-			<div className="max-w-5xl">
+			<div className="w-full">
 				<BatchHeader
 					batch={batch}
 					isRetrying={isRetrying}
