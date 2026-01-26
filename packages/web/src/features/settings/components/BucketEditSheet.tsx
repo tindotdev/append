@@ -71,8 +71,8 @@ export function BucketEditSheet({ bucket, open, onOpenChange }: BucketEditSheetP
 
 	return (
 		<Sheet open={open} onOpenChange={handleOpenChange}>
-			<SheetContent>
-				<SheetHeader>
+			<SheetContent className="flex flex-col px-0">
+				<SheetHeader className="px-6 pb-6">
 					<SheetTitle>Edit Bucket</SheetTitle>
 					<SheetDescription>Update bucket details. The slug cannot be changed after creation.</SheetDescription>
 				</SheetHeader>
@@ -83,96 +83,98 @@ export function BucketEditSheet({ bucket, open, onOpenChange }: BucketEditSheetP
 						e.stopPropagation();
 						form.handleSubmit();
 					}}
-					className="space-y-4 mt-6"
+					className="flex-1 flex flex-col"
 				>
-					<form.Field
-						name="name"
-						validators={{
-							onChange: ({ value }) => {
-								if (!value.trim()) return 'Name is required';
-								if (value.length > 100) return 'Name must be 100 characters or less';
-								return undefined;
-							},
-						}}
-					>
-						{(field) => (
-							<Field>
-								<FieldLabel htmlFor="bucket-name">Name</FieldLabel>
-								<Input
-									id="bucket-name"
-									type="text"
-									value={field.state.value}
-									onChange={(e) => field.handleChange(e.target.value)}
-									onBlur={field.handleBlur}
-									placeholder="e.g., Backend Patterns"
-									maxLength={100}
-									disabled={updateBucketMutation.isPending}
-								/>
-								{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
-							</Field>
-						)}
-					</form.Field>
+					<div className="px-6 space-y-4 flex-1">
+						<form.Field
+							name="name"
+							validators={{
+								onChange: ({ value }) => {
+									if (!value.trim()) return 'Name is required';
+									if (value.length > 100) return 'Name must be 100 characters or less';
+									return undefined;
+								},
+							}}
+						>
+							{(field) => (
+								<Field>
+									<FieldLabel htmlFor="bucket-name">Name</FieldLabel>
+									<Input
+										id="bucket-name"
+										type="text"
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+										onBlur={field.handleBlur}
+										placeholder="e.g., Backend Patterns"
+										maxLength={100}
+										disabled={updateBucketMutation.isPending}
+									/>
+									{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
+								</Field>
+							)}
+						</form.Field>
 
-					{/* Slug field (disabled, read-only) */}
-					<Field>
-						<FieldLabel htmlFor="bucket-slug">Slug</FieldLabel>
-						<Input id="bucket-slug" type="text" value={bucket.slug} disabled className="bg-muted" />
-						<p className="text-xs text-zinc-500 mt-1">Slug cannot be changed after creation.</p>
-					</Field>
+						{/* Slug field (disabled, read-only) */}
+						<Field>
+							<FieldLabel htmlFor="bucket-slug">Slug</FieldLabel>
+							<Input id="bucket-slug" type="text" value={bucket.slug} disabled className="bg-muted" />
+							<p className="text-xs text-zinc-500 mt-1">Slug cannot be changed after creation.</p>
+						</Field>
 
-					<form.Field
-						name="description"
-						validators={{
-							onChange: ({ value }) => {
-								if (!value.trim()) return 'Description is required';
-								if (value.length > 500) return 'Description must be 500 characters or less';
-								return undefined;
-							},
-						}}
-					>
-						{(field) => (
-							<Field>
-								<FieldLabel htmlFor="bucket-description">Description</FieldLabel>
-								<Input
-									id="bucket-description"
-									type="text"
-									value={field.state.value}
-									onChange={(e) => field.handleChange(e.target.value)}
-									onBlur={field.handleBlur}
-									placeholder="e.g., Server-side patterns, APIs, databases"
-									maxLength={500}
-									disabled={updateBucketMutation.isPending}
-								/>
-								{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
-								<p className="text-xs text-zinc-500 mt-1">Used by AI to categorize terms.</p>
-							</Field>
-						)}
-					</form.Field>
+						<form.Field
+							name="description"
+							validators={{
+								onChange: ({ value }) => {
+									if (!value.trim()) return 'Description is required';
+									if (value.length > 500) return 'Description must be 500 characters or less';
+									return undefined;
+								},
+							}}
+						>
+							{(field) => (
+								<Field>
+									<FieldLabel htmlFor="bucket-description">Description</FieldLabel>
+									<Input
+										id="bucket-description"
+										type="text"
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+										onBlur={field.handleBlur}
+										placeholder="e.g., Server-side patterns, APIs, databases"
+										maxLength={500}
+										disabled={updateBucketMutation.isPending}
+									/>
+									{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
+									<p className="text-xs text-zinc-500 mt-1">Used by AI to categorize terms.</p>
+								</Field>
+							)}
+						</form.Field>
 
-					<form.Field name="color">
-						{(field) => (
-							<Field>
-								<FieldLabel htmlFor="bucket-color">Color (optional)</FieldLabel>
-								<BucketColorPicker currentColor={field.state.value} onColorChange={(color) => field.handleChange(color)}>
-									<Button type="button" variant="outline" className="w-full justify-start gap-2" disabled={updateBucketMutation.isPending}>
-										<Palette className="size-4" />
-										<span className="flex-1 text-left">
-											{field.state.value ? (
-												<span className="flex items-center gap-2">
-													<span className="size-3 rounded-full ring-1 ring-border/50" style={{ backgroundColor: field.state.value }} />
-													Color selected
-												</span>
-											) : (
-												'Choose a color'
-											)}
-										</span>
-									</Button>
-								</BucketColorPicker>
-							</Field>
-						)}
-					</form.Field>
+						<form.Field name="color">
+							{(field) => (
+								<Field>
+									<FieldLabel htmlFor="bucket-color">Color (optional)</FieldLabel>
+									<BucketColorPicker currentColor={field.state.value} onColorChange={(color) => field.handleChange(color)}>
+										<Button type="button" variant="outline" className="w-full justify-start gap-2" disabled={updateBucketMutation.isPending}>
+											<Palette className="size-4" />
+											<span className="flex-1 text-left">
+												{field.state.value ? (
+													<span className="flex items-center gap-2">
+														<span className="size-3 rounded-full ring-1 ring-border/50" style={{ backgroundColor: field.state.value }} />
+														Color selected
+													</span>
+												) : (
+													'Choose a color'
+												)}
+											</span>
+										</Button>
+									</BucketColorPicker>
+								</Field>
+							)}
+						</form.Field>
+					</div>
 
-					<div className="flex items-center justify-end gap-3 pt-4">
+					<div className="flex items-center justify-end gap-3 px-6 py-6 mt-auto border-t">
 						<Button type="button" variant="ghost" onClick={() => handleOpenChange(false)} disabled={updateBucketMutation.isPending}>
 							Cancel
 						</Button>
