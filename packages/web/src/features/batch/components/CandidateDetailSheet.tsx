@@ -81,8 +81,8 @@ export function CandidateDetailSheet({
 
 	return (
 		<Sheet open={!!candidate} onOpenChange={(open) => !open && onClose()}>
-			<SheetContent side="right" className="sm:max-w-md overflow-y-auto">
-				<SheetHeader>
+			<SheetContent side="right" className="sm:max-w-md overflow-y-auto px-0">
+				<SheetHeader className="px-6">
 					<div className="flex items-center justify-between">
 						<SheetTitle className="text-lg font-semibold text-zinc-100">{candidate.term}</SheetTitle>
 						{isAccepted && (
@@ -95,7 +95,7 @@ export function CandidateDetailSheet({
 					<SheetDescription>Position {candidate.position + 1} in batch</SheetDescription>
 				</SheetHeader>
 
-				<div className="mt-6 space-y-6">
+				<div className="mt-6 space-y-6 px-6">
 					{/* AI Suggestion section */}
 					{(candidate.suggestedBucket || candidate.suggestedText) && (
 						<div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-700/50">
@@ -183,7 +183,13 @@ export function CandidateDetailSheet({
 								</div>
 
 								{canAccept && (
-									<Button size="sm" className="bg-green-600 hover:bg-green-500" onClick={handleAccept} disabled={isAccepting}>
+									<Button
+										size="sm"
+										variant="outline"
+										className="border-zinc-600 text-zinc-100 hover:bg-zinc-800 hover:text-white"
+										onClick={handleAccept}
+										disabled={isAccepting}
+									>
 										{isAccepting ? (
 											<>
 												<Loader2 className="mr-2 h-4 w-4 animate-spin" />

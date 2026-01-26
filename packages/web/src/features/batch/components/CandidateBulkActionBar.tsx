@@ -32,7 +32,13 @@ export function CandidateBulkActionBar({ selectedCount, isAccepting, onClear, on
 				<div className="h-6 w-px bg-zinc-700" />
 
 				{/* Accept button */}
-				<Button size="sm" className="bg-green-600 hover:bg-green-500" onClick={onAcceptSelected} disabled={isAccepting}>
+				<Button
+					size="sm"
+					variant="outline"
+					onClick={onAcceptSelected}
+					disabled={isAccepting}
+					className="border-zinc-600 text-zinc-100 hover:bg-zinc-800 hover:text-white"
+				>
 					{isAccepting ? (
 						<>
 							<Loader2 className="mr-2 h-4 w-4 animate-spin" />

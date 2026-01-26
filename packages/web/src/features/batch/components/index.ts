@@ -1,3 +1,4 @@
+export { BatchAcceptActionBar } from './BatchAcceptActionBar';
 export { BatchHeader } from './BatchHeader';
 export { CandidateBulkActionBar } from './CandidateBulkActionBar';
 export { CandidateDetailSheet } from './CandidateDetailSheet';

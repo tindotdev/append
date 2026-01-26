@@ -185,28 +185,31 @@ export function getCandidateColumns(meta: CandidateColumnMeta): ColumnDef<Candid
 				switch (status) {
 					case 'ready':
 						return (
-							<Badge variant="outline" className="text-zinc-400 border-zinc-600">
-								Ready
-							</Badge>
+							<div className="flex items-center gap-2">
+								<div className="h-2 w-2 rounded-full bg-blue-400" />
+								<span className="text-sm text-zinc-300">Ready</span>
+							</div>
 						);
 					case 'pending':
 						return (
-							<Badge variant="outline" className="text-yellow-400 border-yellow-600">
-								Pending
-							</Badge>
+							<div className="flex items-center gap-2">
+								<div className="h-2 w-2 rounded-full bg-yellow-400" />
+								<span className="text-sm text-zinc-400">Pending</span>
+							</div>
 						);
 					case 'accepted':
 						return (
-							<Badge className="bg-green-600/20 text-green-400 border-green-600">
-								<Check className="h-3 w-3 mr-1" />
-								Accepted
-							</Badge>
+							<div className="flex items-center gap-2">
+								<Check className="h-4 w-4 text-green-400" />
+								<span className="text-sm text-green-400">Accepted</span>
+							</div>
 						);
 					case 'error':
 						return (
-							<Badge variant="outline" className="text-red-400 border-red-600">
-								Error
-							</Badge>
+							<div className="flex items-center gap-2">
+								<div className="h-2 w-2 rounded-full bg-red-400" />
+								<span className="text-sm text-red-400">Error</span>
+							</div>
 						);
 				}
 			},
