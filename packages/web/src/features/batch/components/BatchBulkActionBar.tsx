@@ -56,7 +56,13 @@ export function BatchBulkActionBar({
 				<div className="h-6 w-px bg-zinc-700" />
 
 				{/* Accept All Ready button */}
-				<Button size="sm" className="bg-green-600 hover:bg-green-500" onClick={onAcceptAllReady} disabled={isLoading}>
+				<Button
+					size="sm"
+					variant="outline"
+					className="border-zinc-600 text-zinc-100 hover:bg-zinc-800 hover:text-white"
+					onClick={onAcceptAllReady}
+					disabled={isLoading}
+				>
 					{isAccepting ? (
 						<>
 							<Loader2 className="mr-2 h-4 w-4 animate-spin" />

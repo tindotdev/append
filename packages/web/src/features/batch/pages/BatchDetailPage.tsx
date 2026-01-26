@@ -2,6 +2,7 @@ import { Link, useParams } from '@tanstack/react-router';
 import type { RowSelectionState } from '@tanstack/react-table';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ApiRequestError } from '@/lib/api-rpc';
 import { useUserBuckets } from '@/lib/user-buckets';
@@ -11,6 +12,7 @@ import { getBatch } from '../api/get-batch';
 import { generateSuggestions } from '../api/retry-suggestions';
 import { updateCandidate } from '../api/update-candidate';
 import {
+	BatchAcceptActionBar,
 	BatchHeader,
 	CandidateBulkActionBar,
 	CandidateDetailSheet,
@@ -101,6 +103,7 @@ export function BatchDetailPage() {
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 	const [searchQuery, setSearchQuery] = useState('');
 	const [acceptingIds, setAcceptingIds] = useState<Set<string>>(new Set());
+	const [statusFilter, setStatusFilter] = useState<'all' | 'ready' | 'pending' | 'accepted' | 'error'>('all');
 
 	// Sheet state
 	const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
@@ -127,14 +130,25 @@ export function BatchDetailPage() {
 		fetchBatch();
 	}, [fetchBatch]);
 
-	// Filter candidates by search query
+	// Filter candidates by search query and status
 	const filteredCandidates = useMemo(() => {
 		if (!batch) return [];
-		if (!searchQuery.trim()) return batch.candidates;
 
-		const query = searchQuery.toLowerCase();
-		return batch.candidates.filter((c) => c.term.toLowerCase().includes(query));
-	}, [batch, searchQuery]);
+		let filtered = batch.candidates;
+
+		// Apply status filter
+		if (statusFilter !== 'all') {
+			filtered = filtered.filter((c) => getCandidateStatus(c) === statusFilter);
+		}
+
+		// Apply search filter
+		if (searchQuery.trim()) {
+			const query = searchQuery.toLowerCase();
+			filtered = filtered.filter((c) => c.term.toLowerCase().includes(query));
+		}
+
+		return filtered;
+	}, [batch, searchQuery, statusFilter]);
 
 	// Count selected candidates
 	const selectedCount = Object.keys(rowSelection).length;
@@ -478,6 +492,21 @@ export function BatchDetailPage() {
 		[handleAcceptCandidate, handleEditCandidate, handleClearCandidate, acceptingIds]
 	);
 
+	// Calculate status counts for filter chips
+	const statusCounts = useMemo(() => {
+		if (!batch) return { all: 0, ready: 0, pending: 0, accepted: 0, error: 0 };
+		return {
+			all: batch.candidates.length,
+			ready: batch.candidates.filter((c) => getCandidateStatus(c) === 'ready').length,
+			pending: batch.candidates.filter((c) => getCandidateStatus(c) === 'pending').length,
+			accepted: batch.candidates.filter((c) => getCandidateStatus(c) === 'accepted').length,
+			error: batch.candidates.filter((c) => getCandidateStatus(c) === 'error').length,
+		};
+	}, [batch]);
+
+	// Calculate ready count for batch accept action bar
+	const readyCount = statusCounts.ready;
+
 	if (isLoading || bucketsLoading) {
 		return <LoadingState />;
 	}
@@ -509,37 +538,80 @@ export function BatchDetailPage() {
 				<BatchHeader
 					batch={batch}
 					isRetrying={isRetrying}
-					isAccepting={isAccepting}
 					generationProgress={generationProgress}
 					onRetryFailed={handleRetryFailed}
 					onGenerateSuggestions={handleGenerateSuggestions}
-					onAcceptAll={handleAcceptAll}
 				/>
 
-				{/* Search filter */}
-				<div className="mt-4 mb-4">
-					<Input
-						type="search"
-						placeholder="Filter candidates..."
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-						className="max-w-sm"
-					/>
-					{searchQuery && (
-						<p className="text-sm text-zinc-500 mt-2">
+				{/* Filter toolbar */}
+				<div className="mt-6 space-y-3 border border-zinc-800 rounded-lg p-4 bg-zinc-950">
+					{/* Search */}
+					<div>
+						<Input
+							type="search"
+							placeholder="Filter candidates..."
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							className="max-w-sm"
+						/>
+					</div>
+
+					{/* Status filter chips */}
+					<div className="flex items-center gap-2 flex-wrap">
+						<span className="text-sm text-zinc-500">Status:</span>
+						<Badge variant={statusFilter === 'all' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setStatusFilter('all')}>
+							All ({statusCounts.all})
+						</Badge>
+						<Badge variant={statusFilter === 'ready' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setStatusFilter('ready')}>
+							<div className="h-2 w-2 rounded-full bg-blue-400 mr-1" />
+							Ready ({statusCounts.ready})
+						</Badge>
+						<Badge
+							variant={statusFilter === 'pending' ? 'default' : 'outline'}
+							className="cursor-pointer"
+							onClick={() => setStatusFilter('pending')}
+						>
+							<div className="h-2 w-2 rounded-full bg-yellow-400 mr-1" />
+							Pending ({statusCounts.pending})
+						</Badge>
+						<Badge
+							variant={statusFilter === 'accepted' ? 'default' : 'outline'}
+							className="cursor-pointer"
+							onClick={() => setStatusFilter('accepted')}
+						>
+							<div className="h-2 w-2 rounded-full bg-green-400 mr-1" />
+							Accepted ({statusCounts.accepted})
+						</Badge>
+						{statusCounts.error > 0 && (
+							<Badge
+								variant={statusFilter === 'error' ? 'default' : 'outline'}
+								className="cursor-pointer"
+								onClick={() => setStatusFilter('error')}
+							>
+								<div className="h-2 w-2 rounded-full bg-red-400 mr-1" />
+								Error ({statusCounts.error})
+							</Badge>
+						)}
+					</div>
+
+					{/* Results count */}
+					{(searchQuery || statusFilter !== 'all') && (
+						<p className="text-sm text-zinc-500">
 							{filteredCandidates.length} of {batch.candidates.length} candidates
 						</p>
 					)}
 				</div>
 
 				{/* Candidate table */}
-				<CandidateTable
-					columns={columns}
-					data={filteredCandidates}
-					rowSelection={rowSelection}
-					onRowSelectionChange={setRowSelection}
-					onRowClick={handleRowClick}
-				/>
+				<div className="mt-4">
+					<CandidateTable
+						columns={columns}
+						data={filteredCandidates}
+						rowSelection={rowSelection}
+						onRowSelectionChange={setRowSelection}
+						onRowClick={handleRowClick}
+					/>
+				</div>
 
 				<div className="mt-6">
 					<Link to="/batch" className="text-zinc-400 hover:text-white transition-colors">
@@ -548,13 +620,16 @@ export function BatchDetailPage() {
 				</div>
 			</div>
 
-			{/* Bulk action bar */}
+			{/* Bulk action bar - shows when items are selected */}
 			<CandidateBulkActionBar
 				selectedCount={selectedCount}
 				isAccepting={isBulkAccepting}
 				onClear={() => setRowSelection({})}
 				onAcceptSelected={handleBulkAccept}
 			/>
+
+			{/* Batch accept action bar - shows when no items selected and there are ready items */}
+			{selectedCount === 0 && <BatchAcceptActionBar readyCount={readyCount} isAccepting={isAccepting} onAcceptAll={handleAcceptAll} />}
 
 			{/* Detail sheet */}
 			<CandidateDetailSheet
