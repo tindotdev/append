@@ -1,15 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import type { ExpandedState, RowSelectionState } from '@tanstack/react-table';
-import { ArrowDownAZ, ArrowUpAZ, Loader2, Search, X } from 'lucide-react';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Kbd } from '@/components/ui/kbd';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useOutboxSafe } from '@/features/outbox';
 import { ApiRequestError } from '@/lib/api-rpc';
 import { UNDO_GRACE_MS } from '@/lib/outbox-adapter';
@@ -21,9 +16,8 @@ import { batchKeys, getBatch } from '../api/get-batch';
 import { type BatchesFilterOptions, useBatches } from '../api/list-batches';
 import { BatchBulkActionBar } from '../components/BatchBulkActionBar';
 import { BatchErrorBoundary } from '../components/BatchErrorBoundary';
-import { BatchTable } from '../components/BatchTable';
-import { BatchTableSkeleton } from '../components/BatchTableSkeleton';
-import { type BatchColumnMeta, getBatchColumns } from '../components/batch-columns';
+import { BatchListCard } from '../components/BatchListCard';
+import { NewBatchCard } from '../components/NewBatchCard';
 import { useBatchStatusUpdates } from '../hooks/useBatchStatusUpdates';
 import type { BatchListItem, BatchSortField, BatchSortOrder, BatchStatusFilter, Candidate } from '../types';
 
@@ -129,7 +123,6 @@ function clearDraft(): void {
 }
 
 // --- Component ---
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Main page component orchestrates capture form, batch list, and real-time updates
 export function BatchNewPage() {
 	// Use safe hook that won't throw during initialization
 	const outbox = useOutboxSafe();
@@ -266,7 +259,7 @@ export function BatchNewPage() {
 		return validation.status === 'too-long' || validation.status === 'forbidden-delimiter';
 	});
 	// Also require outbox to be initialized
-	const canSubmit = outbox && validTermCount >= TERM_MIN && validTermCount <= TERM_MAX && !hasValidationErrors && !isSubmitting;
+	const canSubmit = Boolean(outbox && validTermCount >= TERM_MIN && validTermCount <= TERM_MAX && !hasValidationErrors && !isSubmitting);
 
 	const handleRowChange = useCallback((id: string, value: string) => {
 		setRows((prev) => prev.map((r) => (r.id === id ? { ...r, value } : r)));
@@ -633,268 +626,74 @@ export function BatchNewPage() {
 		setRowSelection({});
 	}, []);
 
-	// Column metadata
-	const columnMeta: BatchColumnMeta = {
-		onViewDetails: handleViewDetails,
-		onAcceptAllReady: handleAcceptAllReady,
-		onRetry: handleRetry,
-		onDelete: handleDelete,
-		acceptingBatches,
-		retryingBatches,
-		deletingBatches,
-		batchProgress,
-	};
-
-	const columns = getBatchColumns(columnMeta);
+	// Toggle expanded state for a specific batch
+	const handleToggleExpanded = useCallback((batchId: string) => {
+		setExpandedRows((prev) => {
+			const prevObj = typeof prev === 'object' ? prev : {};
+			return { ...prevObj, [batchId]: !prevObj[batchId] };
+		});
+	}, []);
 
 	return (
 		<BatchErrorBoundary>
 			<div className="w-full space-y-8">
 				{/* Capture Section */}
-				<div className="space-y-6">
-					{/* Header */}
-					<div className="flex items-start justify-between gap-4">
-						<div className="flex-1 space-y-1.5">
-							<h2 className="text-xl font-semibold tracking-tight">Capture</h2>
-							<p className="text-sm text-zinc-400">Enter terms, one per row. Brain dump welcome.</p>
-						</div>
-						{rows.some((r) => r.value.trim()) && (
-							<Button variant="ghost" size="sm" onClick={handleClearDraft} className="text-zinc-500 hover:text-zinc-300 shrink-0">
-								Clear draft
-							</Button>
-						)}
-					</div>
-
-					{/* Term Input Rows */}
-					<div className="space-y-2">
-						{rows.map((row, index) => {
-							const validation = validateTerm(row.value, termValues, index);
-							const hasError = validation.status === 'too-long' || validation.status === 'forbidden-delimiter';
-							const messageClass = validationMessageClass[validation.status];
-							const showMessage = Boolean(messageClass && validation.message);
-							const dotClass = validationDotClass[validation.status] ?? 'bg-zinc-600';
-
-							return (
-								<div key={row.id} className="group flex items-center gap-2.5">
-									<div className="flex h-9 w-8 shrink-0 items-center justify-center">
-										<span className={`h-2 w-2 rounded-full transition-colors ${dotClass}`} />
-									</div>
-									<div className="relative flex-1">
-										<Input
-											ref={(el) => {
-												if (el) {
-													inputRefs.current.set(row.id, el);
-												} else {
-													inputRefs.current.delete(row.id);
-												}
-											}}
-											value={row.value}
-											onChange={(e) => handleRowChange(row.id, e.target.value)}
-											onPaste={(e) => handleRowPaste(row.id, e)}
-											onKeyDown={(e) => handleRowKeyDown(row.id, e)}
-											placeholder={index === 0 ? 'Type a term or paste many...' : ''}
-											disabled={isSubmitting}
-											className={getInputClassName(hasError)}
-											aria-invalid={hasError}
-										/>
-										{showMessage && (
-											<span className={`absolute right-10 top-1/2 -translate-y-1/2 text-xs ${messageClass}`}>{validation.message}</span>
-										)}
-									</div>
-									<TooltipProvider delayDuration={300}>
-										<Tooltip>
-											<TooltipTrigger asChild>
-												<Button
-													variant="ghost"
-													size="icon"
-													className="h-9 w-9 shrink-0 text-zinc-500 opacity-0 transition-all hover:text-zinc-300 group-hover:opacity-100 focus:opacity-100"
-													onClick={() => handleRemoveRow(row.id)}
-													disabled={isSubmitting}
-													aria-label="Remove row"
-												>
-													<X className="h-4 w-4" />
-												</Button>
-											</TooltipTrigger>
-											<TooltipContent side="right">Remove</TooltipContent>
-										</Tooltip>
-									</TooltipProvider>
-								</div>
-							);
-						})}
-					</div>
-
-					{/* Bottom Actions Bar */}
-					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-zinc-800/50">
-						<div className="flex items-center gap-4">
-							<div className="text-sm text-zinc-500">
-								<span className={validTermCount < TERM_MIN || validTermCount > TERM_MAX ? 'text-amber-400 font-medium' : 'font-medium'}>
-									{validTermCount} term{validTermCount !== 1 ? 's' : ''}
-								</span>
-								<span className="mx-2 text-zinc-700">·</span>
-								<span className="text-zinc-600">
-									{TERM_MIN}–{TERM_MAX} allowed
-								</span>
-							</div>
-							<Button variant="ghost" size="sm" onClick={handleAddRow} disabled={isSubmitting} className="text-zinc-400 hover:text-zinc-200 -ml-1">
-								+ Add term
-							</Button>
-						</div>
-						<div className="flex items-center gap-3">
-							<span className="hidden text-xs text-zinc-500 sm:inline-flex sm:items-center sm:gap-1.5">
-								<Kbd>⌘</Kbd>
-								<Kbd>↵</Kbd>
-								<span className="ml-1">to submit</span>
-							</span>
-							<Button onClick={handleSubmit} disabled={!canSubmit} size="default" className="shrink-0">
-								{isSubmitting ? 'Submitting...' : 'Submit Batch'}
-							</Button>
-						</div>
-					</div>
-				</div>
+				<NewBatchCard
+					rows={rows}
+					isSubmitting={isSubmitting}
+					canSubmit={canSubmit}
+					validTermCount={validTermCount}
+					termMin={TERM_MIN}
+					termMax={TERM_MAX}
+					onRowChange={handleRowChange}
+					onRowPaste={handleRowPaste}
+					onRowKeyDown={handleRowKeyDown}
+					onRemoveRow={handleRemoveRow}
+					onAddRow={handleAddRow}
+					onClearDraft={handleClearDraft}
+					onSubmit={handleSubmit}
+					inputRefs={inputRefs}
+					validateTerm={validateTerm}
+					validationDotClass={validationDotClass}
+					validationMessageClass={validationMessageClass}
+					getInputClassName={getInputClassName}
+				/>
 
 				{/* Recent Batches Section */}
-				<div ref={batchListRef} className="space-y-6 pt-4">
-					<div className="space-y-1.5">
-						<h3 className="text-lg font-semibold tracking-tight">Recent batches</h3>
-						<p className="text-sm text-zinc-400">View and manage your submitted batches</p>
-					</div>
-
-					{/* Search and Filter Bar */}
-					<div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-						{/* Search Input */}
-						<div className="relative flex-1 min-w-full sm:min-w-[240px]">
-							<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-							<Input
-								type="text"
-								placeholder="Search terms..."
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-								className="pl-9 pr-9"
-							/>
-							{searchQuery && (
-								<button
-									type="button"
-									onClick={() => setSearchQuery('')}
-									className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
-									aria-label="Clear search"
-								>
-									<X className="h-4 w-4" />
-								</button>
-							)}
-						</div>
-
-						<div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-							{/* Status Filter */}
-							<Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as BatchStatusFilter | 'all')}>
-								<SelectTrigger className="w-full sm:w-[140px]" size="sm">
-									<SelectValue placeholder="Status" />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="all">All statuses</SelectItem>
-									<SelectItem value="captured">Captured</SelectItem>
-									<SelectItem value="suggested">Suggested</SelectItem>
-									<SelectItem value="accepted">Accepted</SelectItem>
-								</SelectContent>
-							</Select>
-
-							{/* Sort Options */}
-							<Select value={sortBy} onValueChange={(value) => setSortBy(value as BatchSortField)}>
-								<SelectTrigger className="w-full sm:w-[150px]" size="sm">
-									<SelectValue placeholder="Sort by" />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="created">Date created</SelectItem>
-									<SelectItem value="candidateCount">Term count</SelectItem>
-									<SelectItem value="acceptanceRate">Acceptance %</SelectItem>
-								</SelectContent>
-							</Select>
-
-							{/* Sort Order Toggle */}
-							<TooltipProvider delayDuration={300}>
-								<Tooltip>
-									<TooltipTrigger asChild>
-										<Button
-											variant="outline"
-											size="icon"
-											className="h-9 w-9 shrink-0"
-											onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
-										>
-											{sortOrder === 'desc' ? <ArrowDownAZ className="h-4 w-4" /> : <ArrowUpAZ className="h-4 w-4" />}
-										</Button>
-									</TooltipTrigger>
-									<TooltipContent>{sortOrder === 'desc' ? 'Descending' : 'Ascending'}</TooltipContent>
-								</Tooltip>
-							</TooltipProvider>
-
-							{/* Clear Filters */}
-							{hasActiveFilters && (
-								<Button variant="ghost" size="sm" onClick={handleClearFilters} className="text-zinc-500 hover:text-zinc-300 whitespace-nowrap">
-									Clear filters
-								</Button>
-							)}
-						</div>
-					</div>
-
-					{/* Search Status */}
-					{isSearching && (
-						<div className="flex items-center gap-2 text-sm text-zinc-500">
-							<Loader2 className="h-3.5 w-3.5 animate-spin" />
-							<span>Searching...</span>
-						</div>
-					)}
-
-					<div>
-						{isLoading ? (
-							// Loading skeleton
-							<BatchTableSkeleton rows={5} />
-						) : isError ? (
-							// Error state
-							<div className="flex flex-col items-center justify-center py-12 text-center">
-								<p className="text-zinc-400">Failed to load batches. Please try again.</p>
-								<Button variant="secondary" onClick={() => refetch()} className="mt-4">
-									Retry
-								</Button>
-							</div>
-						) : batches.length === 0 ? (
-							// Empty state
-							<div className="flex flex-col items-center justify-center py-12 text-center">
-								{hasActiveFilters ? (
-									<>
-										<p className="text-zinc-400">No batches match your filters.</p>
-										<Button variant="secondary" onClick={handleClearFilters} className="mt-4">
-											Clear filters
-										</Button>
-									</>
-								) : (
-									<p className="text-zinc-400">No batches yet. Submit your first batch above to get started.</p>
-								)}
-							</div>
-						) : (
-							// Table with batches
-							<>
-								<BatchTable
-									columns={columns}
-									data={batches}
-									onRowClick={handleViewDetails}
-									rowSelection={rowSelection}
-									onRowSelectionChange={setRowSelection}
-									onFetchCandidates={handleFetchCandidates}
-									expanded={expandedRows}
-									onExpandedChange={setExpandedRows}
-								/>
-
-								{/* Load more button */}
-								{hasNextPage && (
-									<div className="mt-6 flex justify-center">
-										<Button variant="secondary" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
-											{isFetchingNextPage && <Loader2 className="size-4 animate-spin mr-2" />}
-											Load more
-										</Button>
-									</div>
-								)}
-							</>
-						)}
-					</div>
+				<div ref={batchListRef}>
+					<BatchListCard
+						batches={batches}
+						isLoading={isLoading}
+						isError={isError}
+						searchQuery={searchQuery}
+						isSearching={isSearching}
+						statusFilter={statusFilter}
+						sortBy={sortBy}
+						sortOrder={sortOrder}
+						hasActiveFilters={hasActiveFilters}
+						hasNextPage={hasNextPage ?? false}
+						isFetchingNextPage={isFetchingNextPage}
+						rowSelection={rowSelection}
+						expandedRows={expandedRows}
+						onSearchChange={setSearchQuery}
+						onStatusFilterChange={setStatusFilter}
+						onSortByChange={setSortBy}
+						onSortOrderToggle={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
+						onClearFilters={handleClearFilters}
+						onRefetch={refetch}
+						onFetchNextPage={fetchNextPage}
+						onRowSelectionChange={setRowSelection}
+						onToggleExpanded={handleToggleExpanded}
+						onViewDetails={handleViewDetails}
+						onAcceptAllReady={handleAcceptAllReady}
+						onRetry={handleRetry}
+						onDelete={handleDelete}
+						onFetchCandidates={handleFetchCandidates}
+						acceptingBatches={acceptingBatches}
+						retryingBatches={retryingBatches}
+						deletingBatches={deletingBatches}
+						batchProgress={batchProgress}
+					/>
 				</div>
 
 				{/* Delete Confirmation Dialog */}

@@ -8,11 +8,11 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 	plugins: [
 		devtools(),
-		viteReact(),
-		tailwindcss(),
 		tanstackRouter({
 			autoCodeSplitting: true,
 		}),
+		viteReact(),
+		tailwindcss(),
 	],
 	resolve: {
 		alias: {
