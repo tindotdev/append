@@ -30,7 +30,7 @@ export function CandidateList({
 		<div className="mt-6">
 			{/* Active candidates */}
 			{pendingCandidates.length > 0 && (
-				<div className="border border-zinc-800 rounded-lg divide-y divide-zinc-800">
+				<div className="border border-border rounded-lg divide-y divide-border">
 					{pendingCandidates.map((candidate, index) => {
 						const rowState = rowStates[candidate.id];
 						if (!rowState) return null;
@@ -53,19 +53,19 @@ export function CandidateList({
 			{/* Accepted candidates - collapsed by default */}
 			{acceptedCandidates.length > 0 && (
 				<Collapsible open={isAcceptedOpen} onOpenChange={setIsAcceptedOpen} className="mt-4">
-					<CollapsibleTrigger className="flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-400 py-2 cursor-pointer">
+					<CollapsibleTrigger className="flex items-center gap-1 text-sm text-muted-foreground hover:text-muted-foreground py-2 cursor-pointer">
 						<ChevronRight className={`size-4 transition-transform duration-200 ${isAcceptedOpen ? 'rotate-90' : ''}`} />
 						{acceptedCandidates.length} accepted term{acceptedCandidates.length !== 1 ? 's' : ''}
 					</CollapsibleTrigger>
-					<CollapsibleContent className="mt-2 border border-zinc-800/50 rounded-lg divide-y divide-zinc-800/50 opacity-60">
+					<CollapsibleContent className="mt-2 border border-border/50 rounded-lg divide-y divide-border/50 opacity-60">
 						{acceptedCandidates.map((candidate) => (
 							<div key={candidate.id} className="p-3">
 								<div className="flex items-center gap-2">
 									<span className="text-green-400 text-xs">✓</span>
 									<span className="font-medium">{candidate.term}</span>
-									<span className="text-xs text-zinc-500">→ {candidate.chosenBucket ?? candidate.suggestedBucket}</span>
+									<span className="text-xs text-muted-foreground">→ {candidate.chosenBucket ?? candidate.suggestedBucket}</span>
 								</div>
-								<p className="text-sm text-zinc-500 mt-1 truncate">{candidate.chosenText ?? candidate.suggestedText}</p>
+								<p className="text-sm text-muted-foreground mt-1 truncate">{candidate.chosenText ?? candidate.suggestedText}</p>
 							</div>
 						))}
 					</CollapsibleContent>

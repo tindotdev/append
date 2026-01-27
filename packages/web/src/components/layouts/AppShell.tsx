@@ -68,7 +68,7 @@ export function AppShell() {
 	if (isPending || !isAuthenticated) {
 		return (
 			<div className="flex min-h-screen items-center justify-center">
-				<p className="text-zinc-400">Loading...</p>
+				<p className="text-muted-foreground">Loading...</p>
 			</div>
 		);
 	}
@@ -77,7 +77,7 @@ export function AppShell() {
 		<SidebarProvider>
 			<AppSidebar />
 			<SidebarInset>
-				<header className="flex h-12 shrink-0 items-center gap-2 border-b border-zinc-800 px-4">
+				<header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
 					<SidebarTrigger className="-ml-1" />
 					<div className="ml-auto">
 						<SyncIndicator onManageClick={() => setOutboxManageOpen(true)} />

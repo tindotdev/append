@@ -139,7 +139,7 @@ export function BucketCreateSheet({ open, onOpenChange }: BucketCreateSheetProps
 										<FieldLabel htmlFor="bucket-slug">Slug</FieldLabel>
 										<Tooltip>
 											<TooltipTrigger asChild>
-												<HelpCircle className="size-3.5 text-zinc-500 cursor-help" />
+												<HelpCircle className="size-3.5 text-muted-foreground cursor-help" />
 											</TooltipTrigger>
 											<TooltipContent>
 												<p>A URL-friendly identifier. Cannot be changed after creation.</p>
@@ -188,7 +188,7 @@ export function BucketCreateSheet({ open, onOpenChange }: BucketCreateSheetProps
 										disabled={createBucketMutation.isPending}
 									/>
 									{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
-									<p className="text-xs text-zinc-500 mt-1">Used by AI to categorize terms.</p>
+									<p className="text-xs text-muted-foreground mt-1">Used by AI to categorize terms.</p>
 								</Field>
 							)}
 						</form.Field>

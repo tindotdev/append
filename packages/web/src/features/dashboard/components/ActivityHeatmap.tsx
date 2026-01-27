@@ -31,20 +31,20 @@ function formatDate(dateStr: string): string {
 	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-const HEATMAP_COLORS = [
-	'rgba(255,255,255,0.04)', // 0 - no activity
-	'rgba(52,211,153,0.2)', // 8+ min
-	'rgba(52,211,153,0.4)', // 30+ min
-	'rgba(52,211,153,0.6)', // 60+ min
-	'rgba(52,211,153,0.85)', // 90+ min
-];
+const HEATMAP_COLORS = {
+	0: 'hsl(var(--viz-empty))',
+	1: 'hsl(var(--viz-primary-subtle))',
+	2: 'hsl(var(--viz-primary-medium))',
+	3: 'hsl(var(--viz-primary-strong))',
+	4: 'hsl(var(--viz-primary-intense))',
+};
 
 function ActivityHeatmapLegend() {
 	return (
-		<div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+		<div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
 			<span>Less</span>
 			<div className="flex gap-0.5">
-				{HEATMAP_COLORS.map((color) => (
+				{Object.values(HEATMAP_COLORS).map((color) => (
 					<div key={color} className="size-2.5 rounded-sm" style={{ backgroundColor: color }} />
 				))}
 			</div>
@@ -126,7 +126,7 @@ export function ActivityHeatmap() {
 							space={3}
 							weekLabels={false}
 							monthLabels={['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']}
-							style={{ color: 'var(--color-zinc-500)' }}
+							style={{ color: 'hsl(var(--muted-foreground))' }}
 							panelColors={{
 								0: HEATMAP_COLORS[0],
 								8: HEATMAP_COLORS[1],

@@ -35,16 +35,16 @@ export function BatchBulkActionBar({
 
 	return (
 		<div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-			<div className="flex items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 shadow-xl">
+			<div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-xl">
 				{/* Selection info */}
 				<div className="flex items-center gap-2">
-					<span className="text-sm font-medium text-zinc-100">
+					<span className="text-sm font-medium text-card-foreground">
 						{selectedCount} batch{selectedCount !== 1 ? 'es' : ''} selected
 					</span>
 					<button
 						type="button"
 						onClick={onClear}
-						className="rounded-full p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+						className="rounded-full p-1 text-muted-foreground hover:bg-card/50 hover:text-card-foreground transition-colors"
 						aria-label="Clear selection"
 						disabled={isLoading}
 					>
@@ -53,16 +53,10 @@ export function BatchBulkActionBar({
 				</div>
 
 				{/* Divider */}
-				<div className="h-6 w-px bg-zinc-700" />
+				<div className="h-6 w-px bg-border" />
 
 				{/* Accept All Ready button */}
-				<Button
-					size="sm"
-					variant="outline"
-					className="border-zinc-600 text-zinc-100 hover:bg-zinc-800 hover:text-white"
-					onClick={onAcceptAllReady}
-					disabled={isLoading}
-				>
+				<Button size="sm" variant="outline" onClick={onAcceptAllReady} disabled={isLoading}>
 					{isAccepting ? (
 						<>
 							<Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -104,7 +98,7 @@ export function BatchBulkActionBar({
 							Retry Suggestions
 						</DropdownMenuItem>
 						<DropdownMenuSeparator />
-						<DropdownMenuItem onClick={onDelete} disabled={isLoading} className="text-red-400 focus:text-red-400 focus:bg-red-500/10">
+						<DropdownMenuItem onClick={onDelete} disabled={isLoading} className="text-destructive focus:text-destructive">
 							<Trash2 className="mr-2 h-4 w-4" />
 							Delete Batches
 						</DropdownMenuItem>

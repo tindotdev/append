@@ -125,7 +125,7 @@ export function getCandidateColumns(meta: CandidateColumnMeta): ColumnDef<Candid
 					<ArrowUpDown className="ml-2 h-4 w-4" />
 				</Button>
 			),
-			cell: ({ row }) => <span className="font-medium text-zinc-100">{row.original.term}</span>,
+			cell: ({ row }) => <span className="font-medium text-card-foreground">{row.original.term}</span>,
 		},
 
 		// Bucket column
@@ -139,7 +139,7 @@ export function getCandidateColumns(meta: CandidateColumnMeta): ColumnDef<Candid
 
 				if (status === 'pending' && row.original.suggestionStatus === 'in_progress') {
 					return (
-						<span className="text-zinc-500 text-sm flex items-center gap-1">
+						<span className="text-muted-foreground text-sm flex items-center gap-1">
 							<Loader2 className="h-3 w-3 animate-spin" />
 							generating...
 						</span>
@@ -147,7 +147,7 @@ export function getCandidateColumns(meta: CandidateColumnMeta): ColumnDef<Candid
 				}
 
 				if (!bucket) {
-					return <span className="text-zinc-500 text-sm">—</span>;
+					return <span className="text-muted-foreground text-sm">—</span>;
 				}
 
 				return (
@@ -167,10 +167,10 @@ export function getCandidateColumns(meta: CandidateColumnMeta): ColumnDef<Candid
 				const text = getEffectiveText(row.original);
 
 				if (!text) {
-					return <span className="text-zinc-500 text-sm">—</span>;
+					return <span className="text-muted-foreground text-sm">—</span>;
 				}
 
-				return <span className="text-zinc-400 line-clamp-1 max-w-[300px]">{text}</span>;
+				return <span className="text-muted-foreground line-clamp-1 max-w-[300px]">{text}</span>;
 			},
 		},
 
@@ -185,31 +185,31 @@ export function getCandidateColumns(meta: CandidateColumnMeta): ColumnDef<Candid
 				switch (status) {
 					case 'ready':
 						return (
-							<div className="flex items-center gap-2">
-								<div className="h-2 w-2 rounded-full bg-blue-400" />
-								<span className="text-sm text-zinc-300">Ready</span>
-							</div>
+							<Badge variant="info" className="gap-2">
+								<div className="h-2 w-2 rounded-full bg-current" />
+								<span className="text-sm">Ready</span>
+							</Badge>
 						);
 					case 'pending':
 						return (
-							<div className="flex items-center gap-2">
-								<div className="h-2 w-2 rounded-full bg-yellow-400" />
-								<span className="text-sm text-zinc-400">Pending</span>
-							</div>
+							<Badge variant="warning" className="gap-2">
+								<div className="h-2 w-2 rounded-full bg-current" />
+								<span className="text-sm">Pending</span>
+							</Badge>
 						);
 					case 'accepted':
 						return (
-							<div className="flex items-center gap-2">
-								<Check className="h-4 w-4 text-green-400" />
-								<span className="text-sm text-green-400">Accepted</span>
-							</div>
+							<Badge variant="success" className="gap-2">
+								<Check className="h-4 w-4" />
+								<span className="text-sm">Accepted</span>
+							</Badge>
 						);
 					case 'error':
 						return (
-							<div className="flex items-center gap-2">
-								<div className="h-2 w-2 rounded-full bg-red-400" />
-								<span className="text-sm text-red-400">Error</span>
-							</div>
+							<Badge variant="destructive" className="gap-2">
+								<div className="h-2 w-2 rounded-full bg-current" />
+								<span className="text-sm">Error</span>
+							</Badge>
 						);
 				}
 			},

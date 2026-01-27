@@ -70,15 +70,15 @@ function validateTerm(value: string, existingTerms: string[], currentIndex: numb
 const validationDotClass: Record<ValidationStatus, string> = {
 	valid: 'bg-green-500',
 	duplicate: 'bg-amber-500',
-	'too-long': 'bg-red-500',
-	'forbidden-delimiter': 'bg-red-500',
-	empty: 'bg-zinc-600',
+	'too-long': 'bg-destructive',
+	'forbidden-delimiter': 'bg-destructive',
+	empty: 'bg-border',
 };
 
 const validationMessageClass: Partial<Record<ValidationStatus, string>> = {
 	duplicate: 'text-amber-400',
-	'too-long': 'text-red-400',
-	'forbidden-delimiter': 'text-red-400',
+	'too-long': 'text-destructive',
+	'forbidden-delimiter': 'text-destructive',
 };
 
 function getInputClassName(hasError: boolean): string {
@@ -86,7 +86,7 @@ function getInputClassName(hasError: boolean): string {
 		return 'pr-20';
 	}
 
-	return 'pr-20 border-red-500 focus-visible:ring-red-500';
+	return 'pr-20 border-destructive focus-visible:ring-destructive';
 }
 
 // --- Local Storage ---

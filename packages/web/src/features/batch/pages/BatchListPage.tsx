@@ -63,7 +63,7 @@ export function BatchListPage() {
 		return (
 			<div className="w-full">
 				<Skeleton className="h-7 w-32 mb-6" />
-				<div className="border border-zinc-800 rounded-lg divide-y divide-zinc-800">
+				<div className="border border-border rounded-lg divide-y divide-border">
 					{[1, 2, 3].map((i) => (
 						<div key={i} className="p-4 flex justify-between">
 							<div className="flex items-center gap-3">
@@ -84,7 +84,7 @@ export function BatchListPage() {
 			<div className="w-full">
 				<h2 className="text-xl font-semibold">My Batches</h2>
 				<div className="flex flex-col items-center justify-center py-12 text-center">
-					<p className="text-zinc-400">Something went wrong. Please try again.</p>
+					<p className="text-muted-foreground">Something went wrong. Please try again.</p>
 					<Button variant="secondary" onClick={() => refetch()} className="mt-4">
 						Retry
 					</Button>
@@ -99,7 +99,7 @@ export function BatchListPage() {
 			<div className="w-full">
 				<h2 className="text-xl font-semibold">My Batches</h2>
 				<div className="flex flex-col items-center justify-center py-12 text-center">
-					<p className="text-zinc-400">No batches yet.</p>
+					<p className="text-muted-foreground">No batches yet.</p>
 					<Button asChild variant="secondary" className="mt-4">
 						<Link to="/batch">Create your first batch</Link>
 					</Button>
@@ -114,7 +114,7 @@ export function BatchListPage() {
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="text-xl font-semibold">My Batches</h2>
-					<p className="text-sm text-zinc-500 mt-1">
+					<p className="text-sm text-muted-foreground mt-1">
 						{batches.length} batch{batches.length !== 1 ? 'es' : ''}
 						{hasNextPage ? ' (more available)' : ''}
 					</p>
@@ -125,9 +125,9 @@ export function BatchListPage() {
 			</div>
 
 			{/* Batches list */}
-			<div className="mt-6 border border-zinc-800 rounded-lg divide-y divide-zinc-800">
+			<div className="mt-6 border border-border rounded-lg divide-y divide-border">
 				{batches.map((batch) => (
-					<Link key={batch.id} to="/batch/$batchId" params={{ batchId: batch.id }} className="block p-4 hover:bg-zinc-900/50 transition-colors">
+					<Link key={batch.id} to="/batch/$batchId" params={{ batchId: batch.id }} className="block p-4 hover:bg-card/50 transition-colors">
 						<div className="flex items-center justify-between">
 							<div className="flex items-center gap-3">
 								<Badge variant={getStatusBadgeVariant(batch.status)}>{getStatusLabel(batch.status)}</Badge>
@@ -135,7 +135,7 @@ export function BatchListPage() {
 									{batch.candidateCount} term{batch.candidateCount !== 1 ? 's' : ''}
 								</span>
 							</div>
-							<span className="text-zinc-500 text-sm">{formatRelativeTime(batch.createdAt)}</span>
+							<span className="text-muted-foreground text-sm">{formatRelativeTime(batch.createdAt)}</span>
 						</div>
 					</Link>
 				))}

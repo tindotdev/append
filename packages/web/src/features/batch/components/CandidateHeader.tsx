@@ -7,7 +7,7 @@ export function CandidateHeader({ candidate, index, showSuccess }: { candidate: 
 	const { isSuggestionPending, isSuggestionInProgress, isSuggestionError } = getSuggestionFlags(candidate);
 	return (
 		<div className="flex items-start gap-4 mb-3">
-			<span className="text-zinc-600 text-sm font-mono w-6 text-right flex-shrink-0">{index + 1}</span>
+			<span className="text-muted-foreground text-sm font-mono w-6 text-right flex-shrink-0">{index + 1}</span>
 			<div className="min-w-0 flex-1">
 				<div className="flex items-center gap-2">
 					<p className="text-white font-medium">{candidate.term}</p>
@@ -25,7 +25,9 @@ export function CandidateHeader({ candidate, index, showSuccess }: { candidate: 
 						</Badge>
 					)}
 				</div>
-				{candidate.term !== candidate.normalizedTerm && <p className="text-zinc-500 text-sm mt-0.5">&rarr; {candidate.normalizedTerm}</p>}
+				{candidate.term !== candidate.normalizedTerm && (
+					<p className="text-muted-foreground text-sm mt-0.5">&rarr; {candidate.normalizedTerm}</p>
+				)}
 			</div>
 		</div>
 	);

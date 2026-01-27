@@ -67,13 +67,13 @@ export function BatchTable({
 	});
 
 	return (
-		<div className="border border-zinc-800 rounded-lg overflow-x-auto">
+		<div className="border border-border rounded-lg overflow-x-auto">
 			<Table>
 				<TableHeader>
 					{table.getHeaderGroups().map((headerGroup) => (
-						<TableRow key={headerGroup.id} className="border-zinc-800 hover:bg-transparent">
+						<TableRow key={headerGroup.id} className="border-border hover:bg-transparent">
 							{headerGroup.headers.map((header) => (
-								<TableHead key={header.id} className="text-zinc-400">
+								<TableHead key={header.id} className="text-muted-foreground">
 									{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
 								</TableHead>
 							))}
@@ -87,7 +87,7 @@ export function BatchTable({
 								<TableRow
 									data-state={row.getIsSelected() && 'selected'}
 									data-expanded={row.getIsExpanded()}
-									className="border-zinc-800 cursor-pointer hover:bg-zinc-800/50"
+									className="border-border cursor-pointer hover:bg-accent/50"
 									onClick={(e) => {
 										// Check if click was on an interactive element
 										const target = e.target as HTMLElement;
@@ -103,7 +103,7 @@ export function BatchTable({
 									))}
 								</TableRow>
 								{row.getIsExpanded() && (
-									<TableRow className="border-zinc-800 hover:bg-transparent">
+									<TableRow className="border-border hover:bg-transparent">
 										<TableCell colSpan={columns.length} className="p-0">
 											<ExpandedRowContent
 												batch={row.original}
@@ -117,7 +117,7 @@ export function BatchTable({
 						))
 					) : (
 						<TableRow>
-							<TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
+							<TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
 								No batches found.
 							</TableCell>
 						</TableRow>

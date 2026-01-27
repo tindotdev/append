@@ -33,25 +33,25 @@ function TokenRow({ token, onRevoke }: { token: DeviceTokenListItem; onRevoke: (
 	const expired = token.expires_at_ms !== null && token.expires_at_ms < Date.now();
 
 	return (
-		<div className="flex items-start justify-between gap-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+		<div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-card/50 p-4">
 			<div className="min-w-0 flex-1">
 				<div className="flex items-center gap-2">
-					<KeyRound className="size-4 text-zinc-400" />
-					<div className="font-medium text-zinc-100 truncate">{token.label || 'Untitled token'}</div>
-					<div className="text-xs text-zinc-500">({token.token_prefix}…)</div>
-					{revoked && <span className="text-xs rounded bg-zinc-800 px-2 py-0.5 text-zinc-300">Revoked</span>}
+					<KeyRound className="size-4 text-muted-foreground" />
+					<div className="font-medium text-card-foreground truncate">{token.label || 'Untitled token'}</div>
+					<div className="text-xs text-muted-foreground">({token.token_prefix}…)</div>
+					{revoked && <span className="text-xs rounded bg-muted px-2 py-0.5 text-muted-foreground">Revoked</span>}
 					{!revoked && expired && <span className="text-xs rounded bg-orange-900/50 px-2 py-0.5 text-orange-300">Expired</span>}
 				</div>
-				<div className="mt-1 grid grid-cols-1 gap-1 text-xs text-zinc-500 @md/main:grid-cols-2">
+				<div className="mt-1 grid grid-cols-1 gap-1 text-xs text-muted-foreground @md/main:grid-cols-2">
 					<div>
-						<span className="text-zinc-400">Created:</span> {formatDate(token.created_at_ms)}
+						<span className="text-muted-foreground">Created:</span> {formatDate(token.created_at_ms)}
 					</div>
 					<div>
-						<span className="text-zinc-400">Last used:</span> {formatDate(token.last_used_at_ms)}
+						<span className="text-muted-foreground">Last used:</span> {formatDate(token.last_used_at_ms)}
 					</div>
 					{token.expires_at_ms && (
 						<div className={expired ? 'text-orange-400' : ''}>
-							<span className="text-zinc-400">Expires:</span> {formatDate(token.expires_at_ms)}
+							<span className="text-muted-foreground">Expires:</span> {formatDate(token.expires_at_ms)}
 						</div>
 					)}
 				</div>
@@ -160,7 +160,7 @@ export function DeviceTokenManager() {
 
 							<div className="space-y-3">
 								<div className="space-y-1">
-									<div className="text-xs text-zinc-500">Label (optional)</div>
+									<div className="text-xs text-muted-foreground">Label (optional)</div>
 									<Input
 										value={label}
 										onChange={(e) => setLabel(e.target.value)}
@@ -171,7 +171,7 @@ export function DeviceTokenManager() {
 								</div>
 
 								<div className="space-y-1">
-									<div className="text-xs text-zinc-500">Expiration (optional)</div>
+									<div className="text-xs text-muted-foreground">Expiration (optional)</div>
 									<Select value={expiresInDays} onValueChange={setExpiresInDays} disabled={createMutation.isPending}>
 										<SelectTrigger className="w-full">
 											<SelectValue />
@@ -187,8 +187,8 @@ export function DeviceTokenManager() {
 								</div>
 
 								{createdToken ? (
-									<div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
-										<div className="text-xs text-zinc-400 mb-1">Token (copy now)</div>
+									<div className="rounded-lg border border-border bg-muted/40 p-3">
+										<div className="text-xs text-muted-foreground mb-1">Token (copy now)</div>
 										<div className="flex items-center gap-2">
 											<Input value={createdToken} readOnly />
 											<Button type="button" variant="outline" onClick={handleCopy}>
@@ -196,8 +196,8 @@ export function DeviceTokenManager() {
 												Copy
 											</Button>
 										</div>
-										<p className="text-xs text-zinc-500 mt-2">
-											Paste this token into the extension popup → <span className="text-zinc-300">Device token</span>.
+										<p className="text-xs text-muted-foreground mt-2">
+											Paste this token into the extension popup → <span className="text-foreground">Device token</span>.
 										</p>
 									</div>
 								) : null}
@@ -237,9 +237,9 @@ export function DeviceTokenManager() {
 				)}
 
 				{tokens.length === 0 && !isLoading ? (
-					<div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-6 text-center">
-						<p className="text-zinc-400">No device tokens yet.</p>
-						<p className="text-xs text-zinc-500 mt-1">Create one to connect your extension.</p>
+					<div className="rounded-lg border border-border bg-card/30 p-6 text-center">
+						<p className="text-muted-foreground">No device tokens yet.</p>
+						<p className="text-xs text-muted-foreground mt-1">Create one to connect your extension.</p>
 					</div>
 				) : (
 					<div className="space-y-2">
@@ -250,8 +250,8 @@ export function DeviceTokenManager() {
 				)}
 
 				{createdTokenId ? (
-					<p className="text-xs text-zinc-500">
-						Created token id: <span className="font-mono text-zinc-300">{createdTokenId}</span>
+					<p className="text-xs text-muted-foreground">
+						Created token id: <span className="font-mono text-foreground">{createdTokenId}</span>
 					</p>
 				) : null}
 			</CardContent>

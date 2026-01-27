@@ -14,7 +14,7 @@ export function LoadingState() {
 				<Skeleton className="h-5 w-32" />
 			</div>
 			{/* Content skeleton */}
-			<div className="border border-zinc-800 rounded-lg divide-y divide-zinc-800">
+			<div className="border border-border rounded-lg divide-y divide-border">
 				{[1, 2, 3].map((i) => (
 					<div key={i} className="p-4 space-y-3">
 						<Skeleton className="h-5 w-3/4" />

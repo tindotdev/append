@@ -123,7 +123,7 @@ describe('useBatchStatusUpdates', () => {
 		const onError = vi.fn();
 
 		// Mock error during SSE
-		const mockGenerateSuggestions = vi.fn(async (id: string, callbacks: any) => {
+		const mockGenerateSuggestions = vi.fn(async (_id: string, callbacks: any) => {
 			callbacks.onError('Test error occurred');
 		});
 

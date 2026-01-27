@@ -93,7 +93,7 @@ export function NewBatchCard({
 						</div>
 						<div className="flex items-center gap-2">
 							{hasContent && (
-								<Button variant="ghost" size="sm" onClick={onClearDraft} className="text-zinc-500 hover:text-zinc-300 shrink-0">
+								<Button variant="ghost" size="sm" onClick={onClearDraft} className="text-muted-foreground hover:text-foreground shrink-0">
 									Clear draft
 								</Button>
 							)}
@@ -115,7 +115,7 @@ export function NewBatchCard({
 								const hasError = validation.status === 'too-long' || validation.status === 'forbidden-delimiter';
 								const messageClass = validationMessageClass[validation.status];
 								const showMessage = Boolean(messageClass && validation.message);
-								const dotClass = validationDotClass[validation.status] ?? 'bg-zinc-600';
+								const dotClass = validationDotClass[validation.status] ?? 'bg-border';
 
 								return (
 									<div key={row.id} className="group flex items-center gap-2.5">
@@ -150,7 +150,7 @@ export function NewBatchCard({
 													<Button
 														variant="ghost"
 														size="icon"
-														className="h-9 w-9 shrink-0 text-zinc-500 opacity-0 transition-all hover:text-zinc-300 group-hover:opacity-100 focus:opacity-100"
+														className="h-9 w-9 shrink-0 text-muted-foreground opacity-0 transition-all hover:text-foreground group-hover:opacity-100 focus:opacity-100"
 														onClick={() => onRemoveRow(row.id)}
 														disabled={isSubmitting}
 														aria-label="Remove row"
@@ -169,15 +169,15 @@ export function NewBatchCard({
 
 					<CardFooter>
 						{/* Bottom Actions Bar */}
-						<div className="flex items-center justify-between w-full border-t border-zinc-800/50 pt-4">
+						<div className="flex items-center justify-between w-full border-t border-border pt-4">
 							{/* Left side - minimal counter */}
-							<div className="text-xs text-zinc-500">
-								<span className={validTermCount > termMax ? 'text-red-400' : ''}>{validTermCount}</span>
-								<span className="text-zinc-600"> / {termMax}</span>
+							<div className="text-xs text-muted-foreground">
+								<span className={validTermCount > termMax ? 'text-destructive' : ''}>{validTermCount}</span>
+								<span className="text-muted-foreground/80"> / {termMax}</span>
 							</div>
 							{/* Right side - submit action */}
 							<div className="flex items-center gap-3">
-								<span className="hidden sm:inline text-xs text-zinc-600">⌘↵ to submit</span>
+								<span className="hidden sm:inline text-xs text-muted-foreground/80">⌘↵ to submit</span>
 								<Button onClick={onSubmit} disabled={!canSubmit} size="sm" className="shrink-0">
 									{isSubmitting ? 'Submitting...' : 'Submit'}
 								</Button>

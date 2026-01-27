@@ -45,13 +45,13 @@ export function BucketTable<TData extends { termId: string }>({
 	});
 
 	return (
-		<div className="border border-zinc-800 rounded-lg">
+		<div className="border border-border rounded-lg">
 			<Table>
 				<TableHeader>
 					{table.getHeaderGroups().map((headerGroup) => (
-						<TableRow key={headerGroup.id} className="border-zinc-800 hover:bg-transparent">
+						<TableRow key={headerGroup.id} className="border-border hover:bg-transparent">
 							{headerGroup.headers.map((header) => (
-								<TableHead key={header.id} className="text-zinc-400">
+								<TableHead key={header.id} className="text-muted-foreground">
 									{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
 								</TableHead>
 							))}
@@ -64,7 +64,7 @@ export function BucketTable<TData extends { termId: string }>({
 							<TableRow
 								key={row.id}
 								data-state={row.getIsSelected() && 'selected'}
-								className="border-zinc-800 cursor-pointer hover:bg-zinc-800/50"
+								className="border-border cursor-pointer hover:bg-card/50"
 								onClick={() => onRowClick?.(row.original)}
 							>
 								{row.getVisibleCells().map((cell) => (
@@ -74,7 +74,7 @@ export function BucketTable<TData extends { termId: string }>({
 						))
 					) : (
 						<TableRow>
-							<TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
+							<TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
 								No items found.
 							</TableCell>
 						</TableRow>

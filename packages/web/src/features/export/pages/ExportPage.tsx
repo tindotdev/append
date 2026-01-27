@@ -146,12 +146,12 @@ export function ExportPage() {
 					{hasAnyResults && !state.isDownloading && (
 						<p className="text-sm text-muted-foreground">
 							{failureCount === 0 ? (
-								<span className="text-green-400">✓ All {successCount} files downloaded</span>
+								<span className="text-success">✓ All {successCount} files downloaded</span>
 							) : (
 								<>
-									<span className="text-green-400">{successCount} ✓</span>
+									<span className="text-success">{successCount} ✓</span>
 									{', '}
-									<span className="text-red-400">{failureCount} ✗</span>
+									<span className="text-destructive">{failureCount} ✗</span>
 								</>
 							)}
 						</p>
@@ -178,7 +178,7 @@ export function ExportPage() {
 										<TableCell className="text-xs text-muted-foreground">{bucket}.md</TableCell>
 										<TableCell>
 											{result ? (
-												<span className={`text-xs ${result.success ? 'text-green-400' : 'text-red-400'}`}>
+												<span className={`text-xs ${result.success ? 'text-success' : 'text-destructive'}`}>
 													{result.success ? '✓ Downloaded' : result.error}
 												</span>
 											) : (

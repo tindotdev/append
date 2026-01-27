@@ -18,11 +18,11 @@ function formatFileSize(bytes: number): string {
 function StatusIcon({ status }: { status: ImportHistoryItem['status'] }) {
 	switch (status) {
 		case 'done':
-			return <CheckCircle className="size-4 text-green-500" />;
+			return <CheckCircle className="size-4 text-success" />;
 		case 'error':
-			return <XCircle className="size-4 text-red-500" />;
+			return <XCircle className="size-4 text-destructive" />;
 		default:
-			return <Clock className="size-4 text-yellow-500" />;
+			return <Clock className="size-4 text-warning" />;
 	}
 }
 
@@ -40,7 +40,7 @@ function ImportHistoryItemRow({ item }: { item: ImportHistoryItem }) {
 							<span className="text-sm font-medium text-foreground">
 								{item.termCreatedCount} terms, {item.termSenseCreatedCount} senses
 							</span>
-							{item.flaggedCount > 0 && <span className="text-xs text-yellow-500">{item.flaggedCount} flagged</span>}
+							{item.flaggedCount > 0 && <span className="text-xs text-warning">{item.flaggedCount} flagged</span>}
 						</div>
 						<div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
 							<FileText className="size-3" />

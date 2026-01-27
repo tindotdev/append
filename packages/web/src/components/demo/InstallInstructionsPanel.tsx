@@ -4,14 +4,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 export function InstallInstructionsPanel({ downloadUrl }: { downloadUrl?: string }) {
 	return (
-		<Card className="mb-4 border-zinc-800 bg-zinc-950/50">
+		<Card className="mb-4 bg-card/50">
 			<CardHeader className="gap-1">
 				<CardTitle className="flex items-center gap-2 text-sm">
 					<Puzzle className="size-4" />
 					Try the extension (optional)
 				</CardTitle>
 				<CardDescription className="text-xs">
-					This demo uses synthetic data. Installing the extension is optional and requires Chrome “Developer mode” since it’s not from the Web
+					This demo uses synthetic data. Installing the extension is optional and requires Chrome "Developer mode" since it's not from the Web
 					Store yet.
 				</CardDescription>
 			</CardHeader>
@@ -32,16 +32,16 @@ export function InstallInstructionsPanel({ downloadUrl }: { downloadUrl?: string
 						</Button>
 					</div>
 				) : (
-					<p className="text-xs text-zinc-400">Extension download link not configured.</p>
+					<p className="text-xs text-muted-foreground">Extension download link not configured.</p>
 				)}
 
-				<ol className="list-decimal space-y-1 pl-5 text-xs text-zinc-300">
+				<ol className="list-decimal space-y-1 pl-5 text-xs text-card-foreground">
 					<li>Download the zip and unzip it.</li>
-					<li>Open Chrome extensions page and toggle “Developer mode”.</li>
-					<li>Click “Load unpacked” and select the unzipped folder.</li>
+					<li>Open Chrome extensions page and toggle "Developer mode".</li>
+					<li>Click "Load unpacked" and select the unzipped folder.</li>
 				</ol>
 
-				<p className="text-xs text-zinc-400">
+				<p className="text-xs text-muted-foreground">
 					Note: Uploading real telemetry requires signing in and pairing a device token. The demo page itself never saves data.
 				</p>
 			</CardContent>

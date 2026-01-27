@@ -14,7 +14,7 @@ export function BatchTableSkeleton({ rows = 5 }: BatchTableSkeletonProps) {
 			{Array.from({ length: rows }, (_, i) => i).map((index) => (
 				<div
 					key={`skeleton-${index}`}
-					className="flex items-center gap-3 sm:gap-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 sm:p-4 overflow-x-auto"
+					className="flex items-center gap-3 sm:gap-4 rounded-lg border border-border bg-card/50 p-3 sm:p-4 overflow-x-auto"
 				>
 					{/* Checkbox */}
 					<Skeleton className="h-4 w-4 rounded shrink-0" />

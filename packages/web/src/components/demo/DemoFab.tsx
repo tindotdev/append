@@ -11,7 +11,7 @@ export function DemoFab() {
 		<Button
 			variant="outline"
 			size="icon"
-			className="fixed bottom-4 right-4 z-40 size-9 rounded-full border-zinc-800 bg-zinc-950/80 shadow-sm backdrop-blur-sm hover:bg-zinc-900"
+			className="fixed bottom-4 right-4 z-40 size-9 rounded-full shadow-sm backdrop-blur-sm"
 			title="Regenerate demo data"
 			disabled={isBusy}
 			onClick={async () => {

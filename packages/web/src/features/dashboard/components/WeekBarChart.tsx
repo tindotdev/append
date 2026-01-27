@@ -37,9 +37,9 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
 	const data = payload[0].payload;
 
 	return (
-		<div className="rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-[12px] shadow-lg">
-			<span className="font-medium text-zinc-100">{data.dayLabel}</span>
-			<span className="ml-1.5 text-zinc-400">{data.minutes > 0 ? formatTime(data.minutes) : 'No activity'}</span>
+		<div className="rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] shadow-lg">
+			<span className="font-medium text-card-foreground">{data.dayLabel}</span>
+			<span className="ml-1.5 text-muted-foreground">{data.minutes > 0 ? formatTime(data.minutes) : 'No activity'}</span>
 		</div>
 	);
 }
@@ -82,9 +82,9 @@ export function WeekBarChart() {
 			<CardContent className="px-4">
 				<ResponsiveContainer width="100%" height={100}>
 					<BarChart data={data.days} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-						<XAxis dataKey="dayLabel" axisLine={false} tickLine={false} tick={{ fill: 'rgb(113 113 122)', fontSize: 11 }} dy={8} />
-						<Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-						<Bar dataKey="minutes" fill="rgba(52,211,153,0.7)" radius={[3, 3, 0, 0]} maxBarSize={28} />
+						<XAxis dataKey="dayLabel" axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} dy={8} />
+						<Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--viz-empty))' }} />
+						<Bar dataKey="minutes" fill="hsl(var(--viz-primary-strong))" radius={[3, 3, 0, 0]} maxBarSize={28} />
 					</BarChart>
 				</ResponsiveContainer>
 			</CardContent>

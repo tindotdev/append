@@ -74,13 +74,13 @@ export function getColumns(meta: ColumnMeta): ColumnDef<BucketFeedItem>[] {
 					<ArrowUpDown className="ml-2 h-4 w-4" />
 				</Button>
 			),
-			cell: ({ row }) => <span className="font-medium text-zinc-100">{row.original.displayTerm}</span>,
+			cell: ({ row }) => <span className="font-medium text-card-foreground">{row.original.displayTerm}</span>,
 		},
 		{
 			id: 'definition',
 			accessorFn: (row) => row.primarySense.text,
 			header: 'Definition',
-			cell: ({ row }) => <span className="text-zinc-400 line-clamp-1 max-w-[400px]">{row.original.primarySense.text}</span>,
+			cell: ({ row }) => <span className="text-muted-foreground line-clamp-1 max-w-[400px]">{row.original.primarySense.text}</span>,
 		},
 		{
 			id: 'createdAt',
@@ -91,7 +91,7 @@ export function getColumns(meta: ColumnMeta): ColumnDef<BucketFeedItem>[] {
 					<ArrowUpDown className="ml-2 h-4 w-4" />
 				</Button>
 			),
-			cell: ({ row }) => <span className="text-zinc-500 text-sm">{formatRelativeDate(row.original.primarySense.createdAt)}</span>,
+			cell: ({ row }) => <span className="text-muted-foreground text-sm">{formatRelativeDate(row.original.primarySense.createdAt)}</span>,
 			sortingFn: 'basic',
 		},
 		{

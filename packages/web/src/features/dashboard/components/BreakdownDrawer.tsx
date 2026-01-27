@@ -23,8 +23,8 @@ function BarListItem({ item, maxMinutes }: BarListItemProps) {
 				<div className="h-full bg-emerald-400/10 transition-all group-hover:bg-emerald-400/15" style={{ width: `${percentage}%` }} />
 			</div>
 			{/* Content */}
-			<span className="relative z-10 flex-1 truncate text-[13px] text-zinc-300">{item.label}</span>
-			<span className="relative z-10 text-[13px] tabular-nums text-zinc-500">{formatTime(item.minutes)}</span>
+			<span className="relative z-10 flex-1 truncate text-[13px] text-card-foreground">{item.label}</span>
+			<span className="relative z-10 text-[13px] tabular-nums text-muted-foreground">{formatTime(item.minutes)}</span>
 		</div>
 	);
 }

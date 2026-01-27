@@ -182,7 +182,7 @@ function EditableSense({ sense, canDelete, onSaved, onDeleted }: EditableSensePr
 
 	return (
 		<div className="group relative">
-			<p className="text-zinc-300 pr-16">{sense.text}</p>
+			<p className="text-card-foreground pr-16">{sense.text}</p>
 			<div className="absolute right-0 top-0 flex gap-1 opacity-0 group-hover:opacity-100">
 				<Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setIsEditing(true)}>
 					<Pencil className="h-3 w-3" />
@@ -191,7 +191,7 @@ function EditableSense({ sense, canDelete, onSaved, onDeleted }: EditableSensePr
 					<Button
 						size="icon"
 						variant="ghost"
-						className="h-6 w-6 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+						className="h-6 w-6 text-destructive hover:text-destructive/80 hover:bg-destructive/10"
 						onClick={handleDelete}
 						disabled={archiveSense.isPending}
 					>
@@ -275,7 +275,7 @@ function EditableTermName({ termId, displayTerm, version, onSaved }: EditableTer
 
 	return (
 		<div className="group flex items-center gap-2">
-			<span className="text-lg font-semibold text-zinc-100">{displayTerm}</span>
+			<span className="text-lg font-semibold text-card-foreground">{displayTerm}</span>
 			<Button size="icon" variant="ghost" className="opacity-0 group-hover:opacity-100 h-6 w-6" onClick={() => setIsEditing(true)}>
 				<Pencil className="h-3 w-3" />
 			</Button>
@@ -334,7 +334,7 @@ export function TermDetailSheet({ termId, onClose }: TermDetailSheetProps) {
 			<SheetContent side="right" className="sm:max-w-md overflow-y-auto px-0 flex flex-col">
 				{isLoading && (
 					<div className="flex items-center justify-center py-12 px-6">
-						<span className="text-zinc-400">Loading...</span>
+						<span className="text-muted-foreground">Loading...</span>
 					</div>
 				)}
 
@@ -362,18 +362,18 @@ export function TermDetailSheet({ termId, onClose }: TermDetailSheetProps) {
 
 						<div className="px-6 space-y-6 pb-6 flex-1">
 							<div>
-								<h3 className="text-sm font-medium text-zinc-400 mb-3">
+								<h3 className="text-sm font-medium text-muted-foreground mb-3">
 									{data.senses.length === 1 ? 'Definition' : `Definitions (${data.senses.length})`}
 								</h3>
 								<div className="space-y-4">
 									{data.senses.map((sense) => (
-										<div key={sense.id} className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-700/50">
+										<div key={sense.id} className="p-3 rounded-lg bg-card/50 border border-border/50">
 											<div className="flex items-center gap-2 mb-2">
-												<span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">{sense.bucket}</span>
-												{sense.isPrimary && <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Primary</span>}
+												<span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{sense.bucket}</span>
+												{sense.isPrimary && <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">Primary</span>}
 											</div>
 											<EditableSense sense={sense} canDelete={data.senses.length > 1} onSaved={handleSaved} onDeleted={handleSaved} />
-											<div className="mt-2 text-xs text-zinc-500">
+											<div className="mt-2 text-xs text-muted-foreground">
 												Source: {sense.source} &middot; {formatDate(sense.createdAt)}
 											</div>
 										</div>
@@ -382,10 +382,10 @@ export function TermDetailSheet({ termId, onClose }: TermDetailSheetProps) {
 							</div>
 						</div>
 
-						<div className="px-6 py-4 border-t border-zinc-800 mt-auto">
+						<div className="px-6 py-4 border-t border-border mt-auto">
 							<Button
 								variant="outline"
-								className="w-full text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/20 hover:border-red-500/30"
+								className="w-full text-destructive hover:text-destructive/80 hover:bg-destructive/10 border-destructive/20 hover:border-destructive/30"
 								onClick={handleDeleteTerm}
 								disabled={archiveTerm.isPending}
 							>

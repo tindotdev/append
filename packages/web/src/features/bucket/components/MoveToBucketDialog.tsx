@@ -44,7 +44,7 @@ export function MoveToBucketDialog({ open, onClose, onConfirm, currentBucket, it
 
 				<div className="py-4">
 					{availableBuckets.length === 0 ? (
-						<p className="text-sm text-zinc-400">No other buckets available.</p>
+						<p className="text-sm text-muted-foreground">No other buckets available.</p>
 					) : (
 						<div className="space-y-2">
 							{availableBuckets.map((bucket) => (
@@ -54,8 +54,8 @@ export function MoveToBucketDialog({ open, onClose, onConfirm, currentBucket, it
 									onClick={() => setSelectedBucket(bucket.slug)}
 									className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
 										selectedBucket === bucket.slug
-											? 'border-blue-500 bg-blue-500/10 text-blue-400'
-											: 'border-zinc-700 bg-zinc-800/50 text-zinc-100 hover:bg-zinc-800'
+											? 'border-primary bg-primary/10 text-primary'
+											: 'border-border bg-card/50 text-card-foreground hover:bg-card'
 									}`}
 								>
 									{bucket.name}

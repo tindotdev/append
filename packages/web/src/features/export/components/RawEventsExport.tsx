@@ -135,8 +135,8 @@ export function RawEventsExport() {
 
 				{state.result &&
 					(state.result.success ? (
-						<Alert className={state.result.truncated ? 'border-amber-600' : 'border-green-600'}>
-							<AlertTitle className={state.result.truncated ? 'text-amber-500' : 'text-green-500'}>
+						<Alert className={state.result.truncated ? 'border-warning' : 'border-success'}>
+							<AlertTitle className={state.result.truncated ? 'text-warning' : 'text-success'}>
 								{state.result.truncated
 									? `Export truncated (part ${state.chunkNumber})`
 									: state.chunkNumber > 1

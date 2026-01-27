@@ -82,7 +82,7 @@ export function TelemetryControls() {
 				<Button
 					variant="outline"
 					size="icon"
-					className="fixed bottom-4 right-4 z-40 size-9 rounded-full border-zinc-800 bg-zinc-950/80 shadow-sm backdrop-blur-sm hover:bg-zinc-900"
+					className="fixed bottom-4 right-4 z-40 size-9 rounded-full border-border bg-card/80 shadow-sm backdrop-blur-sm hover:bg-card"
 					title="Open telemetry controls (dev only)"
 				>
 					<FlaskConical className="size-4" />
@@ -97,25 +97,25 @@ export function TelemetryControls() {
 				<div className="mt-6 flex flex-col gap-6 px-4 pb-6">
 					{/* Data Source Toggle (dev only) */}
 					{DEV_MODE && (
-						<div className="flex items-center justify-between rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2">
+						<div className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2">
 							<div className="flex flex-col">
 								<Label htmlFor="api-toggle" className="text-sm font-medium">
 									Use API
 								</Label>
-								<span className="text-xs text-zinc-500">{useApi ? 'Reading from server' : 'Using local simulator'}</span>
+								<span className="text-xs text-muted-foreground">{useApi ? 'Reading from server' : 'Using local simulator'}</span>
 							</div>
 							<Switch id="api-toggle" checked={useApi} onCheckedChange={handleApiToggle} />
 						</div>
 					)}
 
 					{/* Stats */}
-					<div className="flex flex-wrap items-center gap-3 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-400">
+					<div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
 						<span>
-							Events: <span className="tabular-nums text-zinc-300">{eventCount}</span>
+							Events: <span className="tabular-nums text-card-foreground">{eventCount}</span>
 						</span>
-						<span className="text-zinc-700">•</span>
+						<span className="text-border">•</span>
 						<span>
-							Timezone: <span className="text-zinc-300">{timezone}</span>
+							Timezone: <span className="text-card-foreground">{timezone}</span>
 						</span>
 					</div>
 
@@ -126,7 +126,7 @@ export function TelemetryControls() {
 								<h3 className="text-sm font-medium">Add Activity</h3>
 								<div className="space-y-3">
 									<div>
-										<div className="text-xs text-zinc-500">Source URL</div>
+										<div className="text-xs text-muted-foreground">Source URL</div>
 										<Select value={url} onValueChange={setUrl}>
 											<SelectTrigger className="mt-1">
 												<SelectValue />
@@ -141,7 +141,7 @@ export function TelemetryControls() {
 										</Select>
 									</div>
 									<div>
-										<label className="text-xs text-zinc-500" htmlFor={MINUTES_ID}>
+										<label className="text-xs text-muted-foreground" htmlFor={MINUTES_ID}>
 											Minutes
 										</label>
 										<Input id={MINUTES_ID} className="mt-1" inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value)} />
@@ -158,7 +158,7 @@ export function TelemetryControls() {
 								<h3 className="text-sm font-medium">Add Capture</h3>
 								<div className="space-y-3">
 									<div>
-										<div className="text-xs text-zinc-500">Type</div>
+										<div className="text-xs text-muted-foreground">Type</div>
 										<Select value={captureType} onValueChange={(v) => setCaptureType(v as 'term' | 'question')}>
 											<SelectTrigger className="mt-1">
 												<SelectValue />
@@ -170,7 +170,7 @@ export function TelemetryControls() {
 										</Select>
 									</div>
 									<div>
-										<label className="text-xs text-zinc-500" htmlFor={CAPTURE_TEXT_ID}>
+										<label className="text-xs text-muted-foreground" htmlFor={CAPTURE_TEXT_ID}>
 											Text
 										</label>
 										<Input
@@ -182,7 +182,7 @@ export function TelemetryControls() {
 										/>
 									</div>
 									<div>
-										<label className="text-xs text-zinc-500" htmlFor={CAPTURE_NOTE_ID}>
+										<label className="text-xs text-muted-foreground" htmlFor={CAPTURE_NOTE_ID}>
 											Note (optional)
 										</label>
 										<Textarea
@@ -207,7 +207,7 @@ export function TelemetryControls() {
 							</div>
 
 							{/* Actions Section */}
-							<div className="space-y-3 border-t border-zinc-800 pt-6">
+							<div className="space-y-3 border-t border-border pt-6">
 								<h3 className="text-sm font-medium">Actions</h3>
 								<div className="flex flex-col gap-2">
 									<Button variant="outline" onClick={() => exportEventsNdjson()} className="w-full justify-start">

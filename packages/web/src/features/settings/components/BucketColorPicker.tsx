@@ -1,4 +1,5 @@
 import { Check } from 'lucide-react';
+import { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { BUCKET_COLORS } from '@/lib/bucket-colors';
 import { cn } from '@/lib/utils';
@@ -10,8 +11,16 @@ interface BucketColorPickerProps {
 }
 
 export function BucketColorPicker({ currentColor, onColorChange, children }: BucketColorPickerProps) {
+	const [open, setOpen] = useState(false);
+
+	const handleColorSelect = (color: string | null, e: React.MouseEvent) => {
+		e.stopPropagation();
+		onColorChange(color);
+		setOpen(false);
+	};
+
 	return (
-		<Popover>
+		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger asChild>{children}</PopoverTrigger>
 			<PopoverContent className="w-64" align="start">
 				<div className="space-y-2">
@@ -31,7 +40,7 @@ export function BucketColorPicker({ currentColor, onColorChange, children }: Buc
 								style={{
 									backgroundColor: color.value || 'transparent',
 								}}
-								onClick={() => onColorChange(color.value)}
+								onClick={(e) => handleColorSelect(color.value, e)}
 								title={color.label}
 							>
 								{color.value === currentColor && <Check className="h-4 w-4 mx-auto text-primary-foreground" />}
