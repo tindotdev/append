@@ -115,19 +115,19 @@ export function FileUploader({ onFilesUploaded, onError, disabled }: FileUploade
 					font-family: inherit;
 				}
 				.filepond-wrapper .filepond--panel-root {
-					background-color: rgb(24 24 27);
-					border: 1px dashed rgb(63 63 70);
+					background-color: hsl(var(--card));
+					border: 1px dashed hsl(var(--border));
 					border-radius: 0.5rem;
 				}
 				.filepond-wrapper .filepond--drop-label {
-					color: rgb(161 161 170);
+					color: hsl(var(--muted-foreground));
 				}
 				.filepond-wrapper .filepond--drop-label label {
 					font-size: 0.875rem;
 				}
 				.filepond-wrapper .filepond--label-action {
-					color: rgb(59 130 246);
-					text-decoration-color: rgb(59 130 246);
+					color: hsl(var(--primary));
+					text-decoration-color: hsl(var(--primary));
 				}
 				.filepond-wrapper .filepond--label-action:hover {
 					text-decoration: underline;
@@ -136,13 +136,13 @@ export function FileUploader({ onFilesUploaded, onError, disabled }: FileUploade
 					cursor: pointer;
 				}
 				.filepond-wrapper .filepond--item-panel {
-					background-color: rgb(39 39 42);
+					background-color: hsl(var(--border));
 				}
 				.filepond-wrapper [data-filepond-item-state='processing-complete'] .filepond--item-panel {
-					background-color: rgb(22 101 52);
+					background-color: hsl(var(--success));
 				}
 				.filepond-wrapper [data-filepond-item-state='error'] .filepond--item-panel {
-					background-color: rgb(127 29 29);
+					background-color: hsl(var(--destructive));
 				}
 			`}</style>
 		</div>

@@ -90,7 +90,7 @@ export function BatchListCard({
 				<div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
 					{/* Search Input */}
 					<div className="relative flex-1 min-w-full sm:min-w-[240px]">
-						<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+						<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 						<Input
 							type="text"
 							placeholder="Search terms..."
@@ -102,7 +102,7 @@ export function BatchListCard({
 							<button
 								type="button"
 								onClick={() => onSearchChange('')}
-								className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+								className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
 								aria-label="Clear search"
 							>
 								<X className="h-4 w-4" />
@@ -150,7 +150,7 @@ export function BatchListCard({
 
 						{/* Clear Filters */}
 						{hasActiveFilters && (
-							<Button variant="ghost" size="sm" onClick={onClearFilters} className="text-zinc-500 hover:text-zinc-300 whitespace-nowrap">
+							<Button variant="ghost" size="sm" onClick={onClearFilters} className="text-muted-foreground hover:text-foreground whitespace-nowrap">
 								Clear filters
 							</Button>
 						)}
@@ -159,7 +159,7 @@ export function BatchListCard({
 
 				{/* Search Status */}
 				{isSearching && (
-					<div className="flex items-center gap-2 text-sm text-zinc-500 mb-4">
+					<div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
 						<Loader2 className="h-3.5 w-3.5 animate-spin" />
 						<span>Searching...</span>
 					</div>
@@ -172,7 +172,7 @@ export function BatchListCard({
 				) : isError ? (
 					// Error state
 					<div className="flex flex-col items-center justify-center py-12 text-center">
-						<p className="text-zinc-400">Failed to load batches. Please try again.</p>
+						<p className="text-muted-foreground">Failed to load batches. Please try again.</p>
 						<Button variant="secondary" onClick={onRefetch} className="mt-4">
 							Retry
 						</Button>
@@ -182,13 +182,13 @@ export function BatchListCard({
 					<div className="flex flex-col items-center justify-center py-12 text-center">
 						{hasActiveFilters ? (
 							<>
-								<p className="text-zinc-400">No batches match your filters.</p>
+								<p className="text-muted-foreground">No batches match your filters.</p>
 								<Button variant="secondary" onClick={onClearFilters} className="mt-4">
 									Clear filters
 								</Button>
 							</>
 						) : (
-							<p className="text-zinc-400">No batches yet. Submit your first batch above to get started.</p>
+							<p className="text-muted-foreground">No batches yet. Submit your first batch above to get started.</p>
 						)}
 					</div>
 				) : (

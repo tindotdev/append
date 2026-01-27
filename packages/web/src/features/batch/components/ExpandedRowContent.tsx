@@ -17,26 +17,26 @@ function getStatusBadge(status: CandidateStatus) {
 	switch (status) {
 		case 'ready':
 			return (
-				<Badge variant="outline" className="text-zinc-400 border-zinc-600 text-xs">
+				<Badge variant="outline" className="text-xs">
 					Ready
 				</Badge>
 			);
 		case 'pending':
 			return (
-				<Badge variant="outline" className="text-yellow-400 border-yellow-600 text-xs">
+				<Badge variant="warning" className="text-xs">
 					Pending
 				</Badge>
 			);
 		case 'accepted':
 			return (
-				<Badge className="bg-green-600/20 text-green-400 border-green-600 text-xs">
+				<Badge variant="success" className="text-xs">
 					<Check className="h-3 w-3 mr-1" />
 					Accepted
 				</Badge>
 			);
 		case 'error':
 			return (
-				<Badge variant="outline" className="text-red-400 border-red-600 text-xs">
+				<Badge variant="destructive" className="text-xs">
 					Error
 				</Badge>
 			);
@@ -70,8 +70,8 @@ export function ExpandedRowContent({ batch, onFetchCandidates, onViewDetails }: 
 
 	if (isLoading) {
 		return (
-			<div className="border-t border-zinc-800 bg-zinc-900/50 p-4">
-				<div className="flex items-center justify-center gap-2 text-zinc-500">
+			<div className="border-t border-border bg-card/50 p-4">
+				<div className="flex items-center justify-center gap-2 text-muted-foreground">
 					<Loader2 className="h-4 w-4 animate-spin" />
 					<span className="text-sm">Loading candidates...</span>
 				</div>
@@ -81,11 +81,11 @@ export function ExpandedRowContent({ batch, onFetchCandidates, onViewDetails }: 
 
 	if (error) {
 		return (
-			<div className="border-t border-zinc-800 bg-zinc-900/50 p-4">
-				<div className="flex items-center justify-center gap-2 text-red-400">
+			<div className="border-t border-border bg-card/50 p-4">
+				<div className="flex items-center justify-center gap-2 text-destructive">
 					<AlertCircle className="h-4 w-4" />
 					<span className="text-sm">{error}</span>
-					<Button variant="link" size="sm" onClick={fetchCandidates} className="text-red-400 h-auto p-0">
+					<Button variant="link" size="sm" onClick={fetchCandidates} className="text-destructive h-auto p-0">
 						Retry
 					</Button>
 				</div>
@@ -95,8 +95,8 @@ export function ExpandedRowContent({ batch, onFetchCandidates, onViewDetails }: 
 
 	if (!candidates || candidates.length === 0) {
 		return (
-			<div className="border-t border-zinc-800 bg-zinc-900/50 p-4">
-				<div className="text-center text-zinc-500 text-sm">No candidates in this batch</div>
+			<div className="border-t border-border bg-card/50 p-4">
+				<div className="text-center text-muted-foreground text-sm">No candidates in this batch</div>
 			</div>
 		);
 	}
@@ -105,7 +105,7 @@ export function ExpandedRowContent({ batch, onFetchCandidates, onViewDetails }: 
 	const remainingCount = candidates.length - MAX_PREVIEW_CANDIDATES;
 
 	return (
-		<div className="border-t border-zinc-800 bg-zinc-900/50 p-4">
+		<div className="border-t border-border bg-card/50 p-4">
 			<div className="space-y-2">
 				{previewCandidates.map((candidate) => {
 					const status = getCandidateStatus(candidate);
@@ -115,18 +115,18 @@ export function ExpandedRowContent({ batch, onFetchCandidates, onViewDetails }: 
 					return (
 						<div key={candidate.id} className="flex items-center gap-3 text-sm py-1">
 							{getStatusBadge(status)}
-							<span className="font-medium text-zinc-100">{candidate.term}</span>
+							<span className="font-medium text-card-foreground">{candidate.term}</span>
 							{bucket && (
 								<>
-									<ChevronRight className="h-3 w-3 text-zinc-600" />
+									<ChevronRight className="h-3 w-3 text-muted-foreground" />
 									<Badge variant="outline" className="text-xs">
 										{bucket}
 									</Badge>
 								</>
 							)}
-							{text && <span className="text-zinc-500 truncate max-w-[250px]">{text}</span>}
+							{text && <span className="text-muted-foreground truncate max-w-[250px]">{text}</span>}
 							{status === 'error' && candidate.suggestionError && (
-								<span className="text-red-400 text-xs truncate max-w-[200px]">{candidate.suggestionError}</span>
+								<span className="text-destructive text-xs truncate max-w-[200px]">{candidate.suggestionError}</span>
 							)}
 						</div>
 					);
@@ -134,8 +134,8 @@ export function ExpandedRowContent({ batch, onFetchCandidates, onViewDetails }: 
 			</div>
 
 			{(remainingCount > 0 || onViewDetails) && (
-				<div className="mt-3 pt-3 border-t border-zinc-800">
-					<Button variant="link" size="sm" onClick={onViewDetails} className="text-zinc-400 hover:text-zinc-200 h-auto p-0">
+				<div className="mt-3 pt-3 border-t border-border">
+					<Button variant="link" size="sm" onClick={onViewDetails} className="text-muted-foreground hover:text-foreground h-auto p-0">
 						View all {candidates.length} candidates
 						<ChevronRight className="h-4 w-4 ml-1" />
 					</Button>

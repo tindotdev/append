@@ -118,7 +118,7 @@ export function BucketEditSheet({ bucket, open, onOpenChange }: BucketEditSheetP
 						<Field>
 							<FieldLabel htmlFor="bucket-slug">Slug</FieldLabel>
 							<Input id="bucket-slug" type="text" value={bucket.slug} disabled className="bg-muted" />
-							<p className="text-xs text-zinc-500 mt-1">Slug cannot be changed after creation.</p>
+							<p className="text-xs text-muted-foreground mt-1">Slug cannot be changed after creation.</p>
 						</Field>
 
 						<form.Field
@@ -145,7 +145,7 @@ export function BucketEditSheet({ bucket, open, onOpenChange }: BucketEditSheetP
 										disabled={updateBucketMutation.isPending}
 									/>
 									{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
-									<p className="text-xs text-zinc-500 mt-1">Used by AI to categorize terms.</p>
+									<p className="text-xs text-muted-foreground mt-1">Used by AI to categorize terms.</p>
 								</Field>
 							)}
 						</form.Field>

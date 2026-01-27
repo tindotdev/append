@@ -228,14 +228,14 @@ export function ImportPage() {
 					{/* Done state */}
 					{state.step === 'done' && (
 						<div className="space-y-4">
-							<Alert className="bg-green-900/20 border-green-800">
-								<CheckCircleIcon className="size-4 text-green-400" />
-								<AlertTitle className="text-green-400">Import complete</AlertTitle>
+							<Alert className="bg-success/20 border-success">
+								<CheckCircleIcon className="size-4 text-success" />
+								<AlertTitle className="text-success">Import complete</AlertTitle>
 								<AlertDescription className="text-muted-foreground space-y-1">
 									<p>Created {state.result.stats.termCreatedCount} new terms</p>
 									<p>Added {state.result.stats.termSenseCreatedCount} senses</p>
 									{state.result.stats.flaggedCount > 0 && (
-										<p className="text-yellow-400">{state.result.stats.flaggedCount} entries flagged for bucket conflict</p>
+										<p className="text-warning">{state.result.stats.flaggedCount} entries flagged for bucket conflict</p>
 									)}
 									{state.result.stats.skippedCount > 0 && (
 										<p className="text-muted-foreground">{state.result.stats.skippedCount} duplicates skipped</p>

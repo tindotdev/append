@@ -45,7 +45,7 @@ function BucketLoadingState() {
 
 			<Card>
 				<CardContent className="flex items-center justify-center py-12">
-					<span className="text-zinc-400">Loading...</span>
+					<span className="text-muted-foreground">Loading...</span>
 				</CardContent>
 			</Card>
 		</div>
@@ -71,8 +71,10 @@ function BucketNotFoundError({ userBuckets }: { userBuckets: Array<{ name: strin
 
 			<Card>
 				<CardContent className="flex flex-col items-center justify-center py-12 text-center">
-					<p className="text-zinc-400">Bucket not found.</p>
-					{userBuckets.length > 0 && <p className="text-zinc-500 text-sm mt-2">Valid buckets: {userBuckets.map((b) => b.name).join(', ')}</p>}
+					<p className="text-muted-foreground">Bucket not found.</p>
+					{userBuckets.length > 0 && (
+						<p className="text-muted-foreground text-sm mt-2">Valid buckets: {userBuckets.map((b) => b.name).join(', ')}</p>
+					)}
 				</CardContent>
 			</Card>
 		</div>
@@ -105,7 +107,7 @@ function FeedLoadingState({ title }: { title: string }) {
 					<CardTitle>{title}</CardTitle>
 				</CardHeader>
 				<CardContent className="flex items-center justify-center py-12">
-					<span className="text-zinc-400">Loading...</span>
+					<span className="text-muted-foreground">Loading...</span>
 				</CardContent>
 			</Card>
 		</div>
@@ -143,7 +145,7 @@ function FeedErrorState({ title, error, onRetry }: { title: string; error: unkno
 					<CardTitle>{title}</CardTitle>
 				</CardHeader>
 				<CardContent className="flex flex-col items-center justify-center py-12 text-center">
-					<p className="text-zinc-400">{errorMessage}</p>
+					<p className="text-muted-foreground">{errorMessage}</p>
 					<Button variant="secondary" onClick={onRetry} className="mt-4">
 						Retry
 					</Button>
@@ -179,7 +181,7 @@ function FeedEmptyState({ title }: { title: string }) {
 					<CardTitle>{title}</CardTitle>
 				</CardHeader>
 				<CardContent className="flex flex-col items-center justify-center py-12 text-center">
-					<p className="text-zinc-400">No items yet.</p>
+					<p className="text-muted-foreground">No items yet.</p>
 				</CardContent>
 			</Card>
 		</div>
@@ -267,7 +269,7 @@ function FeedContent({
 					<CardContent>
 						{/* Search input */}
 						<div className="relative">
-							<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+							<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 							<Input
 								type="search"
 								placeholder="Filter items..."
@@ -279,7 +281,7 @@ function FeedContent({
 
 						{/* Filtered count */}
 						{searchQuery && (
-							<div className="flex items-center gap-2 text-sm text-zinc-500 mt-4">
+							<div className="flex items-center gap-2 text-sm text-muted-foreground mt-4">
 								{isFiltering && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
 								<span>{isFiltering ? 'Filtering...' : `${filteredItems.length} of ${items.length} items`}</span>
 							</div>

@@ -119,7 +119,7 @@ export function BucketForm({ bucket, onSubmit, onCancel, isPending }: BucketForm
 							<FieldLabel htmlFor="bucket-slug">Slug</FieldLabel>
 							<Tooltip>
 								<TooltipTrigger asChild>
-									<HelpCircle className="size-3.5 text-zinc-500 cursor-help" />
+									<HelpCircle className="size-3.5 text-muted-foreground cursor-help" />
 								</TooltipTrigger>
 								<TooltipContent>
 									<p>A URL-friendly identifier. Cannot be changed after creation.</p>
@@ -140,7 +140,7 @@ export function BucketForm({ bucket, onSubmit, onCancel, isPending }: BucketForm
 							disabled={isPending || isEditing}
 						/>
 						{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
-						{isEditing && <p className="text-xs text-zinc-500 mt-1">Slug cannot be changed after creation.</p>}
+						{isEditing && <p className="text-xs text-muted-foreground mt-1">Slug cannot be changed after creation.</p>}
 					</Field>
 				)}
 			</form.Field>
@@ -169,7 +169,7 @@ export function BucketForm({ bucket, onSubmit, onCancel, isPending }: BucketForm
 							disabled={isPending}
 						/>
 						{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
-						<p className="text-xs text-zinc-500 mt-1">Used by AI to categorize terms.</p>
+						<p className="text-xs text-muted-foreground mt-1">Used by AI to categorize terms.</p>
 					</Field>
 				)}
 			</form.Field>
@@ -199,7 +199,7 @@ export function BucketForm({ bucket, onSubmit, onCancel, isPending }: BucketForm
 								className="flex-1"
 							/>
 							{field.state.value && /^#[0-9A-Fa-f]{6}$/.test(field.state.value) && (
-								<div className="size-8 rounded border border-zinc-700" style={{ backgroundColor: field.state.value }} />
+								<div className="size-8 rounded border border-border" style={{ backgroundColor: field.state.value }} />
 							)}
 						</div>
 						{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}

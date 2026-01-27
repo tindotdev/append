@@ -544,7 +544,7 @@ export function BatchDetailPage() {
 				/>
 
 				{/* Filter toolbar */}
-				<div className="mt-6 space-y-3 border border-zinc-800 rounded-lg p-4 bg-zinc-950">
+				<div className="mt-6 space-y-3 border border-border rounded-lg p-4 bg-card">
 					{/* Search */}
 					<div>
 						<Input
@@ -558,37 +558,37 @@ export function BatchDetailPage() {
 
 					{/* Status filter chips */}
 					<div className="flex items-center gap-2 flex-wrap">
-						<span className="text-sm text-zinc-500">Status:</span>
+						<span className="text-sm text-muted-foreground">Status:</span>
 						<Badge variant={statusFilter === 'all' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setStatusFilter('all')}>
 							All ({statusCounts.all})
 						</Badge>
-						<Badge variant={statusFilter === 'ready' ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setStatusFilter('ready')}>
-							<div className="h-2 w-2 rounded-full bg-blue-400 mr-1" />
+						<Badge variant={statusFilter === 'ready' ? 'info' : 'outline'} className="cursor-pointer" onClick={() => setStatusFilter('ready')}>
+							<div className="h-2 w-2 rounded-full bg-current mr-1" />
 							Ready ({statusCounts.ready})
 						</Badge>
 						<Badge
-							variant={statusFilter === 'pending' ? 'default' : 'outline'}
+							variant={statusFilter === 'pending' ? 'warning' : 'outline'}
 							className="cursor-pointer"
 							onClick={() => setStatusFilter('pending')}
 						>
-							<div className="h-2 w-2 rounded-full bg-yellow-400 mr-1" />
+							<div className="h-2 w-2 rounded-full bg-current mr-1" />
 							Pending ({statusCounts.pending})
 						</Badge>
 						<Badge
-							variant={statusFilter === 'accepted' ? 'default' : 'outline'}
+							variant={statusFilter === 'accepted' ? 'success' : 'outline'}
 							className="cursor-pointer"
 							onClick={() => setStatusFilter('accepted')}
 						>
-							<div className="h-2 w-2 rounded-full bg-green-400 mr-1" />
+							<div className="h-2 w-2 rounded-full bg-current mr-1" />
 							Accepted ({statusCounts.accepted})
 						</Badge>
 						{statusCounts.error > 0 && (
 							<Badge
-								variant={statusFilter === 'error' ? 'default' : 'outline'}
+								variant={statusFilter === 'error' ? 'destructive' : 'outline'}
 								className="cursor-pointer"
 								onClick={() => setStatusFilter('error')}
 							>
-								<div className="h-2 w-2 rounded-full bg-red-400 mr-1" />
+								<div className="h-2 w-2 rounded-full bg-current mr-1" />
 								Error ({statusCounts.error})
 							</Badge>
 						)}
@@ -596,7 +596,7 @@ export function BatchDetailPage() {
 
 					{/* Results count */}
 					{(searchQuery || statusFilter !== 'all') && (
-						<p className="text-sm text-zinc-500">
+						<p className="text-sm text-muted-foreground">
 							{filteredCandidates.length} of {batch.candidates.length} candidates
 						</p>
 					)}
@@ -614,7 +614,7 @@ export function BatchDetailPage() {
 				</div>
 
 				<div className="mt-6">
-					<Link to="/batch" className="text-zinc-400 hover:text-white transition-colors">
+					<Link to="/batch" className="text-muted-foreground hover:text-foreground transition-colors">
 						&larr; Back to batches
 					</Link>
 				</div>

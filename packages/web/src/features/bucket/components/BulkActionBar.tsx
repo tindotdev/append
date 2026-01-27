@@ -20,14 +20,14 @@ export function BulkActionBar({ selectedCount, onClear, onBulkDelete, onBulkMove
 
 	return (
 		<div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-			<div className="flex items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 shadow-xl">
+			<div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-xl">
 				{/* Selection info */}
 				<div className="flex items-center gap-2">
-					<span className="text-sm font-medium text-zinc-100">{selectedCount} selected</span>
+					<span className="text-sm font-medium text-card-foreground">{selectedCount} selected</span>
 					<button
 						type="button"
 						onClick={onClear}
-						className="rounded-full p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+						className="rounded-full p-1 text-muted-foreground hover:bg-card/50 hover:text-card-foreground transition-colors"
 						aria-label="Clear selection"
 					>
 						<X className="h-4 w-4" />
@@ -35,12 +35,12 @@ export function BulkActionBar({ selectedCount, onClear, onBulkDelete, onBulkMove
 				</div>
 
 				{/* Divider */}
-				<div className="h-6 w-px bg-zinc-700" />
+				<div className="h-6 w-px bg-border" />
 
 				{/* Actions dropdown */}
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<Button variant="outline" size="sm" className="border-zinc-700 bg-zinc-800 hover:bg-zinc-700">
+						<Button variant="outline" size="sm" className="border-border bg-card hover:bg-card/50">
 							Actions
 						</Button>
 					</DropdownMenuTrigger>

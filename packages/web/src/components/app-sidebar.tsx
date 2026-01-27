@@ -1,7 +1,7 @@
 import { closestCenter, DndContext, type DragEndEvent, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
-import { ChevronDown, FileDown, FileUp, FolderOpen, LayoutDashboard, LogOut, PenSquare, Plus, Settings, Shield } from 'lucide-react';
+import { ChevronDown, FileDown, FileUp, FolderOpen, LayoutDashboard, LogOut, Plus, Settings, Shield } from 'lucide-react';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';

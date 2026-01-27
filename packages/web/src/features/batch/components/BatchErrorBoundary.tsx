@@ -41,12 +41,12 @@ export class BatchErrorBoundary extends Component<BatchErrorBoundaryProps, Batch
 			return (
 				<div className="flex flex-col items-center justify-center py-12 text-center">
 					<div className="max-w-md space-y-4">
-						<h2 className="text-lg font-semibold text-zinc-200">Something went wrong</h2>
-						<p className="text-sm text-zinc-400">An error occurred while loading the batch view. Please try refreshing the page.</p>
+						<h2 className="text-lg font-semibold text-foreground">Something went wrong</h2>
+						<p className="text-sm text-muted-foreground">An error occurred while loading the batch view. Please try refreshing the page.</p>
 						{this.state.error && (
 							<details className="text-left">
-								<summary className="cursor-pointer text-xs text-zinc-500 hover:text-zinc-400">Technical details</summary>
-								<pre className="mt-2 overflow-auto rounded-lg bg-zinc-900 p-3 text-xs text-zinc-300">
+								<summary className="cursor-pointer text-xs text-muted-foreground hover:text-muted-foreground">Technical details</summary>
+								<pre className="mt-2 overflow-auto rounded-lg bg-card p-3 text-xs text-card-foreground">
 									{this.state.error.message}
 									{this.state.error.stack && `\n\n${this.state.error.stack}`}
 								</pre>

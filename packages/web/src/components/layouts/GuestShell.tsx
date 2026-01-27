@@ -13,10 +13,10 @@ export function GuestShell() {
 			<SidebarProvider>
 				<GuestSidebar extensionDownloadUrl={demoConfig.extensionDownloadUrl} />
 				<SidebarInset>
-					<header className="flex h-12 shrink-0 items-center gap-2 border-b border-zinc-800 px-4">
+					<header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
 						<SidebarTrigger className="-ml-1" />
 						<div className="ml-auto flex items-center gap-2">
-							<div className="hidden items-center gap-2 text-xs text-zinc-400 sm:flex">
+							<div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
 								<Info className="size-3.5" />
 								Synthetic data • nothing is saved
 							</div>

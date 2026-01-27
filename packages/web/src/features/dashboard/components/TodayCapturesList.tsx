@@ -23,12 +23,12 @@ interface CaptureListItemProps {
 function CaptureListItem({ item }: CaptureListItemProps) {
 	return (
 		<div className="flex items-start gap-2 py-1">
-			<Badge variant="outline" className="mt-0.5 shrink-0 px-1.5 py-0 text-[10px] text-zinc-500">
+			<Badge variant="outline" className="mt-0.5 shrink-0 px-1.5 py-0 text-[10px] text-muted-foreground">
 				{CAPTURE_TYPE_LABELS[item.type]}
 			</Badge>
 			<div className="min-w-0 flex-1">
-				<p className="truncate text-[13px] text-zinc-300">{item.label}</p>
-				<p className="truncate text-[11px] text-zinc-600">{item.source}</p>
+				<p className="truncate text-[13px] text-card-foreground">{item.label}</p>
+				<p className="truncate text-[11px] text-muted-foreground">{item.source}</p>
 			</div>
 		</div>
 	);
@@ -105,7 +105,7 @@ export function TodayCapturesList() {
 					<CardDescription className="text-xs">Captures today</CardDescription>
 					<CardTitle className="text-lg tabular-nums">{data.count}</CardTitle>
 					<CardAction>
-						<Bookmark className="size-4 text-zinc-500" />
+						<Bookmark className="size-4 text-muted-foreground" />
 					</CardAction>
 				</CardHeader>
 				<CardContent className="px-4">
@@ -121,7 +121,7 @@ export function TodayCapturesList() {
 							variant="ghost"
 							size="sm"
 							onClick={() => setDrawerOpen(true)}
-							className="mt-2 h-auto px-0 text-[12px] text-zinc-500 hover:bg-transparent hover:text-zinc-300"
+							className="mt-2 h-auto px-0 text-[12px] text-muted-foreground hover:bg-transparent hover:text-card-foreground"
 						>
 							+{data.count - 3} more · View all →
 						</Button>

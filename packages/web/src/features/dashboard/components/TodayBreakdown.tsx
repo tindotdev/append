@@ -33,8 +33,8 @@ function BarListItem({ item, maxMinutes }: BarListItemProps) {
 				<div className="h-full bg-emerald-400/10 transition-all group-hover:bg-emerald-400/15" style={{ width: `${percentage}%` }} />
 			</div>
 			{/* Content */}
-			<span className="relative z-10 flex-1 truncate text-[13px] text-zinc-300">{item.label}</span>
-			<span className="relative z-10 text-[13px] tabular-nums text-zinc-500">{formatTime(item.minutes)}</span>
+			<span className="relative z-10 flex-1 truncate text-[13px] text-card-foreground">{item.label}</span>
+			<span className="relative z-10 text-[13px] tabular-nums text-muted-foreground">{formatTime(item.minutes)}</span>
 		</div>
 	);
 }
@@ -110,14 +110,14 @@ export function TodayBreakdown() {
 					<CardTitle className="min-w-[4.5rem] text-lg tabular-nums">{formatTime(totalMinutes)}</CardTitle>
 					<CardAction>
 						{/* Toggle */}
-						<div className="flex items-center gap-0.5 rounded-md bg-zinc-900 p-0.5">
+						<div className="flex items-center gap-0.5 rounded-md bg-card p-0.5">
 							<Button
 								variant="ghost"
 								size="sm"
 								onClick={() => setView('topic')}
 								className={cn(
 									'h-6 min-w-[52px] px-2 text-[11px]',
-									view === 'topic' ? 'bg-zinc-800 text-zinc-100 hover:bg-zinc-800' : 'text-zinc-500'
+									view === 'topic' ? 'bg-muted text-card-foreground hover:bg-muted' : 'text-muted-foreground'
 								)}
 							>
 								Topic
@@ -128,7 +128,7 @@ export function TodayBreakdown() {
 								onClick={() => setView('source')}
 								className={cn(
 									'h-6 min-w-[52px] px-2 text-[11px]',
-									view === 'source' ? 'bg-zinc-800 text-zinc-100 hover:bg-zinc-800' : 'text-zinc-500'
+									view === 'source' ? 'bg-muted text-card-foreground hover:bg-muted' : 'text-muted-foreground'
 								)}
 							>
 								Source
@@ -151,7 +151,7 @@ export function TodayBreakdown() {
 								variant="ghost"
 								size="sm"
 								onClick={() => setDrawerOpen(true)}
-								className="h-auto px-0 text-[12px] text-zinc-500 hover:bg-transparent hover:text-zinc-300"
+								className="h-auto px-0 text-[12px] text-muted-foreground hover:bg-transparent hover:text-card-foreground"
 							>
 								+{items.length - 4} more · View all →
 							</Button>

@@ -35,7 +35,7 @@ export function BatchHeader({ batch, isRetrying, generationProgress, onRetryFail
 			<div className="flex items-center justify-between">
 				<div>
 					<h2 className="text-xl font-semibold">Batch: Review</h2>
-					<p className="text-sm text-zinc-400 mt-1">
+					<p className="text-sm text-muted-foreground mt-1">
 						{batch.candidateCount} total • {readyCount} ready
 					</p>
 				</div>
@@ -93,7 +93,7 @@ export function BatchHeader({ batch, isRetrying, generationProgress, onRetryFail
 					{generationProgress && (
 						<div className="flex items-center gap-2 ml-auto">
 							<Progress value={(generationProgress.completed / generationProgress.total) * 100} className="h-2 w-24" />
-							<span className="text-sm text-blue-400">
+							<span className="text-sm text-muted-foreground">
 								{generationProgress.completed}/{generationProgress.total}
 							</span>
 						</div>
@@ -103,10 +103,10 @@ export function BatchHeader({ batch, isRetrying, generationProgress, onRetryFail
 
 			{/* Batch accepted alert */}
 			{batch.status === 'accepted' && (
-				<Alert className="bg-green-900/20 border-green-800">
-					<CheckCircle className="h-4 w-4 text-green-400" />
-					<AlertTitle className="text-green-400">All terms have been accepted!</AlertTitle>
-					<AlertDescription className="text-green-500/70">View your terms in the bucket pages.</AlertDescription>
+				<Alert>
+					<CheckCircle className="h-4 w-4" />
+					<AlertTitle>All terms have been accepted!</AlertTitle>
+					<AlertDescription>View your terms in the bucket pages.</AlertDescription>
 				</Alert>
 			)}
 		</div>

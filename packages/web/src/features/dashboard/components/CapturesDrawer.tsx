@@ -19,12 +19,12 @@ interface CaptureListItemProps {
 function CaptureListItem({ item }: CaptureListItemProps) {
 	return (
 		<div className="flex items-start gap-2 py-1">
-			<Badge variant="outline" className="mt-0.5 shrink-0 px-1.5 py-0 text-[10px] text-zinc-500">
+			<Badge variant="outline" className="mt-0.5 shrink-0 px-1.5 py-0 text-[10px] text-muted-foreground">
 				{CAPTURE_TYPE_LABELS[item.type]}
 			</Badge>
 			<div className="min-w-0 flex-1">
-				<p className="truncate text-[13px] text-zinc-300">{item.label}</p>
-				<p className="truncate text-[11px] text-zinc-600">{item.source}</p>
+				<p className="truncate text-[13px] text-card-foreground">{item.label}</p>
+				<p className="truncate text-[11px] text-muted-foreground">{item.source}</p>
 			</div>
 		</div>
 	);
@@ -83,7 +83,7 @@ export function CapturesDrawer({ open, onOpenChange, items, count }: CapturesDra
 				{filteredItems.map((item) => (
 					<CaptureListItem key={item.id} item={item} />
 				))}
-				{filteredItems.length === 0 && <p className="py-4 text-center text-sm text-zinc-500">No captures found</p>}
+				{filteredItems.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">No captures found</p>}
 			</div>
 		</DetailDrawer>
 	);

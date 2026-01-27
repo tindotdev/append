@@ -50,3 +50,9 @@ Primary focus for this branch is shipping the **real ingest path** and the clien
 
 - Cloudflare-first: SPA on Pages + API on Workers (Hono) + D1 for relational storage.
 - Correctness: idempotent creates/accept/import; retry-safe jobs; conditional transitions; conflict detection for edits; soft deletes.
+
+## Color Token Conventions
+
+**Only use semantic color tokens. Never hardcode colors in the web module.**
+
+All color tokens are defined in `packages/web/src/main.css` using OKLCH color space.

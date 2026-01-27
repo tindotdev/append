@@ -36,7 +36,7 @@ function BucketLoadingState() {
 function BucketErrorState({ onRetry }: { onRetry: () => void }) {
 	return (
 		<div className="flex flex-col items-center justify-center py-12 text-center">
-			<p className="text-zinc-400">Failed to load buckets.</p>
+			<p className="text-muted-foreground">Failed to load buckets.</p>
 			<Button type="button" variant="ghost" onClick={onRetry} className="mt-4">
 				Retry
 			</Button>
@@ -62,8 +62,8 @@ function BucketFormView({
 	return (
 		<div className="space-y-6">
 			<div>
-				<h3 className="text-lg font-medium text-zinc-100">{mode === 'create' ? 'Create Bucket' : 'Edit Bucket'}</h3>
-				<p className="text-sm text-zinc-400 mt-1">
+				<h3 className="text-lg font-medium text-foreground">{mode === 'create' ? 'Create Bucket' : 'Edit Bucket'}</h3>
+				<p className="text-sm text-muted-foreground mt-1">
 					{mode === 'create' ? 'Add a new bucket to organize your terms.' : 'Update bucket details.'}
 				</p>
 			</div>
@@ -74,7 +74,7 @@ function BucketFormView({
 				</Alert>
 			)}
 
-			<div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6">
+			<div className="rounded-lg border border-border bg-card/50 p-6">
 				<BucketForm bucket={bucket} onSubmit={onSubmit} onCancel={onCancel} isPending={isPending} />
 			</div>
 		</div>
@@ -105,8 +105,8 @@ function BucketListView({
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
 				<div>
-					<h3 className="text-lg font-medium text-zinc-100">Buckets</h3>
-					<p className="text-sm text-zinc-400 mt-1">
+					<h3 className="text-lg font-medium text-foreground">Buckets</h3>
+					<p className="text-sm text-muted-foreground mt-1">
 						{buckets.length} of {MAX_BUCKETS} buckets used. Drag to reorder.
 					</p>
 				</div>

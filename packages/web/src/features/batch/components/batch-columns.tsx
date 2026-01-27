@@ -96,7 +96,9 @@ export function getBatchColumns(meta: BatchColumnMeta): ColumnDef<BatchListItem>
 
 				return (
 					<div className="flex items-center gap-2">
-						<span className="text-zinc-500">{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</span>
+						<span className="text-muted-foreground">
+							{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+						</span>
 						<div className="flex flex-col gap-1">
 							<div className="font-medium">
 								{displayTerms || 'Empty batch'}
