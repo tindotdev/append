@@ -353,7 +353,8 @@ export async function archiveTermSense(
 				id: updatedSense.id,
 				termId: updatedSense.termId,
 				version: updatedSense.version,
-				archivedAt: updatedSense.archivedAt!.getTime(),
+				// Note: archivedAt is guaranteed non-null since we just set it in the update
+				archivedAt: (updatedSense.archivedAt as Date).getTime(),
 			},
 			...(termResult && { term: termResult }),
 		},

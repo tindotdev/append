@@ -5,7 +5,6 @@
  * by directly testing the archiveTermSense function with controlled DB state.
  */
 
-import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { describe, expect, it, vi } from 'vitest';
 import type { schema } from '../src/db';

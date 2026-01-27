@@ -363,7 +363,7 @@ export const eventsRoutes = app
 							payload: JSON.parse(row.payloadJson),
 						};
 
-						await s.write(JSON.stringify(envelope) + '\n');
+						await s.write(`${JSON.stringify(envelope)}\n`);
 						totalExported += 1;
 						cursor = { emittedAt: row.emittedAt, deviceId: row.deviceId, eventId: row.eventId };
 					}
