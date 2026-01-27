@@ -1,8 +1,18 @@
-import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
+import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import type { RowSelectionState } from '@tanstack/react-table';
-import { Search } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import {
+	Breadcrumb,
+	BreadcrumbItem,
+	BreadcrumbLink,
+	BreadcrumbList,
+	BreadcrumbPage,
+	BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ApiRequestError } from '@/lib/api-rpc';
 import { useUserBuckets } from '@/lib/user-buckets';
@@ -18,32 +28,86 @@ import type { BucketFeedItem } from '../types';
 
 function BucketLoadingState() {
 	return (
-		<div className="w-full">
-			<div className="flex items-center justify-center py-12">
-				<span className="text-zinc-400">Loading...</span>
-			</div>
+		<div className="w-full space-y-4">
+			<Breadcrumb>
+				<BreadcrumbList>
+					<BreadcrumbItem>
+						<BreadcrumbLink asChild>
+							<Link to="/dashboard">Home</Link>
+						</BreadcrumbLink>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbPage>Buckets</BreadcrumbPage>
+					</BreadcrumbItem>
+				</BreadcrumbList>
+			</Breadcrumb>
+
+			<Card>
+				<CardContent className="flex items-center justify-center py-12">
+					<span className="text-zinc-400">Loading...</span>
+				</CardContent>
+			</Card>
 		</div>
 	);
 }
 
 function BucketNotFoundError({ userBuckets }: { userBuckets: Array<{ name: string }> }) {
 	return (
-		<div className="w-full">
-			<div className="flex flex-col items-center justify-center py-12 text-center">
-				<p className="text-zinc-400">Bucket not found.</p>
-				{userBuckets.length > 0 && <p className="text-zinc-500 text-sm mt-2">Valid buckets: {userBuckets.map((b) => b.name).join(', ')}</p>}
-			</div>
+		<div className="w-full space-y-4">
+			<Breadcrumb>
+				<BreadcrumbList>
+					<BreadcrumbItem>
+						<BreadcrumbLink asChild>
+							<Link to="/dashboard">Home</Link>
+						</BreadcrumbLink>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbPage>Buckets</BreadcrumbPage>
+					</BreadcrumbItem>
+				</BreadcrumbList>
+			</Breadcrumb>
+
+			<Card>
+				<CardContent className="flex flex-col items-center justify-center py-12 text-center">
+					<p className="text-zinc-400">Bucket not found.</p>
+					{userBuckets.length > 0 && <p className="text-zinc-500 text-sm mt-2">Valid buckets: {userBuckets.map((b) => b.name).join(', ')}</p>}
+				</CardContent>
+			</Card>
 		</div>
 	);
 }
 
 function FeedLoadingState({ title }: { title: string }) {
 	return (
-		<div className="w-full">
-			<h2 className="text-xl font-semibold">{title}</h2>
-			<div className="flex items-center justify-center py-12">
-				<span className="text-zinc-400">Loading...</span>
-			</div>
+		<div className="w-full space-y-4">
+			<Breadcrumb>
+				<BreadcrumbList>
+					<BreadcrumbItem>
+						<BreadcrumbLink asChild>
+							<Link to="/dashboard">Home</Link>
+						</BreadcrumbLink>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<span className="text-muted-foreground">Buckets</span>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbPage>{title}</BreadcrumbPage>
+					</BreadcrumbItem>
+				</BreadcrumbList>
+			</Breadcrumb>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>{title}</CardTitle>
+				</CardHeader>
+				<CardContent className="flex items-center justify-center py-12">
+					<span className="text-zinc-400">Loading...</span>
+				</CardContent>
+			</Card>
 		</div>
 	);
 }
@@ -55,25 +119,69 @@ function FeedErrorState({ title, error, onRetry }: { title: string; error: unkno
 			: 'Something went wrong. Please try again.';
 
 	return (
-		<div className="w-full">
-			<h2 className="text-xl font-semibold">{title}</h2>
-			<div className="flex flex-col items-center justify-center py-12 text-center">
-				<p className="text-zinc-400">{errorMessage}</p>
-				<button type="button" onClick={onRetry} className="mt-4 px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 transition-colors">
-					Retry
-				</button>
-			</div>
+		<div className="w-full space-y-4">
+			<Breadcrumb>
+				<BreadcrumbList>
+					<BreadcrumbItem>
+						<BreadcrumbLink asChild>
+							<Link to="/dashboard">Home</Link>
+						</BreadcrumbLink>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<span className="text-muted-foreground">Buckets</span>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbPage>{title}</BreadcrumbPage>
+					</BreadcrumbItem>
+				</BreadcrumbList>
+			</Breadcrumb>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>{title}</CardTitle>
+				</CardHeader>
+				<CardContent className="flex flex-col items-center justify-center py-12 text-center">
+					<p className="text-zinc-400">{errorMessage}</p>
+					<Button variant="secondary" onClick={onRetry} className="mt-4">
+						Retry
+					</Button>
+				</CardContent>
+			</Card>
 		</div>
 	);
 }
 
 function FeedEmptyState({ title }: { title: string }) {
 	return (
-		<div className="w-full">
-			<h2 className="text-xl font-semibold">{title}</h2>
-			<div className="flex flex-col items-center justify-center py-12 text-center">
-				<p className="text-zinc-400">No items yet.</p>
-			</div>
+		<div className="w-full space-y-4">
+			<Breadcrumb>
+				<BreadcrumbList>
+					<BreadcrumbItem>
+						<BreadcrumbLink asChild>
+							<Link to="/dashboard">Home</Link>
+						</BreadcrumbLink>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<span className="text-muted-foreground">Buckets</span>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbPage>{title}</BreadcrumbPage>
+					</BreadcrumbItem>
+				</BreadcrumbList>
+			</Breadcrumb>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>{title}</CardTitle>
+				</CardHeader>
+				<CardContent className="flex flex-col items-center justify-center py-12 text-center">
+					<p className="text-zinc-400">No items yet.</p>
+				</CardContent>
+			</Card>
 		</div>
 	);
 }
@@ -128,61 +236,84 @@ function FeedContent({
 
 	return (
 		<>
-			<div className="w-full">
-				<h2 className="text-xl font-semibold">{title}</h2>
-				<p className="text-sm text-zinc-500 mt-1">
-					{items.length} item{items.length !== 1 ? 's' : ''}
-					{hasNextPage ? ' (more available)' : ''}
-				</p>
+			<div className="w-full space-y-4">
+				<Breadcrumb>
+					<BreadcrumbList>
+						<BreadcrumbItem>
+							<BreadcrumbLink asChild>
+								<Link to="/dashboard">Home</Link>
+							</BreadcrumbLink>
+						</BreadcrumbItem>
+						<BreadcrumbSeparator />
+						<BreadcrumbItem>
+							<span className="text-muted-foreground">Buckets</span>
+						</BreadcrumbItem>
+						<BreadcrumbSeparator />
+						<BreadcrumbItem>
+							<BreadcrumbPage>{title}</BreadcrumbPage>
+						</BreadcrumbItem>
+					</BreadcrumbList>
+				</Breadcrumb>
 
-				{/* Search input */}
-				<div className="mt-4 relative">
-					<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
-					<Input
-						type="search"
-						placeholder="Filter items..."
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-						className="pl-9"
-					/>
-				</div>
+				<Card>
+					<CardHeader>
+						<CardTitle>{title}</CardTitle>
+						<CardDescription>
+							{items.length} item{items.length !== 1 ? 's' : ''}
+							{hasNextPage ? ' (more available)' : ''}
+						</CardDescription>
+					</CardHeader>
 
-				{/* Filtered count */}
-				{searchQuery && (
-					<p className="text-sm text-zinc-500 mt-2">{isFiltering ? 'Filtering...' : `${filteredItems.length} of ${items.length} items`}</p>
-				)}
+					<CardContent>
+						{/* Search input */}
+						<div className="relative">
+							<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+							<Input
+								type="search"
+								placeholder="Filter items..."
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+								className="pl-9"
+							/>
+						</div>
 
-				{/* Table */}
-				<div className="mt-4">
-					<BucketTable
-						columns={columns}
-						data={filteredItems}
-						onRowClick={onRowClick}
-						rowSelection={rowSelection}
-						onRowSelectionChange={onRowSelectionChange}
-					/>
-				</div>
+						{/* Filtered count */}
+						{searchQuery && (
+							<div className="flex items-center gap-2 text-sm text-zinc-500 mt-4">
+								{isFiltering && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+								<span>{isFiltering ? 'Filtering...' : `${filteredItems.length} of ${items.length} items`}</span>
+							</div>
+						)}
 
-				{hasNextPage && (
-					<div className="mt-6 flex justify-center">
-						<button
-							type="button"
-							onClick={onFetchNextPage}
-							disabled={isFetchingNextPage}
-							className="px-4 py-2 bg-zinc-800 text-white rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-						>
-							{isFetchingNextPage && <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />}
-							Load more
-						</button>
-					</div>
-				)}
+						{/* Table */}
+						<div className="mt-4">
+							<BucketTable
+								columns={columns}
+								data={filteredItems}
+								onRowClick={onRowClick}
+								rowSelection={rowSelection}
+								onRowSelectionChange={onRowSelectionChange}
+							/>
+						</div>
 
-				{/* Term detail sheet */}
-				<TermDetailSheet termId={selectedTermId} onClose={onClosePanel} />
+						{/* Load more button */}
+						{hasNextPage && (
+							<div className="mt-6 flex justify-center">
+								<Button variant="secondary" onClick={onFetchNextPage} disabled={isFetchingNextPage}>
+									{isFetchingNextPage && <Loader2 className="size-4 animate-spin mr-2" />}
+									Load more
+								</Button>
+							</div>
+						)}
+
+						{/* Term detail sheet */}
+						<TermDetailSheet termId={selectedTermId} onClose={onClosePanel} />
+					</CardContent>
+				</Card>
+
+				{/* Bulk action bar */}
+				<BulkActionBar selectedCount={selectedCount} onClear={onClearSelection} onBulkDelete={onBulkDelete} onBulkMove={onBulkMove} />
 			</div>
-
-			{/* Bulk action bar */}
-			<BulkActionBar selectedCount={selectedCount} onClear={onClearSelection} onBulkDelete={onBulkDelete} onBulkMove={onBulkMove} />
 		</>
 	);
 }
