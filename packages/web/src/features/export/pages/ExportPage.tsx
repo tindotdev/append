@@ -1,7 +1,15 @@
 import { BUCKET_TITLES, BUCKETS, type Bucket } from '@append/contracts/types';
 import { Link } from '@tanstack/react-router';
-import { Download, Minus, Shield } from 'lucide-react';
+import { Download, Minus } from 'lucide-react';
 import { useState } from 'react';
+import {
+	Breadcrumb,
+	BreadcrumbItem,
+	BreadcrumbLink,
+	BreadcrumbList,
+	BreadcrumbPage,
+	BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -85,16 +93,20 @@ export function ExportPage() {
 
 	return (
 		<div className="w-full space-y-4">
-			<div>
-				<h2 className="text-2xl font-semibold">Export</h2>
-				<div className="flex items-center justify-between">
-					<p className="text-sm text-muted-foreground mt-1">Export your data in various formats.</p>
-					<Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5">
-						<Shield className="size-3.5" />
-						Privacy
-					</Link>
-				</div>
-			</div>
+			{/* Breadcrumbs */}
+			<Breadcrumb>
+				<BreadcrumbList>
+					<BreadcrumbItem>
+						<BreadcrumbLink asChild>
+							<Link to="/">Home</Link>
+						</BreadcrumbLink>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbPage>Export</BreadcrumbPage>
+					</BreadcrumbItem>
+				</BreadcrumbList>
+			</Breadcrumb>
 
 			{/* Raw Events Export */}
 			<RawEventsExport />
