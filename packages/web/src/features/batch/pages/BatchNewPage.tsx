@@ -303,12 +303,6 @@ export function BatchNewPage() {
 		});
 	}, []);
 
-	const handleAddRow = useCallback(() => {
-		const newRow: TermRow = { id: crypto.randomUUID(), value: '' };
-		setRows((prev) => [...prev, newRow]);
-		focusRowId.current = newRow.id;
-	}, []);
-
 	const handleClearDraft = useCallback(() => {
 		clearDraft();
 		setRows([{ id: crypto.randomUUID(), value: '' }]);
@@ -410,7 +404,6 @@ export function BatchNewPage() {
 		[navigate]
 	);
 
-	// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles accept with error cases and conflict detection
 	const handleAcceptAllReady = useCallback(
 		async (batch: BatchListItem) => {
 			// Skip if already accepting this batch
@@ -643,13 +636,11 @@ export function BatchNewPage() {
 					isSubmitting={isSubmitting}
 					canSubmit={canSubmit}
 					validTermCount={validTermCount}
-					termMin={TERM_MIN}
 					termMax={TERM_MAX}
 					onRowChange={handleRowChange}
 					onRowPaste={handleRowPaste}
 					onRowKeyDown={handleRowKeyDown}
 					onRemoveRow={handleRemoveRow}
-					onAddRow={handleAddRow}
 					onClearDraft={handleClearDraft}
 					onSubmit={handleSubmit}
 					inputRefs={inputRefs}

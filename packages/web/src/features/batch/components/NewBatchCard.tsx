@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
-import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const STORAGE_KEY_EXPANDED = 'append.captureCard.expanded.v1';
@@ -26,13 +25,11 @@ interface NewBatchCardProps {
 	isSubmitting: boolean;
 	canSubmit: boolean;
 	validTermCount: number;
-	termMin: number;
 	termMax: number;
 	onRowChange: (id: string, value: string) => void;
 	onRowPaste: (id: string, e: React.ClipboardEvent<HTMLInputElement>) => void;
 	onRowKeyDown: (id: string, e: React.KeyboardEvent<HTMLInputElement>) => void;
 	onRemoveRow: (id: string) => void;
-	onAddRow: () => void;
 	onClearDraft: () => void;
 	onSubmit: () => void;
 	inputRefs: React.MutableRefObject<Map<string, HTMLInputElement>>;
@@ -47,13 +44,11 @@ export function NewBatchCard({
 	isSubmitting,
 	canSubmit,
 	validTermCount,
-	termMin,
 	termMax,
 	onRowChange,
 	onRowPaste,
 	onRowKeyDown,
 	onRemoveRow,
-	onAddRow,
 	onClearDraft,
 	onSubmit,
 	inputRefs,
@@ -174,29 +169,17 @@ export function NewBatchCard({
 
 					<CardFooter>
 						{/* Bottom Actions Bar */}
-						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full border-t border-zinc-800/50 pt-6">
-							<div className="flex items-center gap-4">
-								<div className="text-sm text-zinc-500">
-									<span className={validTermCount < termMin || validTermCount > termMax ? 'text-amber-400 font-medium' : 'font-medium'}>
-										{validTermCount} term{validTermCount !== 1 ? 's' : ''}
-									</span>
-									<span className="mx-2 text-zinc-700">·</span>
-									<span className="text-zinc-600">
-										{termMin}–{termMax} allowed
-									</span>
-								</div>
-								<Button variant="ghost" size="sm" onClick={onAddRow} disabled={isSubmitting} className="text-zinc-400 hover:text-zinc-200 -ml-1">
-									+ Add term
-								</Button>
+						<div className="flex items-center justify-between w-full border-t border-zinc-800/50 pt-4">
+							{/* Left side - minimal counter */}
+							<div className="text-xs text-zinc-500">
+								<span className={validTermCount > termMax ? 'text-red-400' : ''}>{validTermCount}</span>
+								<span className="text-zinc-600"> / {termMax}</span>
 							</div>
+							{/* Right side - submit action */}
 							<div className="flex items-center gap-3">
-								<span className="hidden text-xs text-zinc-500 sm:inline-flex sm:items-center sm:gap-1.5">
-									<Kbd>⌘</Kbd>
-									<Kbd>↵</Kbd>
-									<span className="ml-1">to submit</span>
-								</span>
-								<Button onClick={onSubmit} disabled={!canSubmit} size="default" className="shrink-0">
-									{isSubmitting ? 'Submitting...' : 'Submit Batch'}
+								<span className="hidden sm:inline text-xs text-zinc-600">⌘↵ to submit</span>
+								<Button onClick={onSubmit} disabled={!canSubmit} size="sm" className="shrink-0">
+									{isSubmitting ? 'Submitting...' : 'Submit'}
 								</Button>
 							</div>
 						</div>
