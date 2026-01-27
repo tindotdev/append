@@ -153,7 +153,7 @@ describe('GET /api/dashboard/heatmap', () => {
 		// Find Jan 5 in the days array
 		const jan5Data = body.data.days.find((d) => d.date === '2026-01-05');
 		expect(jan5Data).toBeDefined();
-		expect(jan5Data!.minutes).toBeGreaterThan(0);
+		expect(jan5Data?.minutes).toBeGreaterThan(0);
 	});
 
 	it('computes stats correctly', async () => {
@@ -318,7 +318,7 @@ describe('GET /api/dashboard/heatmap', () => {
 		// Verify Feb 29 exists and has activity
 		const feb29Data = body.data.days.find((d) => d.date === '2024-02-29');
 		expect(feb29Data).toBeDefined();
-		expect(feb29Data!.minutes).toBeGreaterThan(0);
+		expect(feb29Data?.minutes).toBeGreaterThan(0);
 		expect(body.stats.activeDays).toBeGreaterThanOrEqual(1);
 	});
 
@@ -348,7 +348,7 @@ describe('GET /api/dashboard/heatmap', () => {
 		// Verify Feb 29 exists and has activity
 		const feb29Data = body.data.days.find((d) => d.date === '2028-02-29');
 		expect(feb29Data).toBeDefined();
-		expect(feb29Data!.minutes).toBeGreaterThan(0);
+		expect(feb29Data?.minutes).toBeGreaterThan(0);
 		expect(body.stats.activeDays).toBeGreaterThanOrEqual(1);
 	});
 
@@ -406,11 +406,11 @@ describe('GET /api/dashboard/heatmap', () => {
 		const mar2Data = body.data.days.find((d) => d.date === '2025-03-02');
 
 		expect(feb28Data).toBeDefined();
-		expect(feb28Data!.minutes).toBeGreaterThan(0);
+		expect(feb28Data?.minutes).toBeGreaterThan(0);
 		expect(mar1Data).toBeDefined();
-		expect(mar1Data!.minutes).toBeGreaterThan(0);
+		expect(mar1Data?.minutes).toBeGreaterThan(0);
 		expect(mar2Data).toBeDefined();
-		expect(mar2Data!.minutes).toBeGreaterThan(0);
+		expect(mar2Data?.minutes).toBeGreaterThan(0);
 
 		// Verify Feb 29 does not exist
 		const feb29Data = body.data.days.find((d) => d.date === '2025-02-29');
@@ -460,7 +460,7 @@ describe('GET /api/dashboard/heatmap', () => {
 		// Verify Dec 31 is in 2025 data
 		const dec31Data = body2025.data.days.find((d) => d.date === '2025-12-31');
 		expect(dec31Data).toBeDefined();
-		expect(dec31Data!.minutes).toBeGreaterThan(0);
+		expect(dec31Data?.minutes).toBeGreaterThan(0);
 		expect(body2025.stats.activeDays).toBe(1);
 
 		// Verify Jan 1 is NOT in 2025 data
@@ -474,7 +474,7 @@ describe('GET /api/dashboard/heatmap', () => {
 		// Verify Jan 1 is in 2026 data
 		const jan1Data = body2026.data.days.find((d) => d.date === '2026-01-01');
 		expect(jan1Data).toBeDefined();
-		expect(jan1Data!.minutes).toBeGreaterThan(0);
+		expect(jan1Data?.minutes).toBeGreaterThan(0);
 		expect(body2026.stats.activeDays).toBe(1);
 
 		// Verify Dec 31 is NOT in 2026 data
@@ -507,13 +507,13 @@ describe('GET /api/dashboard/heatmap', () => {
 		const bodyUtc = (await resUtc.json()) as DashboardHeatmapResponse;
 		const jan1Utc = bodyUtc.data.days.find((d) => d.date === '2026-01-01');
 		expect(jan1Utc).toBeDefined();
-		expect(jan1Utc!.minutes).toBeGreaterThan(0);
+		expect(jan1Utc?.minutes).toBeGreaterThan(0);
 
 		// Query for 2025 with America/Los_Angeles - should have the event on Dec 31
 		const resLa = await authFetch('/api/dashboard/heatmap?year=2025&tz=America/Los_Angeles', { cookie: authCookie });
 		const bodyLa = (await resLa.json()) as DashboardHeatmapResponse;
 		const dec31La = bodyLa.data.days.find((d) => d.date === '2025-12-31');
 		expect(dec31La).toBeDefined();
-		expect(dec31La!.minutes).toBeGreaterThan(0);
+		expect(dec31La?.minutes).toBeGreaterThan(0);
 	});
 });

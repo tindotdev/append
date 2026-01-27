@@ -89,8 +89,9 @@ export function computeCreditIndex(rows: DbEventRow[], timezone: string, windowS
 	const msByDayAndTopic = new Map<string, number>();
 
 	for (const hb of heartbeats) {
-		const host = hb.artifactHost!;
-		const urlHash = hb.artifactUrlHash!;
+		// Note: host and urlHash are guaranteed non-null since we filtered for them above
+		const host = hb.artifactHost as string;
+		const urlHash = hb.artifactUrlHash as string;
 		const artifactKey = `${host}:${urlHash}`;
 		const emittedAtMs = hb.emittedAt.getTime();
 

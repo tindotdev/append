@@ -111,7 +111,8 @@ export async function archiveTerm(
 			term: {
 				id: updated.id,
 				version: updated.version,
-				archivedAt: updated.archivedAt!.getTime(),
+				// Note: archivedAt is guaranteed non-null since we just set it in the update
+				archivedAt: (updated.archivedAt as Date).getTime(),
 			},
 		},
 	};

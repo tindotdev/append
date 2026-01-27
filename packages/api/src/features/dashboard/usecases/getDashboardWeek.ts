@@ -12,7 +12,7 @@ import { fetchAllOverrides, fetchEventsPaged, MAX_EVENTS_PER_REQUEST, mergeWithO
 import { computeCreditIndex, IDLE_CUTOFF_MS, msToMinutes } from '../rollups/credit';
 import { addDays, parseDayKeyToTzRange, weekdayLabel } from '../rollups/time';
 import { TOPIC_LABELS } from '../rollups/topics';
-import type { BreakdownItem, DashboardWeekResponse, DbEventRow, TopicSlug } from '../rollups/types';
+import type { BreakdownItem, DashboardWeekResponse, TopicSlug } from '../rollups/types';
 
 /**
  * Build breakdown items from credit index across all days.

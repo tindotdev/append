@@ -107,15 +107,17 @@ export async function fetchEventsPaged(
 		// Filter out rows at or before cursor (removes duplicates from over-fetch)
 		let filtered = page;
 		if (cursor) {
+			// Capture cursor in a const to help TypeScript narrow the type
+			const currentCursor = cursor;
 			filtered = page.filter((r) => {
 				// Implement lexicographic comparison: (emittedAt, deviceId, eventId) > cursor
 				const rMs = r.emittedAt.getTime();
-				const cMs = cursor!.emittedAt.getTime();
+				const cMs = currentCursor.emittedAt.getTime();
 				if (rMs > cMs) return true;
 				if (rMs < cMs) return false;
-				if (r.deviceId > cursor!.deviceId) return true;
-				if (r.deviceId < cursor!.deviceId) return false;
-				return r.eventId > cursor!.eventId;
+				if (r.deviceId > currentCursor.deviceId) return true;
+				if (r.deviceId < currentCursor.deviceId) return false;
+				return r.eventId > currentCursor.eventId;
 			});
 		}
 

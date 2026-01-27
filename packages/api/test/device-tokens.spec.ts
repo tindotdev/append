@@ -124,7 +124,7 @@ describe('Device tokens', () => {
 		// Verify last_used_at was updated
 		const [updatedRow] = await db.select().from(deviceToken).where(eq(deviceToken.id, tokenId));
 		expect(updatedRow.lastUsedAt).not.toBeNull();
-		const lastUsedMs = updatedRow.lastUsedAt!.getTime();
+		const lastUsedMs = (updatedRow.lastUsedAt as Date).getTime();
 		expect(lastUsedMs).toBeGreaterThanOrEqual(beforeUse);
 		expect(lastUsedMs).toBeLessThanOrEqual(afterUse);
 	});
@@ -192,7 +192,7 @@ describe('Device tokens', () => {
 		});
 
 		const [firstUseRow] = await db.select().from(deviceToken).where(eq(deviceToken.id, tokenId));
-		const firstUseTime = firstUseRow.lastUsedAt!.getTime();
+		const firstUseTime = (firstUseRow.lastUsedAt as Date).getTime();
 
 		// Wait a bit to ensure timestamp will be different
 		await new Promise((resolve) => setTimeout(resolve, 10));
@@ -208,7 +208,7 @@ describe('Device tokens', () => {
 
 		// Verify last_used_at was updated to a later time
 		const [secondUseRow] = await db.select().from(deviceToken).where(eq(deviceToken.id, tokenId));
-		const secondUseTime = secondUseRow.lastUsedAt!.getTime();
+		const secondUseTime = (secondUseRow.lastUsedAt as Date).getTime();
 		expect(secondUseTime).toBeGreaterThan(firstUseTime);
 		expect(secondUseTime).toBeGreaterThanOrEqual(beforeSecondUse);
 		expect(secondUseTime).toBeLessThanOrEqual(afterSecondUse);
