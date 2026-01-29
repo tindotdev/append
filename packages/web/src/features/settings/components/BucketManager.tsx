@@ -6,6 +6,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type UserBucket, useCreateBucket, useDeleteBucket, useReorderBuckets, useUpdateBucket, useUserBuckets } from '../api/user-bucket';
@@ -16,31 +17,44 @@ type ViewState = { mode: 'list' } | { mode: 'create' } | { mode: 'edit'; bucket:
 
 function BucketLoadingState() {
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center justify-between">
-				<div className="space-y-2">
-					<Skeleton className="h-6 w-24" />
-					<Skeleton className="h-4 w-48" />
+		<Card>
+			<CardHeader>
+				<CardDescription className="text-xs">Learning organization</CardDescription>
+				<CardTitle className="text-base">Buckets</CardTitle>
+				<CardDescription>Create, organize, and manage your learning buckets</CardDescription>
+			</CardHeader>
+			<CardContent className="space-y-4">
+				<div className="flex items-center justify-between">
+					<Skeleton className="h-4 w-32" />
+					<Skeleton className="h-10 w-28" />
 				</div>
-				<Skeleton className="h-10 w-28" />
-			</div>
-			<div className="space-y-2">
-				{[1, 2, 3].map((i) => (
-					<Skeleton key={i} className="h-16 w-full" />
-				))}
-			</div>
-		</div>
+				<div className="space-y-2">
+					{[1, 2, 3].map((i) => (
+						<Skeleton key={i} className="h-16 w-full" />
+					))}
+				</div>
+			</CardContent>
+		</Card>
 	);
 }
 
 function BucketErrorState({ onRetry }: { onRetry: () => void }) {
 	return (
-		<div className="flex flex-col items-center justify-center py-12 text-center">
-			<p className="text-muted-foreground">Failed to load buckets.</p>
-			<Button type="button" variant="ghost" onClick={onRetry} className="mt-4">
-				Retry
-			</Button>
-		</div>
+		<Card>
+			<CardHeader>
+				<CardDescription className="text-xs">Learning organization</CardDescription>
+				<CardTitle className="text-base">Buckets</CardTitle>
+				<CardDescription>Create, organize, and manage your learning buckets</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<div className="flex flex-col items-center justify-center py-12 text-center">
+					<p className="text-muted-foreground">Failed to load buckets.</p>
+					<Button type="button" variant="ghost" onClick={onRetry} className="mt-4">
+						Retry
+					</Button>
+				</div>
+			</CardContent>
+		</Card>
 	);
 }
 
@@ -60,24 +74,24 @@ function BucketFormView({
 	onCancel: () => void;
 }) {
 	return (
-		<div className="space-y-6">
-			<div>
-				<h3 className="text-lg font-medium text-foreground">{mode === 'create' ? 'Create Bucket' : 'Edit Bucket'}</h3>
-				<p className="text-sm text-muted-foreground mt-1">
-					{mode === 'create' ? 'Add a new bucket to organize your terms.' : 'Update bucket details.'}
-				</p>
-			</div>
+		<Card>
+			<CardHeader>
+				<CardDescription className="text-xs">Learning organization</CardDescription>
+				<CardTitle className="text-base">{mode === 'create' ? 'Create Bucket' : 'Edit Bucket'}</CardTitle>
+				<CardDescription>{mode === 'create' ? 'Add a new bucket to organize your terms.' : 'Update bucket details.'}</CardDescription>
+			</CardHeader>
+			<CardContent className="space-y-4">
+				{error && (
+					<Alert variant="destructive">
+						<AlertDescription>{error}</AlertDescription>
+					</Alert>
+				)}
 
-			{error && (
-				<Alert variant="destructive">
-					<AlertDescription>{error}</AlertDescription>
-				</Alert>
-			)}
-
-			<div className="rounded-lg border border-border bg-card/50 p-6">
-				<BucketForm bucket={bucket} onSubmit={onSubmit} onCancel={onCancel} isPending={isPending} />
-			</div>
-		</div>
+				<div className="rounded-lg border border-border bg-card/50 p-6">
+					<BucketForm bucket={bucket} onSubmit={onSubmit} onCancel={onCancel} isPending={isPending} />
+				</div>
+			</CardContent>
+		</Card>
 	);
 }
 
@@ -102,28 +116,32 @@ function BucketListView({
 	const canCreate = buckets.length < MAX_BUCKETS;
 
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center justify-between">
-				<div>
-					<h3 className="text-lg font-medium text-foreground">Buckets</h3>
-					<p className="text-sm text-muted-foreground mt-1">
-						{buckets.length} of {MAX_BUCKETS} buckets used. Drag to reorder.
-					</p>
+		<Card>
+			<CardHeader>
+				<div className="flex items-center justify-between">
+					<div className="space-y-1.5">
+						<CardDescription className="text-xs">Learning organization</CardDescription>
+						<CardTitle className="text-base">Buckets</CardTitle>
+						<CardDescription>
+							{buckets.length} of {MAX_BUCKETS} buckets used. Drag to reorder.
+						</CardDescription>
+					</div>
+					<Button type="button" onClick={onCreateClick} disabled={!canCreate}>
+						<Plus className="size-4 mr-2" />
+						New Bucket
+					</Button>
 				</div>
-				<Button type="button" onClick={onCreateClick} disabled={!canCreate}>
-					<Plus className="size-4 mr-2" />
-					New Bucket
-				</Button>
-			</div>
+			</CardHeader>
+			<CardContent className="space-y-4">
+				{error && (
+					<Alert variant="destructive">
+						<AlertDescription>{error}</AlertDescription>
+					</Alert>
+				)}
 
-			{error && (
-				<Alert variant="destructive">
-					<AlertDescription>{error}</AlertDescription>
-				</Alert>
-			)}
-
-			<BucketList buckets={buckets} onReorder={onReorder} onEdit={onEdit} onDelete={onDelete} isReordering={isReordering} />
-		</div>
+				<BucketList buckets={buckets} onReorder={onReorder} onEdit={onEdit} onDelete={onDelete} isReordering={isReordering} />
+			</CardContent>
+		</Card>
 	);
 }
 
