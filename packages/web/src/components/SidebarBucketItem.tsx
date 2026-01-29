@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Link, useLocation } from '@tanstack/react-router';
-import { Copy, Edit, ExternalLink, FileDown, GripVertical, Image, Link2, MoreHorizontal, Palette, Trash2 } from 'lucide-react';
+import { Copy, Edit, ExternalLink, FileDown, GripVertical, Image, Link2, MoreHorizontal, Trash2 } from 'lucide-react';
 import { forwardRef, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { BucketIconPicker } from '@/components/BucketIconPicker';
@@ -17,7 +17,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { BucketColorPicker } from '@/features/settings/components/BucketColorPicker';
 import { BucketContextMenu } from '@/features/settings/components/BucketContextMenu';
 import { getBucketIcon } from '@/lib/bucket-icons';
 import { cn } from '@/lib/utils';
@@ -28,12 +27,10 @@ interface SidebarBucketItemProps {
 		slug: string;
 		name: string;
 		description: string;
-		color?: string | null;
 		icon?: string | null;
 		senseCount: number;
 	};
 	onEdit: () => void;
-	onColorChange: (color: string | null) => void;
 	onIconChange: (icon: string | null) => void;
 	onNameChange: (name: string) => void;
 	onExport: () => void;
@@ -42,7 +39,7 @@ interface SidebarBucketItemProps {
 }
 
 export const SidebarBucketItem = forwardRef<HTMLAnchorElement, SidebarBucketItemProps>(
-	({ bucket, onEdit, onColorChange, onIconChange, onNameChange, onExport, onDelete, onDuplicate }, ref) => {
+	({ bucket, onEdit, onIconChange, onNameChange, onExport, onDelete, onDuplicate }, ref) => {
 		const location = useLocation();
 		const { isMobile } = useSidebar();
 		const [isHovered, setIsHovered] = useState(false);
@@ -120,9 +117,6 @@ export const SidebarBucketItem = forwardRef<HTMLAnchorElement, SidebarBucketItem
 			<BucketContextMenu
 				bucket={bucket}
 				onEdit={onEdit}
-				onChangeColor={() => {
-					/* Will trigger from dropdown */
-				}}
 				onExport={onExport}
 				onCopyLink={handleCopyLink}
 				onDelete={onDelete}
@@ -158,17 +152,9 @@ export const SidebarBucketItem = forwardRef<HTMLAnchorElement, SidebarBucketItem
 					<SidebarMenuButton asChild isActive={isActive} className="h-auto py-1.5 pr-1 pl-4">
 						<Link to="/bucket/$slug" params={{ slug: bucket.slug }} search={{ term: undefined }} ref={ref} tabIndex={0}>
 							<div className="flex items-start gap-2 flex-1 min-w-0">
-								{/* Bucket icon or color indicator */}
+								{/* Bucket icon */}
 								<div className="flex-shrink-0 mt-0.5">
-									{bucket.color ? (
-										<span
-											className="h-2 w-2 rounded-full ring-1 ring-border/50"
-											style={{ backgroundColor: bucket.color }}
-											title={`${bucket.name} color indicator`}
-										/>
-									) : (
-										<BucketIcon className="size-4 opacity-70" />
-									)}
+									<BucketIcon className="size-4 opacity-70" />
 								</div>
 
 								{/* Bucket name and description */}
@@ -230,7 +216,7 @@ export const SidebarBucketItem = forwardRef<HTMLAnchorElement, SidebarBucketItem
 						)}
 					>
 						{/* Three-dot dropdown menu */}
-						<DropdownMenu>
+						<DropdownMenu modal={false}>
 							<DropdownMenuTrigger asChild>
 								<Button variant="ghost" size="icon" className="h-6 w-6 rounded-sm hover:bg-sidebar-accent" onClick={(e) => e.stopPropagation()}>
 									<MoreHorizontal className="h-3.5 w-3.5" />
@@ -250,13 +236,6 @@ export const SidebarBucketItem = forwardRef<HTMLAnchorElement, SidebarBucketItem
 										Change Icon
 									</DropdownMenuItem>
 								</BucketIconPicker>
-
-								<BucketColorPicker currentColor={bucket.color || null} onColorChange={onColorChange}>
-									<DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-										<Palette className="mr-2 h-4 w-4" />
-										Change Color
-									</DropdownMenuItem>
-								</BucketColorPicker>
 
 								{onDuplicate && (
 									<DropdownMenuItem onClick={onDuplicate}>

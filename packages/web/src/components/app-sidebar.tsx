@@ -94,15 +94,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 		}
 	};
 
-	const handleColorChange = async (bucketId: string, color: string | null) => {
-		try {
-			await updateBucketMutation.mutateAsync({ id: bucketId, input: { color } });
-			toast.success('Bucket color updated');
-		} catch (_error) {
-			toast.error('Failed to update color');
-		}
-	};
-
 	const handleIconChange = async (bucketId: string, icon: string | null) => {
 		await updateBucketMutation.mutateAsync({ id: bucketId, input: { icon } });
 	};
@@ -346,7 +337,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 													key={bucket.id}
 													bucket={bucket}
 													onEdit={() => handleEditBucket(bucket.id)}
-													onColorChange={(color) => handleColorChange(bucket.id, color)}
 													onIconChange={(icon) => handleIconChange(bucket.id, icon)}
 													onNameChange={(name) => handleNameChange(bucket.id, name)}
 													onExport={() => handleExportBucket(bucket.id)}

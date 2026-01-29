@@ -162,7 +162,6 @@ export function BucketManager() {
 				input: {
 					name: formData.name,
 					description: formData.description,
-					color: formData.color,
 				},
 			});
 			setViewState({ mode: 'list' });

@@ -30,11 +30,6 @@ export const BucketDescriptionSchema = v.pipe(
 	v.maxLength(256, 'Description must be at most 256 characters')
 );
 
-/** Bucket color: optional hex color. */
-export const BucketColorSchema = v.optional(
-	v.pipe(v.string('Color must be a string'), v.regex(/^#[0-9A-Fa-f]{6}$/, 'Color must be a valid hex color (#RRGGBB)'))
-);
-
 /** Bucket icon: optional icon name (lucide component name). */
 export const BucketIconSchema = v.optional(
 	v.pipe(
@@ -52,7 +47,6 @@ export const CreateBucketSchema = v.object({
 	slug: BucketSlugSchema,
 	name: BucketNameSchema,
 	description: BucketDescriptionSchema,
-	color: BucketColorSchema,
 	icon: BucketIconSchema,
 });
 
@@ -65,7 +59,6 @@ export type CreateBucketInput = v.InferOutput<typeof CreateBucketSchema>;
 export const UpdateBucketSchema = v.object({
 	name: v.optional(BucketNameSchema),
 	description: v.optional(BucketDescriptionSchema),
-	color: v.optional(v.nullable(BucketColorSchema)),
 	icon: v.optional(v.nullable(BucketIconSchema)),
 });
 

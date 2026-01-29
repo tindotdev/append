@@ -162,10 +162,16 @@ export function BucketIconPicker({ currentIcon, onIconChange, children }: Bucket
 	);
 
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
+		<Popover open={open} onOpenChange={setOpen} modal={false}>
 			<PopoverTrigger asChild>{trigger}</PopoverTrigger>
 
-			<PopoverContent className="w-80 p-0" align="end">
+			<PopoverContent
+				className="w-80 p-0"
+				align="end"
+				onCloseAutoFocus={(e) => {
+					e.preventDefault();
+				}}
+			>
 				<Tabs defaultValue="icons" className="w-full">
 					<div className="flex items-center justify-between border-b px-2 py-2">
 						<TabsList className="h-8">

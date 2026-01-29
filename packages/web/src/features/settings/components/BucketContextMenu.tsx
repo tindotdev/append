@@ -1,4 +1,4 @@
-import { Copy, Edit, ExternalLink, FileDown, Link2, Palette, Trash2 } from 'lucide-react';
+import { Copy, Edit, ExternalLink, FileDown, Link2, Trash2 } from 'lucide-react';
 import {
 	ContextMenu,
 	ContextMenuContent,
@@ -16,7 +16,6 @@ interface BucketContextMenuProps {
 		senseCount: number;
 	};
 	onEdit: () => void;
-	onChangeColor: () => void;
 	onExport: () => void;
 	onCopyLink: () => void;
 	onDelete: () => void;
@@ -28,7 +27,6 @@ interface BucketContextMenuProps {
 export function BucketContextMenu({
 	bucket,
 	onEdit,
-	onChangeColor,
 	onExport,
 	onCopyLink,
 	onDelete,
@@ -55,10 +53,6 @@ export function BucketContextMenu({
 					<Edit className="mr-2 h-4 w-4" />
 					Edit Bucket
 					<ContextMenuShortcut>E</ContextMenuShortcut>
-				</ContextMenuItem>
-				<ContextMenuItem onClick={onChangeColor}>
-					<Palette className="mr-2 h-4 w-4" />
-					Change Color
 				</ContextMenuItem>
 				{onDuplicate && (
 					<ContextMenuItem onClick={onDuplicate}>

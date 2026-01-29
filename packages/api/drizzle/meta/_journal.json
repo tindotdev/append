@@ -78,6 +78,13 @@
       "when": 1768320147439,
       "tag": "0010_odd_retro_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1769699916117,
+      "tag": "0011_quiet_paladin",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `bucket` DROP COLUMN `color`;

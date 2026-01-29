@@ -1,5 +1,5 @@
 /**
- * Update a bucket's name, description, color, or icon.
+ * Update a bucket's name, description, or icon.
  * Slug cannot be changed (immutable after creation).
  */
 
@@ -33,7 +33,6 @@ export async function updateBucket(
 	const updates: Partial<{
 		name: string;
 		description: string;
-		color: string | null;
 		icon: string | null;
 	}> = {};
 
@@ -42,9 +41,6 @@ export async function updateBucket(
 	}
 	if (input.description !== undefined) {
 		updates.description = input.description;
-	}
-	if (input.color !== undefined) {
-		updates.color = input.color ?? null;
 	}
 	if (input.icon !== undefined) {
 		updates.icon = input.icon ?? null;
