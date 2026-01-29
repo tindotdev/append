@@ -4,7 +4,7 @@ import { Link, useLocation } from '@tanstack/react-router';
 import { Copy, Edit, ExternalLink, FileDown, GripVertical, Image, Link2, MoreHorizontal, Trash2 } from 'lucide-react';
 import { forwardRef, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { BucketIconPicker } from '@/components/BucketIconPicker';
+import { BucketIconPickerMenu } from '@/components/BucketIconPicker';
 import { Button } from '@/components/ui/button';
 import {
 	DropdownMenu,
@@ -12,6 +12,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuSeparator,
 	DropdownMenuShortcut,
+	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -230,12 +231,12 @@ export const SidebarBucketItem = forwardRef<HTMLAnchorElement, SidebarBucketItem
 									<DropdownMenuShortcut>E</DropdownMenuShortcut>
 								</DropdownMenuItem>
 
-								<BucketIconPicker currentIcon={bucket.icon} onIconChange={handleIconChange}>
-									<DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+								<BucketIconPickerMenu onIconChange={handleIconChange}>
+									<DropdownMenuSubTrigger>
 										<Image className="mr-2 h-4 w-4" />
 										Change Icon
-									</DropdownMenuItem>
-								</BucketIconPicker>
+									</DropdownMenuSubTrigger>
+								</BucketIconPickerMenu>
 
 								{onDuplicate && (
 									<DropdownMenuItem onClick={onDuplicate}>

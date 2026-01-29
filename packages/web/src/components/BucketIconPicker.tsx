@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
+import { DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -32,8 +33,8 @@ type IconComponent = React.ComponentType<{ className?: string }>;
 
 type PickItem = { kind: 'emoji'; value: string; label?: string } | { kind: 'icon'; value: string; label: string; component: IconComponent };
 
-// Curated list of bucket icons (20 icons)
-const BUCKET_ICONS: PickItem[] = [
+// Curated list of bucket icons (20 icons) - exported for reuse
+export const BUCKET_ICONS: PickItem[] = [
 	{ kind: 'icon', value: 'FolderOpen', label: 'Folder Open', component: FolderOpen },
 	{ kind: 'icon', value: 'Folder', label: 'Folder', component: Folder },
 	{ kind: 'icon', value: 'Archive', label: 'Archive', component: Archive },
@@ -242,5 +243,32 @@ export function BucketIconPicker({ currentIcon, onIconChange, children }: Bucket
 				</Tabs>
 			</PopoverContent>
 		</Popover>
+	);
+}
+
+// Submenu version for use inside DropdownMenus
+export interface BucketIconPickerMenuProps {
+	onIconChange: (icon: string) => void;
+	children: React.ReactNode; // The trigger element (usually DropdownMenuSubTrigger)
+}
+
+export function BucketIconPickerMenu({ onIconChange, children }: BucketIconPickerMenuProps) {
+	return (
+		<DropdownMenuSub>
+			{children}
+			<DropdownMenuSubContent className="w-56 p-2">
+				<div className="grid grid-cols-8 gap-1">
+					{BUCKET_ICONS.map((item) => {
+						if (item.kind !== 'icon') return null;
+						const IconComponent = item.component;
+						return (
+							<Button key={item.value} variant="ghost" size="icon" className="h-8 w-8" onClick={() => onIconChange(item.value)} title={item.label}>
+								<IconComponent className="h-4 w-4" />
+							</Button>
+						);
+					})}
+				</div>
+			</DropdownMenuSubContent>
+		</DropdownMenuSub>
 	);
 }
