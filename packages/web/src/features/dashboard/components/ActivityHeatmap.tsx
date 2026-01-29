@@ -32,11 +32,11 @@ function formatDate(dateStr: string): string {
 }
 
 const HEATMAP_COLORS = {
-	0: 'hsl(var(--viz-empty))',
-	1: 'hsl(var(--viz-primary-subtle))',
-	2: 'hsl(var(--viz-primary-medium))',
-	3: 'hsl(var(--viz-primary-strong))',
-	4: 'hsl(var(--viz-primary-intense))',
+	0: 'var(--viz-empty)',
+	1: 'var(--viz-primary-subtle)',
+	2: 'var(--viz-primary-medium)',
+	3: 'var(--viz-primary-strong)',
+	4: 'var(--viz-primary-intense)',
 };
 
 function ActivityHeatmapLegend() {
