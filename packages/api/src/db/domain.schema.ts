@@ -50,7 +50,6 @@ export const bucket = sqliteTable(
 		slug: text('slug').notNull(),
 		name: text('name').notNull(),
 		description: text('description').notNull(),
-		color: text('color'),
 		icon: text('icon'),
 		order: integer('order').notNull(),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(sql`(cast(unixepoch('subsec') * 1000 as integer))`).notNull(),

@@ -41,7 +41,6 @@ function SortableBucketItem({ bucket, onEdit, onDelete }: { bucket: UserBucket; 
 
 			<div className="flex-1 min-w-0">
 				<div className="flex items-center gap-2">
-					{bucket.color && <div className="size-3 rounded-full" style={{ backgroundColor: bucket.color }} />}
 					<span className="font-medium text-card-foreground">{bucket.name}</span>
 					<span className="text-sm text-muted-foreground">({bucket.slug})</span>
 				</div>

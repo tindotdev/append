@@ -25,7 +25,6 @@ export interface BucketFormData {
 	slug: string;
 	name: string;
 	description: string;
-	color: string | null;
 }
 
 function slugify(text: string): string {
@@ -47,14 +46,12 @@ export function BucketForm({ bucket, onSubmit, onCancel, isPending }: BucketForm
 			slug: bucket?.slug ?? '',
 			name: bucket?.name ?? '',
 			description: bucket?.description ?? '',
-			color: bucket?.color ?? '',
 		},
 		onSubmit: async ({ value }) => {
 			await onSubmit({
 				slug: value.slug,
 				name: value.name,
 				description: value.description,
-				color: value.color || null,
 			});
 		},
 	});
@@ -170,39 +167,6 @@ export function BucketForm({ bucket, onSubmit, onCancel, isPending }: BucketForm
 						/>
 						{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
 						<p className="text-xs text-muted-foreground mt-1">Used by AI to categorize terms.</p>
-					</Field>
-				)}
-			</form.Field>
-
-			<form.Field
-				name="color"
-				validators={{
-					onChange: ({ value }) => {
-						if (value && !/^#[0-9A-Fa-f]{6}$/.test(value)) return 'Color must be a valid hex color (e.g., #FF5733)';
-						return undefined;
-					},
-				}}
-			>
-				{(field) => (
-					<Field>
-						<FieldLabel htmlFor="bucket-color">Color (optional)</FieldLabel>
-						<div className="flex items-center gap-2">
-							<Input
-								id="bucket-color"
-								type="text"
-								value={field.state.value}
-								onChange={(e) => field.handleChange(e.target.value)}
-								onBlur={field.handleBlur}
-								placeholder="#6366F1"
-								maxLength={7}
-								disabled={isPending}
-								className="flex-1"
-							/>
-							{field.state.value && /^#[0-9A-Fa-f]{6}$/.test(field.state.value) && (
-								<div className="size-8 rounded border border-border" style={{ backgroundColor: field.state.value }} />
-							)}
-						</div>
-						{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
 					</Field>
 				)}
 			</form.Field>

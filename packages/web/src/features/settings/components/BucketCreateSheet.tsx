@@ -3,7 +3,7 @@
  */
 
 import { useForm } from '@tanstack/react-form';
-import { HelpCircle, Palette } from 'lucide-react';
+import { HelpCircle } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useCreateBucket } from '../api/user-bucket';
-import { BucketColorPicker } from './BucketColorPicker';
 
 // Slug validation regex: lowercase alphanumeric with hyphens
 const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -41,7 +40,6 @@ export function BucketCreateSheet({ open, onOpenChange }: BucketCreateSheetProps
 			slug: '',
 			name: '',
 			description: '',
-			color: null as string | null,
 		},
 		onSubmit: async ({ value }) => {
 			try {
@@ -49,7 +47,6 @@ export function BucketCreateSheet({ open, onOpenChange }: BucketCreateSheetProps
 					slug: value.slug,
 					name: value.name,
 					description: value.description,
-					color: value.color,
 				});
 				toast.success('Bucket created successfully');
 				onOpenChange(false);
@@ -189,29 +186,6 @@ export function BucketCreateSheet({ open, onOpenChange }: BucketCreateSheetProps
 									/>
 									{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
 									<p className="text-xs text-muted-foreground mt-1">Used by AI to categorize terms.</p>
-								</Field>
-							)}
-						</form.Field>
-
-						<form.Field name="color">
-							{(field) => (
-								<Field>
-									<FieldLabel htmlFor="bucket-color">Color (optional)</FieldLabel>
-									<BucketColorPicker currentColor={field.state.value} onColorChange={(color) => field.handleChange(color)}>
-										<Button type="button" variant="outline" className="w-full justify-start gap-2" disabled={createBucketMutation.isPending}>
-											<Palette className="size-4" />
-											<span className="flex-1 text-left">
-												{field.state.value ? (
-													<span className="flex items-center gap-2">
-														<span className="size-3 rounded-full ring-1 ring-border/50" style={{ backgroundColor: field.state.value }} />
-														Color selected
-													</span>
-												) : (
-													'Choose a color'
-												)}
-											</span>
-										</Button>
-									</BucketColorPicker>
 								</Field>
 							)}
 						</form.Field>
