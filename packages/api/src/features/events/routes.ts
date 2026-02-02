@@ -26,6 +26,8 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 type EventRow = typeof eventTable.$inferSelect;
 type WhereClause = ReturnType<typeof and>;
+type ExportCursor = { emittedAt: Date; deviceId: string; eventId: string };
+type RejectedEvent = { index: number; event_id?: string; reason: string };
 
 function firstIssueMessage(issues: v.BaseIssue<unknown>[] | undefined): string {
 	return issues?.[0]?.message ?? 'Validation failed';
@@ -74,6 +76,248 @@ function buildExportCursorWhere(opts: {
 	);
 }
 
+function extractDeviceIds(events: unknown[]): string[] {
+	const deviceIds = new Set<string>();
+	for (const rawEvent of events) {
+		if (typeof rawEvent !== 'object' || rawEvent === null) continue;
+		if (!('device_id' in rawEvent)) continue;
+		const deviceId = (rawEvent as any).device_id;
+		if (typeof deviceId === 'string') {
+			deviceIds.add(deviceId);
+		}
+	}
+	return Array.from(deviceIds);
+}
+
+function validateAndPartitionEvents(
+	events: unknown[],
+	userId: string,
+	deviceOwnerMap: Map<string, string>
+): { safeEvents: TelemetryEventInput[]; rejected: RejectedEvent[] } {
+	const rejected: RejectedEvent[] = [];
+	const validEvents: TelemetryEventInput[] = [];
+
+	for (let i = 0; i < events.length; i += 1) {
+		const rawEvent = events[i];
+		const parsed = v.safeParse(TelemetryEventSchema, rawEvent);
+		if (!parsed.success) {
+			const eventId =
+				typeof rawEvent === 'object' && rawEvent !== null && 'event_id' in rawEvent && typeof (rawEvent as any).event_id === 'string'
+					? ((rawEvent as any).event_id as string)
+					: undefined;
+
+			rejected.push({ index: i, event_id: eventId, reason: firstIssueMessage(parsed.issues) });
+			continue;
+		}
+		validEvents.push(parsed.output);
+	}
+
+	if (validEvents.length === 0) {
+		return { safeEvents: [], rejected };
+	}
+
+	// Track which events should be rejected due to device ownership violations
+	const rejectedEventIds = new Set<string>();
+	for (const e of validEvents) {
+		const existingOwnerId = deviceOwnerMap.get(e.device_id);
+		if (existingOwnerId && existingOwnerId !== userId) {
+			rejectedEventIds.add(e.event_id);
+			// Find the original index in the events array for accurate error reporting
+			const originalIndex = events.findIndex(
+				(evt) => evt === e || (typeof evt === 'object' && evt !== null && 'event_id' in evt && (evt as any).event_id === e.event_id)
+			);
+			rejected.push({
+				index: originalIndex >= 0 ? originalIndex : events.length,
+				event_id: e.event_id,
+				reason: 'Device belongs to another user',
+			});
+		}
+	}
+
+	// Filter to only safe events (devices are new or owned by this user)
+	const safeEvents = validEvents.filter((e) => !rejectedEventIds.has(e.event_id));
+	return { safeEvents, rejected };
+}
+
+function buildInsertStatements(
+	db: Variables['db'],
+	rawDb: D1Database,
+	safeEvents: TelemetryEventInput[],
+	safeDeviceIds: string[],
+	userId: string,
+	receivedAt: Date
+): D1PreparedStatement[] {
+	const statements: D1PreparedStatement[] = [];
+
+	for (const deviceId of safeDeviceIds) {
+		const stmt = db
+			.insert(deviceTable)
+			.values({
+				id: deviceId,
+				userId,
+				type: 'chrome_extension',
+				installedAt: receivedAt,
+				lastSeenAt: receivedAt,
+			})
+			.onConflictDoUpdate({
+				target: deviceTable.id,
+				set: { lastSeenAt: receivedAt },
+			})
+			.toSQL();
+		statements.push(rawDb.prepare(stmt.sql).bind(...stmt.params));
+	}
+
+	for (const e of safeEvents) {
+		const artifact = e.artifact;
+
+		const stmt = db
+			.insert(eventTable)
+			.values({
+				userId,
+				deviceId: e.device_id,
+				eventId: e.event_id,
+				schemaVersion: e.schema_version,
+				type: e.type,
+				emittedAt: new Date(e.emitted_at),
+				receivedAt,
+				artifactHost: artifact?.host ?? null,
+				artifactUrlHash: artifact?.url_hash ?? null,
+				artifactPathHint: artifact?.path_hint ?? null,
+				titleHint: artifact?.title_hint ?? null,
+				payloadJson: JSON.stringify(e.payload),
+			})
+			.onConflictDoNothing()
+			.toSQL();
+
+		statements.push(rawDb.prepare(stmt.sql).bind(...stmt.params));
+	}
+
+	return statements;
+}
+
+function buildEventEnvelope(row: EventRow): Record<string, unknown> {
+	const artifact =
+		row.artifactHost && row.artifactUrlHash
+			? {
+					host: row.artifactHost,
+					url_hash: row.artifactUrlHash,
+					...(row.artifactPathHint && { path_hint: row.artifactPathHint }),
+					...(row.titleHint && { title_hint: row.titleHint }),
+				}
+			: null;
+
+	return {
+		schema_version: row.schemaVersion,
+		event_id: row.eventId,
+		device_id: row.deviceId,
+		emitted_at: row.emittedAt.getTime(),
+		received_at: row.receivedAt.getTime(),
+		type: row.type,
+		...(artifact && { artifact }),
+		payload: JSON.parse(row.payloadJson),
+	};
+}
+
+function createStreamAbortTracker(c: any, s: any): { isAborted: () => boolean; cleanup: () => void } {
+	let aborted = false;
+	const abortListener = () => {
+		aborted = true;
+		s.abort();
+	};
+
+	try {
+		c.req.raw.signal.addEventListener('abort', abortListener, { once: true });
+	} catch {
+		// Ignore if the runtime doesn't support AbortSignal listeners.
+	}
+
+	s.onAbort(() => {
+		aborted = true;
+	});
+
+	return {
+		isAborted: () => aborted,
+		cleanup: () => {
+			try {
+				c.req.raw.signal.removeEventListener('abort', abortListener);
+			} catch {
+				// ignore
+			}
+		},
+	};
+}
+
+async function fetchExportPage(
+	db: Variables['db'],
+	userId: string,
+	fromMs: number,
+	toMs: number,
+	cursor: ExportCursor | null,
+	limit: number
+): Promise<EventRow[]> {
+	const cursorWhere = buildExportCursorWhere({ userId, fromMs, toMs, cursor });
+	return await db
+		.select()
+		.from(eventTable)
+		.where(cursorWhere)
+		.orderBy(eventTable.emittedAt, eventTable.deviceId, eventTable.eventId)
+		.limit(limit);
+}
+
+async function writeExportRows(s: any, rows: EventRow[], isAborted: () => boolean): Promise<ExportCursor | null> {
+	let cursor: ExportCursor | null = null;
+
+	for (const row of rows) {
+		if (isAborted()) break;
+		await s.write(`${JSON.stringify(buildEventEnvelope(row))}\n`);
+		cursor = { emittedAt: row.emittedAt, deviceId: row.deviceId, eventId: row.eventId };
+	}
+
+	return cursor;
+}
+
+async function streamExportNdjson(opts: {
+	c: any;
+	s: any;
+	db: Variables['db'];
+	userId: string;
+	fromMs: number;
+	toMs: number;
+	initialCursor: ExportCursor | null;
+	pageSize: number;
+	maxTotalRows: number;
+}): Promise<void> {
+	const { c, s, db, userId, fromMs, toMs, pageSize, maxTotalRows } = opts;
+	const abort = createStreamAbortTracker(c, s);
+
+	let cursor: ExportCursor | null = opts.initialCursor;
+	let totalExported = 0;
+
+	try {
+		while (!abort.isAborted() && totalExported < maxTotalRows) {
+			const remainingCapacity = maxTotalRows - totalExported;
+			const limit = Math.min(pageSize, remainingCapacity);
+
+			const rows = await fetchExportPage(db, userId, fromMs, toMs, cursor, limit);
+			if (rows.length === 0 || abort.isAborted()) break;
+
+			const nextCursor = await writeExportRows(s, rows, abort.isAborted);
+			if (nextCursor) {
+				cursor = nextCursor;
+				totalExported += rows.length;
+			}
+
+			if (rows.length < limit) break;
+		}
+	} catch (error) {
+		console.error('Export stream failed:', error);
+		s.abort();
+		throw error;
+	} finally {
+		abort.cleanup();
+	}
+}
+
 export const eventsRoutes = app
 	.post('/ingest', async (c) => {
 		const userId = c.get('userId');
@@ -95,29 +339,7 @@ export const eventsRoutes = app
 		if (!rateLimit.allowed) {
 			return apiError(c, 429, 'RATE_LIMIT_EXCEEDED', 'Rate limit exceeded. Please wait before sending more events.');
 		}
-		const rejected: Array<{ index: number; event_id?: string; reason: string }> = [];
-		const validEvents: TelemetryEventInput[] = [];
-
-		for (let i = 0; i < events.length; i += 1) {
-			const rawEvent = events[i];
-			const parsed = v.safeParse(TelemetryEventSchema, rawEvent);
-			if (!parsed.success) {
-				const eventId =
-					typeof rawEvent === 'object' && rawEvent !== null && 'event_id' in rawEvent && typeof (rawEvent as any).event_id === 'string'
-						? ((rawEvent as any).event_id as string)
-						: undefined;
-
-				rejected.push({ index: i, event_id: eventId, reason: firstIssueMessage(parsed.issues) });
-				continue;
-			}
-			validEvents.push(parsed.output);
-		}
-
-		if (validEvents.length === 0) {
-			return c.json({ validated: 0, inserted: 0, rejected, server_time_ms: serverTimeMs });
-		}
-
-		const uniqueDeviceIds = Array.from(new Set(validEvents.map((e) => e.device_id)));
+		const uniqueDeviceIds = extractDeviceIds(events);
 
 		// Verify device ownership to prevent data integrity violations:
 		// Clients must not send events with device_ids owned by other users
@@ -128,26 +350,7 @@ export const eventsRoutes = app
 
 		const deviceOwnerMap = new Map(existingDevices.map((d) => [d.id, d.userId]));
 
-		// Track which events should be rejected due to device ownership violations
-		const rejectedEventIds = new Set<string>();
-		for (const e of validEvents) {
-			const existingOwnerId = deviceOwnerMap.get(e.device_id);
-			if (existingOwnerId && existingOwnerId !== userId) {
-				rejectedEventIds.add(e.event_id);
-				// Find the original index in the events array for accurate error reporting
-				const originalIndex = events.findIndex(
-					(evt) => evt === e || (typeof evt === 'object' && evt !== null && 'event_id' in evt && (evt as any).event_id === e.event_id)
-				);
-				rejected.push({
-					index: originalIndex >= 0 ? originalIndex : events.length,
-					event_id: e.event_id,
-					reason: 'Device belongs to another user',
-				});
-			}
-		}
-
-		// Filter to only safe events (devices are new or owned by this user)
-		const safeEvents = validEvents.filter((e) => !rejectedEventIds.has(e.event_id));
+		const { safeEvents, rejected } = validateAndPartitionEvents(events, userId, deviceOwnerMap);
 
 		if (safeEvents.length === 0) {
 			return c.json({ validated: 0, inserted: 0, rejected, server_time_ms: serverTimeMs });
@@ -156,50 +359,7 @@ export const eventsRoutes = app
 		// Only process devices that passed ownership check
 		const safeDeviceIds = Array.from(new Set(safeEvents.map((e) => e.device_id)));
 
-		const statements: D1PreparedStatement[] = [];
-
-		for (const deviceId of safeDeviceIds) {
-			const stmt = db
-				.insert(deviceTable)
-				.values({
-					id: deviceId,
-					userId,
-					type: 'chrome_extension',
-					installedAt: receivedAt,
-					lastSeenAt: receivedAt,
-				})
-				.onConflictDoUpdate({
-					target: deviceTable.id,
-					set: { lastSeenAt: receivedAt },
-				})
-				.toSQL();
-			statements.push(rawDb.prepare(stmt.sql).bind(...stmt.params));
-		}
-
-		for (const e of safeEvents) {
-			const artifact = e.artifact;
-
-			const stmt = db
-				.insert(eventTable)
-				.values({
-					userId,
-					deviceId: e.device_id,
-					eventId: e.event_id,
-					schemaVersion: e.schema_version,
-					type: e.type,
-					emittedAt: new Date(e.emitted_at),
-					receivedAt,
-					artifactHost: artifact?.host ?? null,
-					artifactUrlHash: artifact?.url_hash ?? null,
-					artifactPathHint: artifact?.path_hint ?? null,
-					titleHint: artifact?.title_hint ?? null,
-					payloadJson: JSON.stringify(e.payload),
-				})
-				.onConflictDoNothing()
-				.toSQL();
-
-			statements.push(rawDb.prepare(stmt.sql).bind(...stmt.params));
-		}
+		const statements = buildInsertStatements(db, rawDb, safeEvents, safeDeviceIds, userId, receivedAt);
 
 		const results = await rawDb.batch(statements);
 
@@ -262,7 +422,7 @@ export const eventsRoutes = app
 		}
 
 		// Parse incoming cursor for resumable exports
-		let initialCursor: { emittedAt: Date; deviceId: string; eventId: string } | null = null;
+		let initialCursor: ExportCursor | null = null;
 		if (cursorParam) {
 			const decoded = decodeCursor(cursorParam);
 			initialCursor = {
@@ -305,84 +465,6 @@ export const eventsRoutes = app
 		}
 
 		return stream(c, async (s) => {
-			let aborted = false;
-			const abortListener = () => {
-				aborted = true;
-				s.abort();
-			};
-
-			try {
-				c.req.raw.signal.addEventListener('abort', abortListener, { once: true });
-			} catch {
-				// Ignore if the runtime doesn't support AbortSignal listeners.
-			}
-
-			s.onAbort(() => {
-				aborted = true;
-			});
-
-			let cursor: { emittedAt: Date; deviceId: string; eventId: string } | null = initialCursor;
-			let totalExported = 0;
-
-			try {
-				while (!aborted && totalExported < MAX_TOTAL_ROWS) {
-					const remainingCapacity = MAX_TOTAL_ROWS - totalExported;
-					const limit = Math.min(PAGE_SIZE, remainingCapacity);
-					const cursorWhere = buildExportCursorWhere({ userId, fromMs, toMs, cursor });
-
-					const rows: EventRow[] = await db
-						.select()
-						.from(eventTable)
-						.where(cursorWhere)
-						.orderBy(eventTable.emittedAt, eventTable.deviceId, eventTable.eventId)
-						.limit(limit);
-
-					if (rows.length === 0 || aborted) break;
-
-					for (const row of rows) {
-						if (aborted) break;
-						// Build event envelope (exclude user_id)
-						const artifact =
-							row.artifactHost && row.artifactUrlHash
-								? {
-										host: row.artifactHost,
-										url_hash: row.artifactUrlHash,
-										...(row.artifactPathHint && { path_hint: row.artifactPathHint }),
-										...(row.titleHint && { title_hint: row.titleHint }),
-									}
-								: null;
-
-						const envelope = {
-							schema_version: row.schemaVersion,
-							event_id: row.eventId,
-							device_id: row.deviceId,
-							emitted_at: row.emittedAt.getTime(),
-							received_at: row.receivedAt.getTime(),
-							type: row.type,
-							...(artifact && { artifact }),
-							payload: JSON.parse(row.payloadJson),
-						};
-
-						await s.write(`${JSON.stringify(envelope)}\n`);
-						totalExported += 1;
-						cursor = { emittedAt: row.emittedAt, deviceId: row.deviceId, eventId: row.eventId };
-					}
-
-					// If the DB returned fewer rows than requested, we've reached the end.
-					if (rows.length < limit) break;
-				}
-			} catch (error) {
-				// Don't write non-event lines into the NDJSON stream; keep it "raw events only".
-				// If anything fails mid-export, abort the stream so callers don't treat a partial body as complete.
-				console.error('Export stream failed:', error);
-				s.abort();
-				throw error;
-			} finally {
-				try {
-					c.req.raw.signal.removeEventListener('abort', abortListener);
-				} catch {
-					// ignore
-				}
-			}
+			await streamExportNdjson({ c, s, db, userId, fromMs, toMs, initialCursor, pageSize: PAGE_SIZE, maxTotalRows: MAX_TOTAL_ROWS });
 		});
 	});

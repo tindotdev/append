@@ -156,6 +156,7 @@ export async function clearAuthError(): Promise<void> {
 	console.log('[append][outbox] auth error cleared');
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: linear state-machine handling distinct failure modes (auth, backoff, network, parse, server error)
 export async function flushOutbox(): Promise<void> {
 	const settings = await getSettings();
 	if (!settings.deviceToken) return;

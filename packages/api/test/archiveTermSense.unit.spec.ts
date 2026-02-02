@@ -498,6 +498,7 @@ describe('archiveTermSense - replacement sense race condition protection', () =>
 			update: vi.fn().mockImplementation(() => ({
 				set: vi.fn().mockReturnThis(),
 				where: vi.fn().mockReturnThis(),
+				// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: test mock with branching return values (+1 over limit)
 				returning: vi.fn().mockImplementation(() => {
 					termUpdateCallCount++;
 					if (termUpdateCallCount === 1) {

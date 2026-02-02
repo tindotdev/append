@@ -36,6 +36,33 @@ function getDefaultDateRange(): { from: Date; to: Date } {
 	};
 }
 
+function ExportResultAlert({ result, chunkNumber }: { result: EventsExportResult; chunkNumber: number }) {
+	if (result.success) {
+		return (
+			<Alert className={result.truncated ? 'border-warning' : 'border-success'}>
+				<AlertTitle className={result.truncated ? 'text-warning' : 'text-success'}>
+					{result.truncated
+						? `Export truncated (part ${chunkNumber})`
+						: chunkNumber > 1
+							? `Download complete (${chunkNumber} parts total)`
+							: 'Download complete'}
+				</AlertTitle>
+				<AlertDescription>
+					<p>Downloaded: {result.filename}</p>
+					{result.truncated && <p className="mt-1">More data available. Click "Next Chunk" to download part {chunkNumber + 1}.</p>}
+				</AlertDescription>
+			</Alert>
+		);
+	}
+
+	return (
+		<Alert variant="destructive">
+			<AlertTitle>Export failed</AlertTitle>
+			<AlertDescription>{result.error}</AlertDescription>
+		</Alert>
+	);
+}
+
 export function RawEventsExport() {
 	const defaultRange = getDefaultDateRange();
 	const [fromDate, setFromDate] = useState(defaultRange.from);
@@ -133,29 +160,7 @@ export function RawEventsExport() {
 					</div>
 				</div>
 
-				{state.result &&
-					(state.result.success ? (
-						<Alert className={state.result.truncated ? 'border-warning' : 'border-success'}>
-							<AlertTitle className={state.result.truncated ? 'text-warning' : 'text-success'}>
-								{state.result.truncated
-									? `Export truncated (part ${state.chunkNumber})`
-									: state.chunkNumber > 1
-										? `Download complete (${state.chunkNumber} parts total)`
-										: 'Download complete'}
-							</AlertTitle>
-							<AlertDescription>
-								<p>Downloaded: {state.result.filename}</p>
-								{state.result.truncated && (
-									<p className="mt-1">More data available. Click "Next Chunk" to download part {state.chunkNumber + 1}.</p>
-								)}
-							</AlertDescription>
-						</Alert>
-					) : (
-						<Alert variant="destructive">
-							<AlertTitle>Export failed</AlertTitle>
-							<AlertDescription>{state.result.error}</AlertDescription>
-						</Alert>
-					))}
+				{state.result && <ExportResultAlert result={state.result} chunkNumber={state.chunkNumber} />}
 
 				<FieldDescription>
 					Large exports may be truncated into multiple chunks. Continuation files are named with part numbers (e.g., .part-002.ndjson). If you

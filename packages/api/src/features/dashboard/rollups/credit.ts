@@ -11,6 +11,35 @@ import type { ActiveSignals, ArtifactActivePayload, CreditIndex, DbEventRow } fr
 export const IDLE_CUTOFF_MS = 300_000; // 5 minutes
 export const MIN_ACTIVE_MINUTES_FOR_STREAK = 10;
 
+function validateCreditInputs(rows: DbEventRow[], timezone: string, windowStartMs?: number, windowEndMs?: number): void {
+	if (!isValidTimezone(timezone)) {
+		throw new Error(`Invalid timezone: ${timezone}. Must be a valid IANA timezone (e.g., "America/New_York").`);
+	}
+
+	if (windowStartMs != null && windowEndMs != null && windowStartMs > windowEndMs) {
+		throw new Error(`Invalid window: windowStartMs (${windowStartMs}) must be <= windowEndMs (${windowEndMs}).`);
+	}
+
+	// Validate rows are sorted by emittedAt ASC
+	for (let i = 1; i < rows.length; i++) {
+		const prevTime = rows[i - 1].emittedAt.getTime();
+		const currTime = rows[i].emittedAt.getTime();
+		if (prevTime > currTime) {
+			throw new Error(`Rows are not sorted by emittedAt. Row ${i - 1} (${prevTime}) > Row ${i} (${currTime}).`);
+		}
+	}
+
+	// Validate all rows belong to the same user (defense-in-depth)
+	if (rows.length > 0) {
+		const firstUserId = rows[0].userId;
+		for (let i = 1; i < rows.length; i++) {
+			if (rows[i].userId !== firstUserId) {
+				throw new Error(`All rows must belong to the same user. Found userId ${rows[i].userId} at row ${i}, expected ${firstUserId}.`);
+			}
+		}
+	}
+}
+
 /**
  * Check if heartbeat signals indicate active state.
  */
@@ -48,33 +77,7 @@ export function computeHeartbeatCreditMs(opts: {
  * @param windowEndMs - End of the requested window (credits after this are not counted)
  */
 export function computeCreditIndex(rows: DbEventRow[], timezone: string, windowStartMs?: number, windowEndMs?: number): CreditIndex {
-	// Input validation
-	if (!isValidTimezone(timezone)) {
-		throw new Error(`Invalid timezone: ${timezone}. Must be a valid IANA timezone (e.g., "America/New_York").`);
-	}
-
-	if (windowStartMs != null && windowEndMs != null && windowStartMs > windowEndMs) {
-		throw new Error(`Invalid window: windowStartMs (${windowStartMs}) must be <= windowEndMs (${windowEndMs}).`);
-	}
-
-	// Validate rows are sorted by emittedAt ASC
-	for (let i = 1; i < rows.length; i++) {
-		const prevTime = rows[i - 1].emittedAt.getTime();
-		const currTime = rows[i].emittedAt.getTime();
-		if (prevTime > currTime) {
-			throw new Error(`Rows are not sorted by emittedAt. Row ${i - 1} (${prevTime}) > Row ${i} (${currTime}).`);
-		}
-	}
-
-	// Validate all rows belong to the same user (defense-in-depth)
-	if (rows.length > 0) {
-		const firstUserId = rows[0].userId;
-		for (let i = 1; i < rows.length; i++) {
-			if (rows[i].userId !== firstUserId) {
-				throw new Error(`All rows must belong to the same user. Found userId ${rows[i].userId} at row ${i}, expected ${firstUserId}.`);
-			}
-		}
-	}
+	validateCreditInputs(rows, timezone, windowStartMs, windowEndMs);
 
 	const overridesByArtifact = buildTopicOverrideIndex(rows);
 
