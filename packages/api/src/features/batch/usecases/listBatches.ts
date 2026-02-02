@@ -11,6 +11,8 @@ import { type BatchStatus, batch, candidate, type schema } from '../../../db';
 import type { ListBatchesInput } from '../validation/listBatches.schema';
 import { decodeCursor, encodeCursor } from '../validation/listBatches.schema';
 
+type Condition = Parameters<typeof and>[number];
+
 /**
  * Status breakdown for a batch.
  */
@@ -45,31 +47,24 @@ export interface ListBatchesResult {
 	nextCursor: string | null;
 }
 
-/**
- * List batches for a user with pagination, search, filtering, and sorting.
- *
- * @param db - Drizzle D1 database instance
- * @param userId - User ID
- * @param input - Validated query parameters
- * @returns List of batches with next cursor
- */
-export async function listBatches(
+function needsCustomSort(sortBy: ListBatchesInput['sortBy']): boolean {
+	return sortBy === 'candidateCount' || sortBy === 'acceptanceRate';
+}
+
+async function buildFilterConditions(
 	db: DrizzleD1Database<typeof schema>,
 	userId: string,
 	input: ListBatchesInput
-): Promise<ListBatchesResult> {
-	const { limit, cursor, search, status, hasErrors, sortBy, sortOrder } = input;
+): Promise<{ conditions: Condition[]; earlyEmpty: boolean; customSort: boolean }> {
+	const { cursor, search, status, hasErrors, sortBy } = input;
 
-	// Build query conditions
-	const conditions = [eq(batch.userId, userId)];
+	const conditions: Condition[] = [eq(batch.userId, userId)];
 
-	// Status filter
 	if (status) {
 		conditions.push(eq(batch.status, status));
 	}
 
 	// Search filter: find batch IDs where any candidate term matches
-	let searchBatchIds: string[] | null = null;
 	if (search) {
 		const searchPattern = `%${search.toLowerCase()}%`;
 		const matchingBatches = await db
@@ -78,11 +73,9 @@ export async function listBatches(
 			.innerJoin(batch, eq(candidate.batchId, batch.id))
 			.where(and(eq(batch.userId, userId), like(sql`lower(${candidate.term})`, searchPattern)));
 
-		searchBatchIds = matchingBatches.map((b) => b.batchId);
-
-		// If no matches, return empty result early
+		const searchBatchIds = matchingBatches.map((b) => b.batchId);
 		if (searchBatchIds.length === 0) {
-			return { batches: [], nextCursor: null };
+			return { conditions: [], earlyEmpty: true, customSort: needsCustomSort(sortBy) };
 		}
 
 		conditions.push(inArray(batch.id, searchBatchIds));
@@ -97,30 +90,147 @@ export async function listBatches(
 			.where(and(eq(batch.userId, userId), eq(candidate.suggestionStatus, 'error')));
 
 		const errorBatchIds = errorBatches.map((b) => b.batchId);
-
-		// If no matches, return empty result early
 		if (errorBatchIds.length === 0) {
-			return { batches: [], nextCursor: null };
+			return { conditions: [], earlyEmpty: true, customSort: needsCustomSort(sortBy) };
 		}
 
 		conditions.push(inArray(batch.id, errorBatchIds));
 	}
 
-	// Determine if we need custom sorting (by candidateCount or acceptanceRate)
-	const needsCustomSort = sortBy === 'candidateCount' || sortBy === 'acceptanceRate';
+	const customSort = needsCustomSort(sortBy);
 
 	// If cursor provided and not using custom sort, get batches created before the cursor
-	if (cursor && !needsCustomSort) {
+	if (cursor && !customSort) {
 		const decoded = decodeCursor(cursor);
 		if (decoded) {
-			// Use (createdAt, id) tuple for stable cursor-based pagination
 			const cursorCondition = or(
 				lt(batch.createdAt, new Date(decoded.createdAt)),
 				and(eq(batch.createdAt, new Date(decoded.createdAt)), lt(batch.id, decoded.id))
 			);
-			if (cursorCondition) conditions.push(cursorCondition);
+			conditions.push(cursorCondition);
 		}
 	}
+
+	return { conditions, earlyEmpty: false, customSort };
+}
+
+type CandidateStatsRow = {
+	batchId: string;
+	totalCount: number;
+	acceptedCount: number;
+	pendingCount: number;
+	errorCount: number;
+	readyCount: number;
+};
+
+async function fetchCandidateStats(db: DrizzleD1Database<typeof schema>, batchIds: string[]): Promise<Map<string, CandidateStatsRow>> {
+	const statsMap = new Map<string, CandidateStatsRow>();
+	if (batchIds.length === 0) return statsMap;
+
+	const candidateStats = await db
+		.select({
+			batchId: candidate.batchId,
+			totalCount: count(),
+			// Accepted: has materialized term sense ID
+			acceptedCount: sql<number>`sum(case when ${candidate.materializedTermSenseId} is not null then 1 else 0 end)`,
+			// Error: suggestion status is 'error'
+			errorCount: sql<number>`sum(case when ${candidate.suggestionStatus} = 'error' then 1 else 0 end)`,
+			// Pending: suggestion in progress OR missing effective values
+			pendingCount: sql<number>`sum(case when
+				${candidate.materializedTermSenseId} is null
+				and (${candidate.suggestionStatus} = 'in_progress'
+					or (${candidate.suggestionStatus} != 'error'
+						and (coalesce(${candidate.chosenBucket}, ${candidate.suggestedBucket}) is null
+							or coalesce(${candidate.chosenText}, ${candidate.suggestedText}) is null)))
+				then 1 else 0 end)`,
+			// Ready: has effective values and not accepted
+			readyCount: sql<number>`sum(case when
+				${candidate.materializedTermSenseId} is null
+				and ${candidate.suggestionStatus} != 'in_progress'
+				and ${candidate.suggestionStatus} != 'error'
+				and coalesce(${candidate.chosenBucket}, ${candidate.suggestedBucket}) is not null
+				and coalesce(${candidate.chosenText}, ${candidate.suggestedText}) is not null
+				then 1 else 0 end)`,
+		})
+		.from(candidate)
+		.where(
+			sql`${candidate.batchId} IN (${sql.join(
+				batchIds.map((id) => sql`${id}`),
+				sql`, `
+			)})`
+		)
+		.groupBy(candidate.batchId);
+
+	for (const stat of candidateStats) {
+		statsMap.set(stat.batchId, stat);
+	}
+
+	return statsMap;
+}
+
+async function fetchSampleTerms(db: DrizzleD1Database<typeof schema>, batchIds: string[]): Promise<Map<string, string[]>> {
+	const sampleTermsMap: Map<string, string[]> = new Map();
+	if (batchIds.length === 0) return sampleTermsMap;
+
+	for (const batchId of batchIds) {
+		const terms = await db
+			.select({
+				term: candidate.term,
+			})
+			.from(candidate)
+			.where(eq(candidate.batchId, batchId))
+			.orderBy(candidate.position)
+			.limit(3);
+
+		sampleTermsMap.set(
+			batchId,
+			terms.map((t) => t.term)
+		);
+	}
+
+	return sampleTermsMap;
+}
+
+function applyCustomSort(opts: {
+	summaries: BatchSummary[];
+	sortBy: ListBatchesInput['sortBy'];
+	sortOrder: ListBatchesInput['sortOrder'];
+	cursor: string | null | undefined;
+}): BatchSummary[] {
+	const { summaries, sortBy, sortOrder, cursor } = opts;
+	const descOrder = sortOrder !== 'asc';
+	const multiplier = descOrder ? -1 : 1;
+
+	if (sortBy === 'candidateCount') {
+		summaries.sort((a, b) => multiplier * (a.candidateCount - b.candidateCount));
+	} else if (sortBy === 'acceptanceRate') {
+		summaries.sort((a, b) => multiplier * (a.acceptanceRate - b.acceptanceRate));
+	}
+
+	if (!cursor) return summaries;
+
+	const cursorIndex = summaries.findIndex((b) => b.id === cursor);
+	if (cursorIndex === -1) return summaries;
+	return summaries.slice(cursorIndex + 1);
+}
+
+/**
+ * List batches for a user with pagination, search, filtering, and sorting.
+ *
+ * @param db - Drizzle D1 database instance
+ * @param userId - User ID
+ * @param input - Validated query parameters
+ * @returns List of batches with next cursor
+ */
+export async function listBatches(
+	db: DrizzleD1Database<typeof schema>,
+	userId: string,
+	input: ListBatchesInput
+): Promise<ListBatchesResult> {
+	const { limit, cursor, sortBy, sortOrder } = input;
+
+	const { conditions, earlyEmpty, customSort } = await buildFilterConditions(db, userId, input);
+	if (earlyEmpty) return { batches: [], nextCursor: null };
 
 	// Build sort order
 	const descOrder = sortOrder !== 'asc'; // Default to desc
@@ -133,7 +243,7 @@ export async function listBatches(
 				sql`${batch.createdAt} DESC, ${batch.id} DESC`;
 
 	// Fetch batches - get more if we need custom sorting
-	const fetchLimit = needsCustomSort ? 1000 : limit + 1;
+	const fetchLimit = customSort ? 1000 : limit + 1;
 	const batches = await db
 		.select({
 			id: batch.id,
@@ -148,75 +258,7 @@ export async function listBatches(
 
 	// Get enhanced metadata for all batches
 	const batchIds = batches.map((b) => b.id);
-	let candidateStats: {
-		batchId: string;
-		totalCount: number;
-		acceptedCount: number;
-		pendingCount: number;
-		errorCount: number;
-		readyCount: number;
-	}[] = [];
-	const sampleTermsMap: Map<string, string[]> = new Map();
-
-	if (batchIds.length > 0) {
-		// Query status breakdown using SQL aggregation
-		candidateStats = await db
-			.select({
-				batchId: candidate.batchId,
-				totalCount: count(),
-				// Accepted: has materialized term sense ID
-				acceptedCount: sql<number>`sum(case when ${candidate.materializedTermSenseId} is not null then 1 else 0 end)`,
-				// Error: suggestion status is 'error'
-				errorCount: sql<number>`sum(case when ${candidate.suggestionStatus} = 'error' then 1 else 0 end)`,
-				// Pending: suggestion in progress OR missing effective values
-				pendingCount: sql<number>`sum(case when
-					${candidate.materializedTermSenseId} is null
-					and (${candidate.suggestionStatus} = 'in_progress'
-						or (${candidate.suggestionStatus} != 'error'
-							and (coalesce(${candidate.chosenBucket}, ${candidate.suggestedBucket}) is null
-								or coalesce(${candidate.chosenText}, ${candidate.suggestedText}) is null)))
-					then 1 else 0 end)`,
-				// Ready: has effective values and not accepted
-				readyCount: sql<number>`sum(case when
-					${candidate.materializedTermSenseId} is null
-					and ${candidate.suggestionStatus} != 'in_progress'
-					and ${candidate.suggestionStatus} != 'error'
-					and coalesce(${candidate.chosenBucket}, ${candidate.suggestedBucket}) is not null
-					and coalesce(${candidate.chosenText}, ${candidate.suggestedText}) is not null
-					then 1 else 0 end)`,
-			})
-			.from(candidate)
-			.where(
-				sql`${candidate.batchId} IN (${sql.join(
-					batchIds.map((id) => sql`${id}`),
-					sql`, `
-				)})`
-			)
-			.groupBy(candidate.batchId);
-
-		// Query sample terms (first 3 per batch)
-		for (const batchId of batchIds) {
-			const terms = await db
-				.select({
-					term: candidate.term,
-				})
-				.from(candidate)
-				.where(eq(candidate.batchId, batchId))
-				.orderBy(candidate.position)
-				.limit(3);
-
-			sampleTermsMap.set(
-				batchId,
-				terms.map((t) => t.term)
-			);
-		}
-	}
-
-	// Build map of batch ID to stats
-	const statsMap = new Map<string, (typeof candidateStats)[0]>();
-	for (const stat of candidateStats) {
-		statsMap.set(stat.batchId, stat);
-	}
+	const [statsMap, sampleTermsMap] = await Promise.all([fetchCandidateStats(db, batchIds), fetchSampleTerms(db, batchIds)]);
 
 	// Transform batches to summaries with stats
 	let batchSummaries: BatchSummary[] = batches.map((b) => {
@@ -247,22 +289,8 @@ export async function listBatches(
 	});
 
 	// Custom sort if needed
-	if (needsCustomSort) {
-		const multiplier = descOrder ? -1 : 1;
-
-		if (sortBy === 'candidateCount') {
-			batchSummaries.sort((a, b) => multiplier * (a.candidateCount - b.candidateCount));
-		} else if (sortBy === 'acceptanceRate') {
-			batchSummaries.sort((a, b) => multiplier * (a.acceptanceRate - b.acceptanceRate));
-		}
-
-		// Apply cursor-based pagination for custom sort
-		if (cursor) {
-			const cursorIndex = batchSummaries.findIndex((b) => b.id === cursor);
-			if (cursorIndex !== -1) {
-				batchSummaries = batchSummaries.slice(cursorIndex + 1);
-			}
-		}
+	if (customSort) {
+		batchSummaries = applyCustomSort({ summaries: batchSummaries, sortBy, sortOrder, cursor });
 	}
 
 	// Determine pagination
@@ -273,7 +301,7 @@ export async function listBatches(
 	let nextCursor: string | null = null;
 	if (hasNextPage && resultBatches.length > 0) {
 		const lastBatch = resultBatches[resultBatches.length - 1];
-		if (needsCustomSort) {
+		if (customSort) {
 			// For custom sort, use batch ID as cursor
 			nextCursor = lastBatch.id;
 		} else {

@@ -76,6 +76,116 @@ async function findReplacementPrimarySense(
 	return null;
 }
 
+type TermUpdateRow = {
+	id: string;
+	primarySenseId: string | null;
+	version: number;
+	archivedAt: Date | null;
+};
+
+function toTermResult(row: TermUpdateRow): ArchiveTermSenseResult['term'] {
+	return {
+		id: row.id,
+		primarySenseId: row.primarySenseId,
+		version: row.version,
+		archivedAt: row.archivedAt?.getTime() ?? null,
+	};
+}
+
+async function assertTermStillPrimary(
+	db: DrizzleD1Database<typeof schema>,
+	termRow: typeof term.$inferSelect,
+	archivedSenseId: string
+): Promise<void> {
+	const currentTerm = await db.query.term.findFirst({
+		where: eq(term.id, termRow.id),
+		columns: { version: true, primarySenseId: true },
+	});
+
+	if (!currentTerm || currentTerm.version !== termRow.version || currentTerm.primarySenseId !== archivedSenseId) {
+		throw new Error('Unexpected: term update failed despite version guard');
+	}
+}
+
+async function tryUpdateTermPrimarySense(
+	db: DrizzleD1Database<typeof schema>,
+	termRow: typeof term.$inferSelect,
+	archivedSenseId: string,
+	replacementSenseId: string
+): Promise<TermUpdateRow | null> {
+	const termUpdateResult = await db
+		.update(term)
+		.set({
+			primarySenseId: replacementSenseId,
+			version: sql`${term.version} + 1`,
+		})
+		.where(
+			sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${archivedSenseId} AND ${term.version} = ${termRow.version} AND EXISTS (SELECT 1 FROM ${termSense} WHERE ${termSense.id} = ${replacementSenseId} AND ${termSense.archivedAt} IS NULL)`
+		)
+		.returning({
+			id: term.id,
+			primarySenseId: term.primarySenseId,
+			version: term.version,
+			archivedAt: term.archivedAt,
+		});
+
+	return termUpdateResult[0] ?? null;
+}
+
+async function archiveParentTerm(
+	db: DrizzleD1Database<typeof schema>,
+	termRow: typeof term.$inferSelect,
+	archivedSenseId: string,
+	now: Date
+): Promise<ArchiveTermSenseResult['term']> {
+	const termArchiveResult = await db
+		.update(term)
+		.set({
+			archivedAt: now,
+			version: sql`${term.version} + 1`,
+		})
+		.where(sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${archivedSenseId} AND ${term.version} = ${termRow.version}`)
+		.returning({
+			id: term.id,
+			primarySenseId: term.primarySenseId,
+			version: term.version,
+			archivedAt: term.archivedAt,
+		});
+
+	if (termArchiveResult.length === 0) {
+		throw new Error('Unexpected: term archive failed despite version guard');
+	}
+
+	return toTermResult(termArchiveResult[0]);
+}
+
+async function updateTermPrimarySense(
+	db: DrizzleD1Database<typeof schema>,
+	termRow: typeof term.$inferSelect,
+	archivedSenseId: string,
+	replacementSenseId: string,
+	now: Date,
+	preferredBucket: string
+): Promise<ArchiveTermSenseResult['term']> {
+	const firstAttempt = await tryUpdateTermPrimarySense(db, termRow, archivedSenseId, replacementSenseId);
+	if (firstAttempt) return toTermResult(firstAttempt);
+
+	// If update failed, the replacement sense may have been archived concurrently.
+	// Term version was already guarded before archiving the sense, so this should not fail.
+	await assertTermStillPrimary(db, termRow, archivedSenseId);
+
+	const newReplacementId = await findReplacementPrimarySense(db, termRow.id, archivedSenseId, preferredBucket);
+	if (newReplacementId === null) {
+		return await archiveParentTerm(db, termRow, archivedSenseId, now);
+	}
+
+	const retryAttempt = await tryUpdateTermPrimarySense(db, termRow, archivedSenseId, newReplacementId);
+	if (retryAttempt) return toTermResult(retryAttempt);
+
+	// Still failing - archive the term as fallback.
+	return await archiveParentTerm(db, termRow, archivedSenseId, now);
+}
+
 /**
  * Archive a term sense with optimistic locking.
  *
@@ -180,169 +290,12 @@ export async function archiveTermSense(
 	let termResult: ArchiveTermSenseResult['term'] | undefined;
 
 	// 7. Handle primary sense replacement (term version already verified in step 4)
-
 	if (wasPrimary) {
-		// Find a replacement primary sense
 		const replacementId = await findReplacementPrimarySense(db, termRow.id, senseId, senseRow.bucket);
-
-		if (replacementId !== null) {
-			// Update term's primarySenseId (conditional on primarySenseId to prevent race)
-			// Also verify the replacement sense is still active (not archived by a concurrent request)
-			// Note: term version was already verified in step 4, so this should not fail
-			const termUpdateResult = await db
-				.update(term)
-				.set({
-					primarySenseId: replacementId,
-					version: sql`${term.version} + 1`,
-				})
-				.where(
-					sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId} AND ${term.version} = ${termRow.version} AND EXISTS (SELECT 1 FROM ${termSense} WHERE ${termSense.id} = ${replacementId} AND ${termSense.archivedAt} IS NULL)`
-				)
-				.returning({
-					id: term.id,
-					primarySenseId: term.primarySenseId,
-					version: term.version,
-					archivedAt: term.archivedAt,
-				});
-
-			// If update failed, the replacement sense may have been archived concurrently
-			// Fall back to finding another replacement or archiving the term
-			if (termUpdateResult.length === 0) {
-				// Re-fetch to determine why: term changed or replacement sense archived?
-				const currentTerm = await db.query.term.findFirst({
-					where: eq(term.id, termRow.id),
-					columns: { version: true, primarySenseId: true },
-				});
-
-				if (!currentTerm || currentTerm.version !== termRow.version || currentTerm.primarySenseId !== senseId) {
-					// Term was concurrently modified - this is unexpected due to step 4 guard
-					throw new Error('Unexpected: term update failed despite version guard');
-				}
-
-				// Replacement sense was archived concurrently - retry finding another replacement
-				const newReplacementId = await findReplacementPrimarySense(db, termRow.id, senseId, senseRow.bucket);
-
-				if (newReplacementId !== null) {
-					// Try again with new replacement (recursive would be cleaner but keep it simple)
-					const retryResult = await db
-						.update(term)
-						.set({
-							primarySenseId: newReplacementId,
-							version: sql`${term.version} + 1`,
-						})
-						.where(
-							sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId} AND ${term.version} = ${termRow.version} AND EXISTS (SELECT 1 FROM ${termSense} WHERE ${termSense.id} = ${newReplacementId} AND ${termSense.archivedAt} IS NULL)`
-						)
-						.returning({
-							id: term.id,
-							primarySenseId: term.primarySenseId,
-							version: term.version,
-							archivedAt: term.archivedAt,
-						});
-
-					if (retryResult.length > 0) {
-						const updatedTerm = retryResult[0];
-						termResult = {
-							id: updatedTerm.id,
-							primarySenseId: updatedTerm.primarySenseId,
-							version: updatedTerm.version,
-							archivedAt: updatedTerm.archivedAt?.getTime() ?? null,
-						};
-					} else {
-						// Still failing - archive the term as fallback
-						const archiveResult = await db
-							.update(term)
-							.set({
-								archivedAt: now,
-								version: sql`${term.version} + 1`,
-							})
-							.where(sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId} AND ${term.version} = ${termRow.version}`)
-							.returning({
-								id: term.id,
-								primarySenseId: term.primarySenseId,
-								version: term.version,
-								archivedAt: term.archivedAt,
-							});
-
-						if (archiveResult.length === 0) {
-							throw new Error('Unexpected: term archive failed despite version guard');
-						}
-
-						const archivedTerm = archiveResult[0];
-						termResult = {
-							id: archivedTerm.id,
-							primarySenseId: archivedTerm.primarySenseId,
-							version: archivedTerm.version,
-							archivedAt: archivedTerm.archivedAt?.getTime() ?? null,
-						};
-					}
-				} else {
-					// No more replacements - archive the term
-					const archiveResult = await db
-						.update(term)
-						.set({
-							archivedAt: now,
-							version: sql`${term.version} + 1`,
-						})
-						.where(sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId} AND ${term.version} = ${termRow.version}`)
-						.returning({
-							id: term.id,
-							primarySenseId: term.primarySenseId,
-							version: term.version,
-							archivedAt: term.archivedAt,
-						});
-
-					if (archiveResult.length === 0) {
-						throw new Error('Unexpected: term archive failed despite version guard');
-					}
-
-					const archivedTerm = archiveResult[0];
-					termResult = {
-						id: archivedTerm.id,
-						primarySenseId: archivedTerm.primarySenseId,
-						version: archivedTerm.version,
-						archivedAt: archivedTerm.archivedAt?.getTime() ?? null,
-					};
-				}
-			} else {
-				const updatedTerm = termUpdateResult[0];
-				termResult = {
-					id: updatedTerm.id,
-					primarySenseId: updatedTerm.primarySenseId,
-					version: updatedTerm.version,
-					archivedAt: updatedTerm.archivedAt?.getTime() ?? null,
-				};
-			}
-		} else {
-			// No replacement exists - archive the term too
-			// Note: term version was already verified in step 4, so this should not fail
-			const termArchiveResult = await db
-				.update(term)
-				.set({
-					archivedAt: now,
-					version: sql`${term.version} + 1`,
-				})
-				.where(sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${senseId} AND ${term.version} = ${termRow.version}`)
-				.returning({
-					id: term.id,
-					primarySenseId: term.primarySenseId,
-					version: term.version,
-					archivedAt: term.archivedAt,
-				});
-
-			// This should not happen due to step 4 guard, but handle defensively
-			if (termArchiveResult.length === 0) {
-				throw new Error('Unexpected: term archive failed despite version guard');
-			}
-
-			const archivedTerm = termArchiveResult[0];
-			termResult = {
-				id: archivedTerm.id,
-				primarySenseId: archivedTerm.primarySenseId,
-				version: archivedTerm.version,
-				archivedAt: archivedTerm.archivedAt?.getTime() ?? null,
-			};
-		}
+		termResult =
+			replacementId !== null
+				? await updateTermPrimarySense(db, termRow, senseId, replacementId, now, senseRow.bucket)
+				: await archiveParentTerm(db, termRow, senseId, now);
 	}
 
 	// Success - return updated sense (and optionally term)

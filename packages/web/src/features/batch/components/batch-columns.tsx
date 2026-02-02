@@ -39,6 +39,61 @@ function getStatusVariant(status: string): 'secondary' | 'default' | 'success' {
 	}
 }
 
+function BatchProgressCell({ batch, activeProgress }: { batch: BatchListItem; activeProgress: BatchProgress | undefined }) {
+	const { statusBreakdown } = batch;
+	const isProcessing = activeProgress?.status === 'active';
+
+	if (isProcessing && activeProgress) {
+		const progressPercent = activeProgress.total > 0 ? Math.round((activeProgress.processed / activeProgress.total) * 100) : 0;
+
+		return (
+			<div className="flex flex-col gap-2 min-w-[180px]">
+				<div className="flex items-center gap-2">
+					<Progress value={progressPercent} className="h-1.5 flex-1" />
+					<span className="text-xs text-muted-foreground min-w-[32px]">{progressPercent}%</span>
+				</div>
+				<div className="text-xs text-muted-foreground flex items-center gap-1">
+					<Loader2 className="h-3 w-3 animate-spin" />
+					<span>
+						{activeProgress.processed} / {activeProgress.total} processed
+						{activeProgress.failed > 0 && <span className="text-destructive"> &bull; {activeProgress.failed} failed</span>}
+					</span>
+				</div>
+			</div>
+		);
+	}
+
+	return (
+		<div className="flex flex-col gap-2 min-w-[180px]">
+			<div className="flex items-center gap-2">
+				<Progress value={batch.acceptanceRate} className="h-1.5 flex-1" />
+				<span className="text-xs text-muted-foreground min-w-[32px]">{batch.acceptanceRate}%</span>
+			</div>
+			<div className="text-xs text-muted-foreground">
+				{statusBreakdown.accepted > 0 && <span>{statusBreakdown.accepted} accepted</span>}
+				{statusBreakdown.ready > 0 && (
+					<>
+						{statusBreakdown.accepted > 0 && <span> &bull; </span>}
+						<span>{statusBreakdown.ready} ready</span>
+					</>
+				)}
+				{statusBreakdown.pending > 0 && (
+					<>
+						{(statusBreakdown.accepted > 0 || statusBreakdown.ready > 0) && <span> &bull; </span>}
+						<span>{statusBreakdown.pending} pending</span>
+					</>
+				)}
+				{statusBreakdown.error > 0 && (
+					<>
+						{(statusBreakdown.accepted > 0 || statusBreakdown.ready > 0 || statusBreakdown.pending > 0) && <span> &bull; </span>}
+						<span className="text-destructive">{statusBreakdown.error} errors</span>
+					</>
+				)}
+			</div>
+		</div>
+	);
+}
+
 /**
  * Column definitions for the batch list table.
  */
@@ -147,63 +202,8 @@ export function getBatchColumns(meta: BatchColumnMeta): ColumnDef<BatchListItem>
 			},
 			cell: ({ row }) => {
 				const batch = row.original;
-				const { statusBreakdown } = batch;
-
-				// Check if batch is actively being processed
 				const activeProgress = meta.batchProgress?.get(batch.id);
-				const isProcessing = activeProgress?.status === 'active';
-
-				// Show real-time progress if available
-				if (isProcessing && activeProgress) {
-					const progressPercent = activeProgress.total > 0 ? Math.round((activeProgress.processed / activeProgress.total) * 100) : 0;
-
-					return (
-						<div className="flex flex-col gap-2 min-w-[180px]">
-							<div className="flex items-center gap-2">
-								<Progress value={progressPercent} className="h-1.5 flex-1" />
-								<span className="text-xs text-muted-foreground min-w-[32px]">{progressPercent}%</span>
-							</div>
-							<div className="text-xs text-muted-foreground flex items-center gap-1">
-								<Loader2 className="h-3 w-3 animate-spin" />
-								<span>
-									{activeProgress.processed} / {activeProgress.total} processed
-									{activeProgress.failed > 0 && <span className="text-destructive"> • {activeProgress.failed} failed</span>}
-								</span>
-							</div>
-						</div>
-					);
-				}
-
-				// Show static acceptance rate and breakdown
-				return (
-					<div className="flex flex-col gap-2 min-w-[180px]">
-						<div className="flex items-center gap-2">
-							<Progress value={batch.acceptanceRate} className="h-1.5 flex-1" />
-							<span className="text-xs text-muted-foreground min-w-[32px]">{batch.acceptanceRate}%</span>
-						</div>
-						<div className="text-xs text-muted-foreground">
-							{statusBreakdown.accepted > 0 && <span>{statusBreakdown.accepted} accepted</span>}
-							{statusBreakdown.ready > 0 && (
-								<>
-									{statusBreakdown.accepted > 0 && <span> • </span>}
-									<span>{statusBreakdown.ready} ready</span>
-								</>
-							)}
-							{statusBreakdown.pending > 0 && (
-								<>
-									{(statusBreakdown.accepted > 0 || statusBreakdown.ready > 0) && <span> • </span>}
-									<span>{statusBreakdown.pending} pending</span>
-								</>
-							)}
-							{statusBreakdown.error > 0 && (
-								<>
-									{(statusBreakdown.accepted > 0 || statusBreakdown.ready > 0 || statusBreakdown.pending > 0) && <span> • </span>}
-									<span className="text-destructive">{statusBreakdown.error} errors</span>
-								</>
-							)}
-						</div>
-					</div>
-				);
+				return <BatchProgressCell batch={batch} activeProgress={activeProgress} />;
 			},
 		},
 

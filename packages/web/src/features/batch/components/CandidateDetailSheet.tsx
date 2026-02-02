@@ -25,6 +25,7 @@ interface CandidateDetailSheetProps {
 	onAccept: (candidate: Candidate) => void;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: conditional JSX rendering is idiomatic React
 export function CandidateDetailSheet({
 	candidate,
 	buckets,

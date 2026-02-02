@@ -5,12 +5,11 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ApiRequestError } from '@/lib/api-rpc';
+import { handleApiError } from '@/lib/handle-api-error';
 import { useUserBuckets } from '@/lib/user-buckets';
 import { acceptBatch } from '../api/accept-batch';
-import { acceptCandidate } from '../api/accept-candidate';
 import { getBatch } from '../api/get-batch';
 import { generateSuggestions } from '../api/retry-suggestions';
-import { updateCandidate } from '../api/update-candidate';
 import {
 	BatchAcceptActionBar,
 	BatchHeader,
@@ -23,6 +22,8 @@ import {
 	getCandidateStatus,
 	LoadingState,
 } from '../components';
+import { useCandidateActions } from '../hooks/useCandidateActions';
+import { useSheetActions } from '../hooks/useSheetActions';
 import type { BatchError, BatchResponse, Candidate, SuggestCandidateEvent } from '../types';
 
 interface GenerationProgress {
@@ -44,14 +45,6 @@ function getBatchError(err: unknown): BatchError {
 		return { status: err.status, message: 'Something went wrong. Please try again.' };
 	}
 	return { status: 500, message: 'Something went wrong. Please try again.' };
-}
-
-function updateBatchCandidate(batch: BatchResponse | null, candidate: Candidate): BatchResponse | null {
-	if (!batch) return batch;
-	return {
-		...batch,
-		candidates: batch.candidates.map((item) => (item.id === candidate.id ? candidate : item)),
-	};
 }
 
 function applySseEventToCandidate(batch: BatchResponse | null, event: SuggestCandidateEvent): BatchResponse | null {
@@ -95,20 +88,13 @@ export function BatchDetailPage() {
 	const [error, setError] = useState<BatchError | null>(null);
 	const [isRetrying, setIsRetrying] = useState(false);
 	const [isAccepting, setIsAccepting] = useState(false);
-	const [isBulkAccepting, setIsBulkAccepting] = useState(false);
 	const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
 	const generationInFlightRef = useRef(false);
 
 	// Table state
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 	const [searchQuery, setSearchQuery] = useState('');
-	const [acceptingIds, setAcceptingIds] = useState<Set<string>>(new Set());
 	const [statusFilter, setStatusFilter] = useState<'all' | 'ready' | 'pending' | 'accepted' | 'error'>('all');
-
-	// Sheet state
-	const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
-	const [isSavingSheet, setIsSavingSheet] = useState(false);
-	const [isAcceptingSheet, setIsAcceptingSheet] = useState(false);
 
 	// Fetch user buckets for the dropdown
 	const { data: bucketsData, isLoading: bucketsLoading } = useUserBuckets();
@@ -130,18 +116,20 @@ export function BatchDetailPage() {
 		fetchBatch();
 	}, [fetchBatch]);
 
+	// Candidate and sheet actions
+	const candidateActions = useCandidateActions(batch, setBatch, fetchBatch);
+	const sheetActions = useSheetActions(batch, setBatch, fetchBatch);
+
 	// Filter candidates by search query and status
 	const filteredCandidates = useMemo(() => {
 		if (!batch) return [];
 
 		let filtered = batch.candidates;
 
-		// Apply status filter
 		if (statusFilter !== 'all') {
 			filtered = filtered.filter((c) => getCandidateStatus(c) === statusFilter);
 		}
 
-		// Apply search filter
 		if (searchQuery.trim()) {
 			const query = searchQuery.toLowerCase();
 			filtered = filtered.filter((c) => c.term.toLowerCase().includes(query));
@@ -150,260 +138,31 @@ export function BatchDetailPage() {
 		return filtered;
 	}, [batch, searchQuery, statusFilter]);
 
-	// Count selected candidates
 	const selectedCount = Object.keys(rowSelection).length;
 
-	// Handle individual accept from row dropdown
+	// Wrapper handlers that pass row selection state
 	const handleAcceptCandidate = useCallback(
-		async (candidate: Candidate) => {
-			setAcceptingIds((prev) => new Set(prev).add(candidate.id));
-
-			try {
-				const result = await acceptCandidate(candidate.id, candidate.version);
-
-				// Update the candidate in batch state
-				setBatch((prev) => {
-					if (!prev) return prev;
-					return {
-						...prev,
-						candidates: prev.candidates.map((c) =>
-							c.id === candidate.id
-								? {
-										...c,
-										status: 'accepted',
-										materializedTermId: result.termId,
-										materializedTermSenseId: result.termSenseId,
-										version: result.candidate.version,
-									}
-								: c
-						),
-					};
-				});
-
-				// Clear from selection if selected
-				setRowSelection((prev) => {
-					const next = { ...prev };
-					delete next[candidate.id];
-					return next;
-				});
-
-				toast.success(`Accepted "${candidate.term}"`);
-			} catch (err) {
-				if (err instanceof ApiRequestError) {
-					if (err.status === 409) {
-						const code = err.code;
-						if (code === 'ALREADY_ACCEPTED') {
-							toast.info('Already accepted');
-							await fetchBatch();
-						} else if (code === 'VERSION_CONFLICT') {
-							toast.warning('Modified elsewhere. Please refresh.');
-							await fetchBatch();
-						} else {
-							toast.error('Cannot accept. Please try again.');
-						}
-					} else {
-						toast.error('Accept failed. Please try again.');
-					}
-				} else {
-					toast.error('Accept failed. Please try again.');
-				}
-			} finally {
-				setAcceptingIds((prev) => {
-					const next = new Set(prev);
-					next.delete(candidate.id);
-					return next;
-				});
-			}
-		},
-		[fetchBatch]
+		(candidate: Candidate) => candidateActions.handleAcceptCandidate(candidate, setRowSelection),
+		[candidateActions.handleAcceptCandidate]
 	);
 
-	// Handle bulk accept
-	const handleBulkAccept = useCallback(async () => {
-		if (!batch) return;
-
-		const selectedCandidates = batch.candidates.filter((c) => rowSelection[c.id] && getCandidateStatus(c) === 'ready');
-
-		if (selectedCandidates.length === 0) return;
-
-		setIsBulkAccepting(true);
-		let successCount = 0;
-		let failedCount = 0;
-
-		for (const candidate of selectedCandidates) {
-			try {
-				const result = await acceptCandidate(candidate.id, candidate.version);
-
-				setBatch((prev) => {
-					if (!prev) return prev;
-					return {
-						...prev,
-						candidates: prev.candidates.map((c) =>
-							c.id === candidate.id
-								? {
-										...c,
-										status: 'accepted',
-										materializedTermId: result.termId,
-										materializedTermSenseId: result.termSenseId,
-										version: result.candidate.version,
-									}
-								: c
-						),
-					};
-				});
-
-				successCount++;
-			} catch {
-				failedCount++;
-			}
-		}
-
-		setRowSelection({});
-		setIsBulkAccepting(false);
-
-		if (failedCount === selectedCandidates.length) {
-			toast.error('All accepts failed. Please try again.');
-		} else if (failedCount > 0) {
-			toast.warning(`Accepted ${successCount}, ${failedCount} failed`);
-		} else {
-			toast.success(`Accepted ${successCount} terms`);
-		}
-	}, [batch, rowSelection]);
-
-	// Handle edit from row dropdown
-	const handleEditCandidate = useCallback((candidate: Candidate) => {
-		setSelectedCandidate(candidate);
-	}, []);
-
-	// Handle clear overrides from row dropdown
-	const handleClearCandidate = useCallback(
-		async (candidate: Candidate) => {
-			try {
-				const response = await updateCandidate(candidate.id, {
-					expectedVersion: candidate.version,
-					chosenBucket: null,
-					chosenText: null,
-				});
-				setBatch((prev) => updateBatchCandidate(prev, response.candidate));
-				toast.success('Overrides cleared');
-			} catch (err) {
-				if (err instanceof ApiRequestError && err.status === 409) {
-					toast.warning('Modified elsewhere. Please refresh.');
-					await fetchBatch();
-				} else {
-					toast.error('Clear failed. Please try again.');
-				}
-			}
-		},
-		[fetchBatch]
+	const handleBulkAccept = useCallback(
+		() => candidateActions.handleBulkAccept(rowSelection, setRowSelection),
+		[candidateActions.handleBulkAccept, rowSelection]
 	);
 
-	// Handle save from sheet
-	const handleSheetSave = useCallback(
-		async (candidateId: string, bucket: string | null, text: string | null) => {
-			const candidate = batch?.candidates.find((c) => c.id === candidateId);
-			if (!candidate) return;
-
-			setIsSavingSheet(true);
-
-			try {
-				const response = await updateCandidate(candidateId, {
-					expectedVersion: candidate.version,
-					chosenBucket: bucket,
-					chosenText: text,
-				});
-				setBatch((prev) => updateBatchCandidate(prev, response.candidate));
-				setSelectedCandidate(response.candidate);
-				toast.success('Saved');
-			} catch (err) {
-				if (err instanceof ApiRequestError && err.status === 409) {
-					toast.warning('Modified elsewhere. Please refresh.');
-					await fetchBatch();
-					setSelectedCandidate(null);
-				} else {
-					toast.error('Save failed. Please try again.');
-				}
-			} finally {
-				setIsSavingSheet(false);
-			}
-		},
-		[batch, fetchBatch]
-	);
-
-	// Handle clear from sheet
-	const handleSheetClear = useCallback(
-		async (candidateId: string) => {
-			const candidate = batch?.candidates.find((c) => c.id === candidateId);
-			if (!candidate) return;
-
-			setIsSavingSheet(true);
-
-			try {
-				const response = await updateCandidate(candidateId, {
-					expectedVersion: candidate.version,
-					chosenBucket: null,
-					chosenText: null,
-				});
-				setBatch((prev) => updateBatchCandidate(prev, response.candidate));
-				setSelectedCandidate(response.candidate);
-				toast.success('Overrides cleared');
-			} catch (err) {
-				if (err instanceof ApiRequestError && err.status === 409) {
-					toast.warning('Modified elsewhere. Please refresh.');
-					await fetchBatch();
-					setSelectedCandidate(null);
-				} else {
-					toast.error('Clear failed. Please try again.');
-				}
-			} finally {
-				setIsSavingSheet(false);
-			}
-		},
-		[batch, fetchBatch]
-	);
-
-	// Handle accept from sheet
-	const handleSheetAccept = useCallback(
-		async (candidate: Candidate) => {
-			setIsAcceptingSheet(true);
-
-			try {
-				const result = await acceptCandidate(candidate.id, candidate.version);
-
-				const updatedCandidate: Candidate = {
-					...candidate,
-					status: 'accepted',
-					materializedTermId: result.termId,
-					materializedTermSenseId: result.termSenseId,
-					version: result.candidate.version,
-				};
-
-				setBatch((prev) => updateBatchCandidate(prev, updatedCandidate));
-				setSelectedCandidate(updatedCandidate);
-				toast.success(`Accepted "${candidate.term}"`);
-			} catch (err) {
-				if (err instanceof ApiRequestError) {
-					if (err.status === 409) {
-						toast.warning('Modified elsewhere. Please refresh.');
-						await fetchBatch();
-						setSelectedCandidate(null);
-					} else {
-						toast.error('Accept failed. Please try again.');
-					}
-				} else {
-					toast.error('Accept failed. Please try again.');
-				}
-			} finally {
-				setIsAcceptingSheet(false);
-			}
-		},
-		[fetchBatch]
+	const handleEditCandidate = useCallback(
+		(candidate: Candidate) => candidateActions.handleEditCandidate(candidate, sheetActions.setSelectedCandidate),
+		[candidateActions.handleEditCandidate, sheetActions.setSelectedCandidate]
 	);
 
 	// Handle row click to open sheet
-	const handleRowClick = useCallback((candidate: Candidate) => {
-		setSelectedCandidate(candidate);
-	}, []);
+	const handleRowClick = useCallback(
+		(candidate: Candidate) => {
+			sheetActions.setSelectedCandidate(candidate);
+		},
+		[sheetActions.setSelectedCandidate]
+	);
 
 	// Generate suggestions
 	const handleGenerateSuggestions = useCallback(async () => {
@@ -459,9 +218,9 @@ export function BatchDetailPage() {
 			toast.success(`Accepted ${summary.acceptedCount} terms (${summary.termCreatedCount} new terms created)`);
 			await fetchBatch();
 		} catch (err) {
-			if (err instanceof ApiRequestError) {
-				if (err.status === 409) {
-					const reason = err.details?.reason as string | undefined;
+			handleApiError(err, {
+				onConflict: (_code, details) => {
+					const reason = details?.reason as string | undefined;
 					if (reason === 'SUGGESTIONS_IN_PROGRESS') {
 						toast.error('Cannot accept: some suggestions are still being generated.');
 					} else if (reason === 'MISSING_EFFECTIVE_FIELDS') {
@@ -469,12 +228,9 @@ export function BatchDetailPage() {
 					} else {
 						toast.error('Cannot accept: please refresh and try again.');
 					}
-				} else {
-					toast.error('Accept failed. Please try again.');
-				}
-			} else {
-				toast.error('Accept failed. Please try again.');
-			}
+				},
+				onDefault: () => toast.error('Accept failed. Please try again.'),
+			});
 		} finally {
 			setIsAccepting(false);
 		}
@@ -486,10 +242,10 @@ export function BatchDetailPage() {
 			getCandidateColumns({
 				onAccept: handleAcceptCandidate,
 				onEdit: handleEditCandidate,
-				onClear: handleClearCandidate,
-				acceptingIds,
+				onClear: candidateActions.handleClearCandidate,
+				acceptingIds: candidateActions.acceptingIds,
 			}),
-		[handleAcceptCandidate, handleEditCandidate, handleClearCandidate, acceptingIds]
+		[handleAcceptCandidate, handleEditCandidate, candidateActions.handleClearCandidate, candidateActions.acceptingIds]
 	);
 
 	// Calculate status counts for filter chips
@@ -504,7 +260,6 @@ export function BatchDetailPage() {
 		};
 	}, [batch]);
 
-	// Calculate ready count for batch accept action bar
 	const readyCount = statusCounts.ready;
 
 	if (isLoading || bucketsLoading) {
@@ -623,7 +378,7 @@ export function BatchDetailPage() {
 			{/* Bulk action bar - shows when items are selected */}
 			<CandidateBulkActionBar
 				selectedCount={selectedCount}
-				isAccepting={isBulkAccepting}
+				isAccepting={candidateActions.isBulkAccepting}
 				onClear={() => setRowSelection({})}
 				onAcceptSelected={handleBulkAccept}
 			/>
@@ -633,14 +388,14 @@ export function BatchDetailPage() {
 
 			{/* Detail sheet */}
 			<CandidateDetailSheet
-				candidate={selectedCandidate}
+				candidate={sheetActions.selectedCandidate}
 				buckets={buckets}
-				isSaving={isSavingSheet}
-				isAccepting={isAcceptingSheet}
-				onClose={() => setSelectedCandidate(null)}
-				onSave={handleSheetSave}
-				onClear={handleSheetClear}
-				onAccept={handleSheetAccept}
+				isSaving={sheetActions.isSavingSheet}
+				isAccepting={sheetActions.isAcceptingSheet}
+				onClose={() => sheetActions.setSelectedCandidate(null)}
+				onSave={sheetActions.handleSheetSave}
+				onClear={sheetActions.handleSheetClear}
+				onAccept={sheetActions.handleSheetAccept}
 			/>
 		</>
 	);

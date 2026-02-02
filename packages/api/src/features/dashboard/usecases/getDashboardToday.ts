@@ -98,6 +98,83 @@ function buildBreakdown(
 	return items.filter((i) => i.minutes > 0).map((i) => makeItem(i.key, i.minutes));
 }
 
+function computeWeeklyTopSource(
+	creditIndex: ReturnType<typeof computeCreditIndex>,
+	dayKeys: string[]
+): { source: string; minutes: number } {
+	const daySet = new Set(dayKeys);
+	const weeklyHostTotals = new Map<string, number>();
+
+	for (const [k, v] of creditIndex.msByDayAndHost) {
+		const [dayKey, host] = k.split('|');
+		if (!daySet.has(dayKey)) continue;
+		weeklyHostTotals.set(host, (weeklyHostTotals.get(host) ?? 0) + v);
+	}
+
+	let topSource = { source: '', minutes: 0 };
+	for (const [host, ms] of weeklyHostTotals) {
+		const minutes = msToMinutes(ms);
+		if (minutes > topSource.minutes) {
+			topSource = { source: host, minutes };
+		}
+	}
+
+	return topSource;
+}
+
+function computeWeeklyTopTopic(
+	creditIndex: ReturnType<typeof computeCreditIndex>,
+	dayKeys: string[]
+): { topic: string; minutes: number; weeklyTotalMinutes: number } {
+	const daySet = new Set(dayKeys);
+	const weeklyTopicTotals = new Map<TopicSlug, number>();
+	let weeklyTotalMs = 0;
+
+	for (const [k, v] of creditIndex.msByDayAndTopic) {
+		const [dayKey, topicSlug] = k.split('|');
+		if (!daySet.has(dayKey)) continue;
+		const topic = topicSlug as TopicSlug;
+		weeklyTopicTotals.set(topic, (weeklyTopicTotals.get(topic) ?? 0) + v);
+	}
+
+	let topTopic = { topic: '', minutes: 0, weeklyTotalMinutes: 0 };
+	for (const [topic, ms] of weeklyTopicTotals) {
+		weeklyTotalMs += ms;
+		const minutes = msToMinutes(ms);
+		if (minutes > topTopic.minutes) {
+			topTopic = { topic: TOPIC_LABELS[topic] ?? topic, minutes, weeklyTotalMinutes: 0 };
+		}
+	}
+
+	topTopic.weeklyTotalMinutes = msToMinutes(weeklyTotalMs);
+	return topTopic;
+}
+
+function extractTodayCaptures(rows: DbEventRow[], todayStartMs: number, todayEndMs: number): { count: number; items: CaptureItem[] } {
+	const captures: Array<CaptureItem & { emitted_at: number }> = [];
+
+	for (const row of rows) {
+		if (row.type !== 'capture') continue;
+		const emittedAtMs = row.emittedAt.getTime();
+		if (emittedAtMs < todayStartMs || emittedAtMs > todayEndMs) continue;
+
+		const payload = JSON.parse(row.payloadJson) as CapturePayload;
+		captures.push({
+			id: row.eventId,
+			type: payload.capture_type,
+			label: payload.label,
+			source: row.artifactHost ?? 'unknown',
+			emitted_at: emittedAtMs,
+		});
+	}
+
+	captures.sort((a, b) => b.emitted_at - a.emitted_at);
+	return {
+		count: captures.length,
+		items: captures.map(({ emitted_at: _, ...rest }) => rest),
+	};
+}
+
 export async function getDashboardToday(
 	db: DrizzleD1Database<typeof schema>,
 	userId: string,
@@ -149,65 +226,13 @@ export async function getDashboardToday(
 		return { id: host, label: host, minutes };
 	});
 
-	// Top source (7-day)
-	const weeklyHostTotals = new Map<string, number>();
-	for (const dayKey of sevenDayDays) {
-		for (const [k, v] of creditIndex.msByDayAndHost) {
-			if (!k.startsWith(`${dayKey}|`)) continue;
-			const host = k.split('|')[1];
-			weeklyHostTotals.set(host, (weeklyHostTotals.get(host) ?? 0) + v);
-		}
-	}
-	let topSource = { source: '', minutes: 0 };
-	for (const [host, ms] of weeklyHostTotals) {
-		const minutes = msToMinutes(ms);
-		if (minutes > topSource.minutes) {
-			topSource = { source: host, minutes };
-		}
-	}
-
-	// Top topic (7-day)
-	const weeklyTopicTotals = new Map<TopicSlug, number>();
-	for (const dayKey of sevenDayDays) {
-		for (const [k, v] of creditIndex.msByDayAndTopic) {
-			if (!k.startsWith(`${dayKey}|`)) continue;
-			const topic = k.split('|')[1] as TopicSlug;
-			weeklyTopicTotals.set(topic, (weeklyTopicTotals.get(topic) ?? 0) + v);
-		}
-	}
-	let topTopic = { topic: '', minutes: 0, weeklyTotalMinutes: 0 };
-	let weeklyTotalMs = 0;
-	for (const [topic, ms] of weeklyTopicTotals) {
-		weeklyTotalMs += ms;
-		const minutes = msToMinutes(ms);
-		if (minutes > topTopic.minutes) {
-			topTopic = { topic: TOPIC_LABELS[topic] ?? topic, minutes, weeklyTotalMinutes: 0 };
-		}
-	}
-	topTopic.weeklyTotalMinutes = msToMinutes(weeklyTotalMs);
-
 	// Today captures
 	const { startMs: todayStartMs } = parseDayKeyToTzRange(todayKey, timezone);
-	const captures: Array<CaptureItem & { emitted_at: number }> = [];
-	for (const row of rows) {
-		if (row.type !== 'capture') continue;
-		const emittedAtMs = row.emittedAt.getTime();
-		if (emittedAtMs < todayStartMs || emittedAtMs > todayEndMs) continue;
+	const todayCaptures = extractTodayCaptures(rows, todayStartMs, todayEndMs);
 
-		const payload = JSON.parse(row.payloadJson) as CapturePayload;
-		captures.push({
-			id: row.eventId,
-			type: payload.capture_type,
-			label: payload.label,
-			source: row.artifactHost ?? 'unknown',
-			emitted_at: emittedAtMs,
-		});
-	}
-	captures.sort((a, b) => b.emitted_at - a.emitted_at);
-	const todayCaptures = {
-		count: captures.length,
-		items: captures.map(({ emitted_at: _, ...rest }) => rest),
-	};
+	// Top cards (7-day)
+	const topSource = computeWeeklyTopSource(creditIndex, sevenDayDays);
+	const topTopic = computeWeeklyTopTopic(creditIndex, sevenDayDays);
 
 	// Streak (computed separately with paging, reuses pre-fetched overrides)
 	const streakScanBudget = MAX_EVENTS_PER_REQUEST - scanned;

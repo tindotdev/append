@@ -46,132 +46,29 @@ const UTILITY_ITEMS = [
 	{ to: '/privacy', label: 'Privacy', icon: Shield, shortcut: undefined },
 ] as const;
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-	const location = useLocation();
-	const navigate = useNavigate();
-	const { data: session } = useAuth();
-	const { data: bucketsData } = useUserBuckets({ enabled: !!session });
-	const buckets = bucketsData?.buckets ?? [];
-	const { isMobile } = useSidebar();
-	const [bucketsOpen, setBucketsOpen] = React.useState(true);
-	const [createSheetOpen, setCreateSheetOpen] = React.useState(false);
-	const [editTarget, setEditTarget] = React.useState<UserBucket | null>(null);
-	const [deleteTarget, setDeleteTarget] = React.useState<UserBucket | null>(null);
-	const [deleteError, setDeleteError] = React.useState<string | null>(null);
-	const [focusedItemIndex, setFocusedItemIndex] = React.useState<number>(-1);
-	const menuItemsRef = React.useRef<(HTMLAnchorElement | null)[]>([]);
-
-	const updateBucketMutation = useUpdateBucket();
-	const deleteBucketMutation = useDeleteBucket();
-	const reorderBucketsMutation = useReorderBuckets();
-
-	// DnD sensors for drag-and-drop
-	const sensors = useSensors(
-		useSensor(PointerSensor, {
-			activationConstraint: {
-				distance: 8, // 8px movement required before drag starts
-			},
-		}),
-		useSensor(KeyboardSensor)
-	);
-
-	const user = session?.user;
-	const userInitials =
-		user?.name
-			?.split(' ')
-			.map((n) => n[0])
-			.join('')
-			.toUpperCase()
-			.slice(0, 2) ??
-		user?.email?.slice(0, 2).toUpperCase() ??
-		'U';
-
-	// Bucket action handlers
-	const handleEditBucket = (bucketId: string) => {
-		const bucket = buckets.find((b) => b.id === bucketId);
-		if (bucket) {
-			setEditTarget(bucket);
-		}
-	};
-
-	const handleIconChange = async (bucketId: string, icon: string | null) => {
-		await updateBucketMutation.mutateAsync({ id: bucketId, input: { icon } });
-	};
-
-	const handleNameChange = async (bucketId: string, name: string) => {
-		await updateBucketMutation.mutateAsync({ id: bucketId, input: { name } });
-	};
-
-	const handleExportBucket = (bucketId: string) => {
-		// Navigate to export page with bucket filter
-		const bucket = buckets.find((b) => b.id === bucketId);
-		if (bucket) {
-			navigate({ to: '/export', search: { bucket: bucket.slug } });
-		}
-	};
-
-	const handleDeleteBucket = (bucketId: string) => {
-		const bucket = buckets.find((b) => b.id === bucketId);
-		if (!bucket) return;
-		setDeleteTarget(bucket);
-	};
-
-	const confirmDelete = async () => {
-		if (!deleteTarget) return;
-
-		try {
-			setDeleteError(null);
-			await deleteBucketMutation.mutateAsync(deleteTarget.id);
-			toast.success('Bucket deleted');
-			setDeleteTarget(null);
-		} catch (_error) {
-			setDeleteError('Failed to delete bucket');
-		}
-	};
-
-	const closeDeleteDialog = () => {
-		setDeleteTarget(null);
-		setDeleteError(null);
-	};
-
-	const handleDragEnd = async (event: DragEndEvent) => {
-		const { active, over } = event;
-
-		if (!over || active.id === over.id) return;
-
-		// Find the indices of the dragged and target buckets
-		const oldIndex = buckets.findIndex((b) => b.id === active.id);
-		const newIndex = buckets.findIndex((b) => b.id === over.id);
-
-		if (oldIndex === -1 || newIndex === -1) return;
-
-		// Reorder the buckets array
-		const reorderedBuckets = [...buckets];
-		const [removed] = reorderedBuckets.splice(oldIndex, 1);
-		reorderedBuckets.splice(newIndex, 0, removed);
-
-		// Optimistically update UI and persist to backend
-		try {
-			await reorderBucketsMutation.mutateAsync(reorderedBuckets.map((b) => b.id));
-		} catch (_error) {
-			toast.error('Failed to reorder buckets');
-		}
-	};
-
-	// Keyboard navigation for sidebar items
+function useSidebarKeyboardNav({
+	totalNavItems,
+	totalBucketItems,
+	totalUtilityItems,
+	menuItemsRef,
+	focusedItemIndex,
+	setFocusedItemIndex,
+	disabled,
+}: {
+	totalNavItems: number;
+	totalBucketItems: number;
+	totalUtilityItems: number;
+	menuItemsRef: React.RefObject<(HTMLAnchorElement | null)[]>;
+	focusedItemIndex: number;
+	setFocusedItemIndex: React.Dispatch<React.SetStateAction<number>>;
+	disabled: boolean;
+}) {
 	React.useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
-			// Skip if user is typing in input/textarea or if a modal is open
 			const target = event.target as HTMLElement;
 			const isEditing = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
-			if (isEditing || deleteTarget !== null || editTarget !== null || createSheetOpen) {
-				return;
-			}
+			if (isEditing || disabled) return;
 
-			// Get all navigable items (NAV_ITEMS + buckets + UTILITY_ITEMS)
-			const totalNavItems = NAV_ITEMS.length;
-			const totalBucketItems = bucketsOpen ? buckets.length : 0;
-			const totalUtilityItems = UTILITY_ITEMS.length;
 			const totalItems = totalNavItems + totalBucketItems + totalUtilityItems;
 
 			switch (event.key) {
@@ -179,7 +76,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 					event.preventDefault();
 					setFocusedItemIndex((prev) => {
 						const next = prev < totalItems - 1 ? prev + 1 : 0;
-						// Focus the element
 						setTimeout(() => menuItemsRef.current[next]?.focus(), 0);
 						return next;
 					});
@@ -220,7 +116,198 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [focusedItemIndex, bucketsOpen, buckets.length, deleteTarget, editTarget, createSheetOpen]);
+	}, [focusedItemIndex, totalNavItems, totalBucketItems, totalUtilityItems, menuItemsRef, setFocusedItemIndex, disabled]);
+}
+
+function useBucketActions(buckets: UserBucket[], navigate: ReturnType<typeof useNavigate>) {
+	const [editTarget, setEditTarget] = React.useState<UserBucket | null>(null);
+	const [deleteTarget, setDeleteTarget] = React.useState<UserBucket | null>(null);
+	const [deleteError, setDeleteError] = React.useState<string | null>(null);
+
+	const updateBucketMutation = useUpdateBucket();
+	const deleteBucketMutation = useDeleteBucket();
+	const reorderBucketsMutation = useReorderBuckets();
+
+	const handleEditBucket = (bucketId: string) => {
+		const bucket = buckets.find((b) => b.id === bucketId);
+		if (bucket) setEditTarget(bucket);
+	};
+
+	const handleIconChange = async (bucketId: string, icon: string | null) => {
+		await updateBucketMutation.mutateAsync({ id: bucketId, input: { icon } });
+	};
+
+	const handleNameChange = async (bucketId: string, name: string) => {
+		await updateBucketMutation.mutateAsync({ id: bucketId, input: { name } });
+	};
+
+	const handleExportBucket = (bucketId: string) => {
+		const bucket = buckets.find((b) => b.id === bucketId);
+		if (bucket) {
+			navigate({ to: '/export', search: { bucket: bucket.slug } });
+		}
+	};
+
+	const handleDeleteBucket = (bucketId: string) => {
+		const bucket = buckets.find((b) => b.id === bucketId);
+		if (!bucket) return;
+		setDeleteTarget(bucket);
+	};
+
+	const confirmDelete = async () => {
+		if (!deleteTarget) return;
+
+		try {
+			setDeleteError(null);
+			await deleteBucketMutation.mutateAsync(deleteTarget.id);
+			toast.success('Bucket deleted');
+			setDeleteTarget(null);
+		} catch (_error) {
+			setDeleteError('Failed to delete bucket');
+		}
+	};
+
+	const closeDeleteDialog = () => {
+		setDeleteTarget(null);
+		setDeleteError(null);
+	};
+
+	const handleDragEnd = async (event: DragEndEvent) => {
+		const { active, over } = event;
+
+		if (!over || active.id === over.id) return;
+
+		const oldIndex = buckets.findIndex((b) => b.id === active.id);
+		const newIndex = buckets.findIndex((b) => b.id === over.id);
+
+		if (oldIndex === -1 || newIndex === -1) return;
+
+		const reorderedBuckets = [...buckets];
+		const [removed] = reorderedBuckets.splice(oldIndex, 1);
+		reorderedBuckets.splice(newIndex, 0, removed);
+
+		try {
+			await reorderBucketsMutation.mutateAsync(reorderedBuckets.map((b) => b.id));
+		} catch (_error) {
+			toast.error('Failed to reorder buckets');
+		}
+	};
+
+	return {
+		editTarget,
+		setEditTarget,
+		deleteTarget,
+		deleteError,
+		deleteBucketMutation,
+		handleEditBucket,
+		handleIconChange,
+		handleNameChange,
+		handleExportBucket,
+		handleDeleteBucket,
+		confirmDelete,
+		closeDeleteDialog,
+		handleDragEnd,
+	};
+}
+
+function BucketDeleteDialog({
+	deleteTarget,
+	deleteError,
+	isPending,
+	onConfirm,
+	onClose,
+}: {
+	deleteTarget: UserBucket | null;
+	deleteError: string | null;
+	isPending: boolean;
+	onConfirm: () => void;
+	onClose: () => void;
+}) {
+	return (
+		<Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && onClose()}>
+			<DialogContent>
+				<DialogHeader>
+					<DialogTitle>Delete Bucket</DialogTitle>
+					<DialogDescription>
+						Are you sure you want to delete <strong className="text-foreground">{deleteTarget?.name}</strong>?
+					</DialogDescription>
+				</DialogHeader>
+
+				{deleteTarget && deleteTarget.senseCount > 0 && (
+					<Alert className="bg-yellow-900/20 border-yellow-800">
+						<AlertDescription className="text-yellow-300">
+							This bucket contains {deleteTarget.senseCount} item{deleteTarget.senseCount !== 1 ? 's' : ''}. You must move or delete all items
+							before deleting the bucket.
+						</AlertDescription>
+					</Alert>
+				)}
+
+				{deleteError && (
+					<Alert variant="destructive">
+						<AlertDescription>{deleteError}</AlertDescription>
+					</Alert>
+				)}
+
+				<DialogFooter>
+					<DialogClose asChild>
+						<Button variant="ghost" disabled={isPending}>
+							Cancel
+						</Button>
+					</DialogClose>
+					<Button variant="destructive" onClick={onConfirm} disabled={isPending || (deleteTarget?.senseCount ?? 0) > 0}>
+						{isPending ? 'Deleting...' : 'Delete Bucket'}
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+	const location = useLocation();
+	const navigate = useNavigate();
+	const { data: session } = useAuth();
+	const { data: bucketsData } = useUserBuckets({ enabled: !!session });
+	const buckets = bucketsData?.buckets ?? [];
+	const { isMobile } = useSidebar();
+	const [bucketsOpen, setBucketsOpen] = React.useState(true);
+	const [createSheetOpen, setCreateSheetOpen] = React.useState(false);
+	const [focusedItemIndex, setFocusedItemIndex] = React.useState<number>(-1);
+	const menuItemsRef = React.useRef<(HTMLAnchorElement | null)[]>([]);
+
+	const bucketActions = useBucketActions(buckets, navigate);
+
+	// DnD sensors for drag-and-drop
+	const sensors = useSensors(
+		useSensor(PointerSensor, {
+			activationConstraint: {
+				distance: 8,
+			},
+		}),
+		useSensor(KeyboardSensor)
+	);
+
+	const user = session?.user;
+	const userInitials =
+		user?.name
+			?.split(' ')
+			.map((n) => n[0])
+			.join('')
+			.toUpperCase()
+			.slice(0, 2) ??
+		user?.email?.slice(0, 2).toUpperCase() ??
+		'U';
+
+	// Keyboard navigation for sidebar items
+	useSidebarKeyboardNav({
+		totalNavItems: NAV_ITEMS.length,
+		totalBucketItems: bucketsOpen ? buckets.length : 0,
+		totalUtilityItems: UTILITY_ITEMS.length,
+		menuItemsRef,
+		focusedItemIndex,
+		setFocusedItemIndex,
+		disabled: bucketActions.deleteTarget !== null || bucketActions.editTarget !== null || createSheetOpen,
+	});
 
 	return (
 		<Sidebar collapsible="icon" {...props}>
@@ -330,17 +417,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 						<CollapsibleContent>
 							<SidebarMenu role="tree" aria-label="Buckets">
 								{buckets.length > 0 ? (
-									<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+									<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={bucketActions.handleDragEnd}>
 										<SortableContext items={buckets.map((b) => b.id)} strategy={verticalListSortingStrategy}>
 											{buckets.map((bucket, index) => (
 												<SidebarBucketItem
 													key={bucket.id}
 													bucket={bucket}
-													onEdit={() => handleEditBucket(bucket.id)}
-													onIconChange={(icon) => handleIconChange(bucket.id, icon)}
-													onNameChange={(name) => handleNameChange(bucket.id, name)}
-													onExport={() => handleExportBucket(bucket.id)}
-													onDelete={() => handleDeleteBucket(bucket.id)}
+													onEdit={() => bucketActions.handleEditBucket(bucket.id)}
+													onIconChange={(icon) => bucketActions.handleIconChange(bucket.id, icon)}
+													onNameChange={(name) => bucketActions.handleNameChange(bucket.id, name)}
+													onExport={() => bucketActions.handleExportBucket(bucket.id)}
+													onDelete={() => bucketActions.handleDeleteBucket(bucket.id)}
 													ref={(el) => {
 														menuItemsRef.current[NAV_ITEMS.length + index] = el;
 													}}
@@ -390,52 +477,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 			<SidebarRail />
 
 			{/* Delete confirmation dialog */}
-			<Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && closeDeleteDialog()}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Delete Bucket</DialogTitle>
-						<DialogDescription>
-							Are you sure you want to delete <strong className="text-foreground">{deleteTarget?.name}</strong>?
-						</DialogDescription>
-					</DialogHeader>
-
-					{deleteTarget && deleteTarget.senseCount > 0 && (
-						<Alert className="bg-yellow-900/20 border-yellow-800">
-							<AlertDescription className="text-yellow-300">
-								This bucket contains {deleteTarget.senseCount} item{deleteTarget.senseCount !== 1 ? 's' : ''}. You must move or delete all items
-								before deleting the bucket.
-							</AlertDescription>
-						</Alert>
-					)}
-
-					{deleteError && (
-						<Alert variant="destructive">
-							<AlertDescription>{deleteError}</AlertDescription>
-						</Alert>
-					)}
-
-					<DialogFooter>
-						<DialogClose asChild>
-							<Button variant="ghost" disabled={deleteBucketMutation.isPending}>
-								Cancel
-							</Button>
-						</DialogClose>
-						<Button
-							variant="destructive"
-							onClick={confirmDelete}
-							disabled={deleteBucketMutation.isPending || (deleteTarget?.senseCount ?? 0) > 0}
-						>
-							{deleteBucketMutation.isPending ? 'Deleting...' : 'Delete Bucket'}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			<BucketDeleteDialog
+				deleteTarget={bucketActions.deleteTarget}
+				deleteError={bucketActions.deleteError}
+				isPending={bucketActions.deleteBucketMutation.isPending}
+				onConfirm={bucketActions.confirmDelete}
+				onClose={bucketActions.closeDeleteDialog}
+			/>
 
 			{/* Create bucket sheet */}
 			<BucketCreateSheet open={createSheetOpen} onOpenChange={setCreateSheetOpen} />
 
 			{/* Edit bucket sheet */}
-			<BucketEditSheet bucket={editTarget} open={editTarget !== null} onOpenChange={(open) => !open && setEditTarget(null)} />
+			<BucketEditSheet
+				bucket={bucketActions.editTarget}
+				open={bucketActions.editTarget !== null}
+				onOpenChange={(open) => !open && bucketActions.setEditTarget(null)}
+			/>
 		</Sidebar>
 	);
 }
