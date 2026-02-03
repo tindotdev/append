@@ -79,25 +79,34 @@ export function RawEventsExport() {
 			result: null,
 		}));
 
-		const result = await downloadEventsExport({
-			from: formatDateForApi(fromDate),
-			to: formatDateForApi(toDate),
-			cursor,
-			// Only use part numbers when we expect multi-part exports (cursor continuation)
-			// or when the first chunk gets truncated
-			partNumber: cursor ? nextChunkNumber : undefined,
-		});
+		try {
+			const result = await downloadEventsExport({
+				from: formatDateForApi(fromDate),
+				to: formatDateForApi(toDate),
+				cursor,
+				// Only use part numbers when we expect multi-part exports (cursor continuation)
+				// or when the first chunk gets truncated
+				partNumber: cursor ? nextChunkNumber : undefined,
+			});
 
-		// If first download was truncated, we need to rename it mentally as part 1
-		// The next download will be part 2, etc.
-		const effectiveChunkNumber = result.success && result.truncated && !cursor ? 1 : nextChunkNumber;
+			// If first download was truncated, we need to rename it mentally as part 1
+			// The next download will be part 2, etc.
+			const effectiveChunkNumber = result.success && result.truncated && !cursor ? 1 : nextChunkNumber;
 
-		setState({
-			isDownloading: false,
-			result,
-			cursor: result.success && result.truncated ? result.cursor : null,
-			chunkNumber: result.success ? effectiveChunkNumber : state.chunkNumber,
-		});
+			setState((prev) => ({
+				isDownloading: false,
+				result,
+				cursor: result.success && result.truncated ? result.cursor : null,
+				chunkNumber: result.success ? effectiveChunkNumber : prev.chunkNumber,
+			}));
+		} catch (err) {
+			setState((prev) => ({
+				isDownloading: false,
+				result: { success: false, error: String(err) },
+				cursor: null,
+				chunkNumber: prev.chunkNumber,
+			}));
+		}
 	};
 
 	const handleRangeChange = (from: Date, to: Date) => {
@@ -133,10 +142,11 @@ export function RawEventsExport() {
 							size="sm"
 							onClick={() => handleDownload()}
 							disabled={state.isDownloading}
+							aria-label="Download NDJSON"
 							title={state.isDownloading && !state.cursor ? 'Downloading...' : 'Download NDJSON'}
 						>
 							{state.isDownloading && !state.cursor ? (
-								<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+								<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-foreground" />
 							) : (
 								<Download className="size-4" />
 							)}
@@ -146,7 +156,7 @@ export function RawEventsExport() {
 							<Button size="sm" variant="secondary" onClick={handleDownloadNext} disabled={state.isDownloading}>
 								{state.isDownloading ? (
 									<>
-										<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+										<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-foreground" />
 										Downloading...
 									</>
 								) : (
