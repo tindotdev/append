@@ -40,7 +40,7 @@ repos:
         name: Check documentation policy
         entry: pnpm docs:policy
         language: system
-        files: '^docs/.*\.md$'
+        files: '^(docs/.*\.md$|AGENTS\.md$)'
         pass_filenames: false
         stages: [pre-commit]
         priority: 10  # Run after biome (can run in parallel with lint-boundaries)
