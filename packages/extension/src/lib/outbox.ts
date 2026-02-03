@@ -87,6 +87,10 @@ function calculateBackoffMs(consecutiveFailures: number): number {
 }
 
 async function updateBadge(outboxCount: number, hasAuthError = false): Promise<void> {
+	// NOTE: Hardcoded hex colors are used here because chrome.action.setBadgeBackgroundColor
+	// only accepts CSS color strings and cannot reference CSS custom properties.
+	// This is an exception to the project's color token rules.
+
 	// Auth error takes precedence - show critical error state
 	if (hasAuthError) {
 		await chrome.action.setBadgeText({ text: '!' });
@@ -156,143 +160,169 @@ export async function clearAuthError(): Promise<void> {
 	console.log('[append][outbox] auth error cleared');
 }
 
+let flushing = false;
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: linear state-machine handling distinct failure modes (auth, backoff, network, parse, server error)
 export async function flushOutbox(): Promise<void> {
-	const settings = await getSettings();
-	if (!settings.deviceToken) return;
+	// Re-entrancy guard: prevent concurrent flushes under slow network conditions
+	if (flushing) return;
+	flushing = true;
 
-	const outbox = await getOutbox();
-	if (outbox.length === 0) return;
-
-	// Check if we have an auth error - if so, stop flushing until user fixes token
-	const authErrorState = await getAuthErrorState();
-	if (authErrorState.hasAuthError) {
-		console.warn('[append][outbox] auth error detected, skipping flush until token is updated');
-		await updateBadge(outbox.length, true);
-		return;
-	}
-
-	// Check if we're in backoff period
-	const backoffState = await getBackoffState();
-	const now = Date.now();
-	if (backoffState.nextRetryAt > now) {
-		const waitMs = backoffState.nextRetryAt - now;
-		console.log(`[append][outbox] in backoff period, skipping flush (retry in ${Math.round(waitMs / 1000)}s)`);
-		return;
-	}
-
-	const batch = outbox.slice(0, BATCH_SIZE);
-	const url = `${settings.apiBaseUrl}/events/ingest`;
-
-	let res: Response;
 	try {
-		res = await fetch(url, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				authorization: `Bearer ${settings.deviceToken}`,
-			},
-			body: JSON.stringify({ events: batch }),
-		});
-	} catch (err) {
-		console.warn('[append][outbox] upload failed', err);
-		// Network error - apply backoff
-		const failures = backoffState.consecutiveFailures + 1;
-		const backoffMs = calculateBackoffMs(failures);
-		await setBackoffState({
-			consecutiveFailures: failures,
-			nextRetryAt: now + backoffMs,
-		});
-		console.warn(`[append][outbox] backoff applied: ${failures} failures, next retry in ${Math.round(backoffMs / 1000)}s`);
-		return;
-	}
+		const settings = await getSettings();
+		if (!settings.deviceToken) return;
 
-	if (res.status === 401) {
-		// Treat 401 as terminal auth error - stop flushing until user updates token
-		await setAuthErrorState({ hasAuthError: true, lastAuthErrorAt: now });
-		await updateBadge(outbox.length, true);
-		console.error(
-			'[append][outbox] UNAUTHORIZED: Authentication failed. ' +
-				'Please check your device token. Outbox flushing paused until token is updated.'
-		);
-		return;
-	}
+		const outbox = await getOutbox();
+		if (outbox.length === 0) return;
 
-	let body: IngestResponse;
-	try {
-		body = (await res.json()) as IngestResponse;
-	} catch (err) {
-		// Invalid JSON (e.g., HTML error page) - apply backoff
-		const failures = backoffState.consecutiveFailures + 1;
-		const backoffMs = calculateBackoffMs(failures);
-		await setBackoffState({
-			consecutiveFailures: failures,
-			nextRetryAt: Date.now() + backoffMs,
-		});
-		console.warn('[append][outbox] invalid response, backoff applied', {
-			error: err,
-			failures,
-			nextRetryInSec: Math.round(backoffMs / 1000),
-		});
-		return;
-	}
-
-	if (!res.ok) {
-		// Server error (429, 500, etc.) - apply backoff to avoid hot-loop retries
-		const failures = backoffState.consecutiveFailures + 1;
-		const backoffMs = calculateBackoffMs(failures);
-		await setBackoffState({
-			consecutiveFailures: failures,
-			nextRetryAt: Date.now() + backoffMs,
-		});
-		console.warn('[append][outbox] server error, backoff applied', {
-			status: res.status,
-			body,
-			failures,
-			nextRetryInSec: Math.round(backoffMs / 1000),
-		});
-		return;
-	}
-
-	if (!('rejected' in body) || !Array.isArray(body.rejected)) {
-		console.warn('[append][outbox] unexpected response', body);
-		return;
-	}
-
-	const rejectedByIndex = new Map<number, string>();
-	for (const r of body.rejected) {
-		if (typeof r.index === 'number' && typeof r.reason === 'string') {
-			rejectedByIndex.set(r.index, r.reason);
+		// Check if we have an auth error - if so, stop flushing until user fixes token
+		const authErrorState = await getAuthErrorState();
+		if (authErrorState.hasAuthError) {
+			console.warn('[append][outbox] auth error detected, skipping flush until token is updated');
+			await updateBadge(outbox.length, true);
+			return;
 		}
-	}
 
-	const remaining: TelemetryEvent[] = [];
-	const deadletter: DeadletterItem[] = [];
+		// Check if we're in backoff period
+		const backoffState = await getBackoffState();
+		const now = Date.now();
+		if (backoffState.nextRetryAt > now) {
+			const waitMs = backoffState.nextRetryAt - now;
+			console.log(`[append][outbox] in backoff period, skipping flush (retry in ${Math.round(waitMs / 1000)}s)`);
+			return;
+		}
 
-	// Remove submitted events from the front; keep rejected items in deadletter.
-	for (let i = 0; i < outbox.length; i += 1) {
-		if (i < batch.length) {
-			const reason = rejectedByIndex.get(i);
-			if (reason) {
-				deadletter.push({ at_ms: Date.now(), reason, event: outbox[i] });
+		const batch = outbox.slice(0, BATCH_SIZE);
+		const url = `${settings.apiBaseUrl}/events/ingest`;
+
+		let res: Response;
+		try {
+			res = await fetch(url, {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json',
+					authorization: `Bearer ${settings.deviceToken}`,
+				},
+				body: JSON.stringify({ events: batch }),
+			});
+		} catch (err) {
+			console.warn('[append][outbox] upload failed', err);
+			// Network error - apply backoff
+			const failures = backoffState.consecutiveFailures + 1;
+			const backoffMs = calculateBackoffMs(failures);
+			await setBackoffState({
+				consecutiveFailures: failures,
+				nextRetryAt: now + backoffMs,
+			});
+			console.warn(`[append][outbox] backoff applied: ${failures} failures, next retry in ${Math.round(backoffMs / 1000)}s`);
+			return;
+		}
+
+		if (res.status === 401) {
+			// Treat 401 as terminal auth error - stop flushing until user updates token
+			await setAuthErrorState({ hasAuthError: true, lastAuthErrorAt: now });
+			await updateBadge(outbox.length, true);
+			console.error(
+				'[append][outbox] UNAUTHORIZED: Authentication failed. ' +
+					'Please check your device token. Outbox flushing paused until token is updated.'
+			);
+			return;
+		}
+
+		let body: IngestResponse;
+		try {
+			body = (await res.json()) as IngestResponse;
+		} catch (err) {
+			// Invalid JSON (e.g., HTML error page) - apply backoff
+			const failures = backoffState.consecutiveFailures + 1;
+			const backoffMs = calculateBackoffMs(failures);
+			await setBackoffState({
+				consecutiveFailures: failures,
+				nextRetryAt: Date.now() + backoffMs,
+			});
+			console.warn('[append][outbox] invalid response, backoff applied', {
+				error: err,
+				failures,
+				nextRetryInSec: Math.round(backoffMs / 1000),
+			});
+			return;
+		}
+
+		if (!res.ok) {
+			// Server error (429, 500, etc.) - apply backoff to avoid hot-loop retries
+			const failures = backoffState.consecutiveFailures + 1;
+			const backoffMs = calculateBackoffMs(failures);
+			await setBackoffState({
+				consecutiveFailures: failures,
+				nextRetryAt: Date.now() + backoffMs,
+			});
+			console.warn('[append][outbox] server error, backoff applied', {
+				status: res.status,
+				body,
+				failures,
+				nextRetryInSec: Math.round(backoffMs / 1000),
+			});
+			return;
+		}
+
+		// Edge case: server returned 200 but body is error union variant (server bug)
+		if ('error' in body) {
+			console.error('[append][outbox] server returned 200 with error body - moving batch to deadletter to avoid infinite retries', body);
+			const deadletterItems: DeadletterItem[] = batch.map((event) => ({
+				at_ms: Date.now(),
+				reason: `server_error_in_success_response: ${body.error.code}`,
+				event,
+			}));
+			await appendDeadletter(deadletterItems);
+			// Remove the batch from outbox
+			const remaining = outbox.slice(batch.length);
+			await setOutbox(remaining);
+			await updateBadge(remaining.length, false);
+			return;
+		}
+
+		if (!('rejected' in body) || !Array.isArray(body.rejected)) {
+			console.warn('[append][outbox] unexpected response', body);
+			return;
+		}
+
+		const rejectedByIndex = new Map<number, string>();
+		for (const r of body.rejected) {
+			if (typeof r.index === 'number' && typeof r.reason === 'string') {
+				rejectedByIndex.set(r.index, r.reason);
 			}
-			continue;
 		}
-		remaining.push(outbox[i]);
-	}
 
-	await setOutbox(remaining);
+		const remaining: TelemetryEvent[] = [];
+		const deadletter: DeadletterItem[] = [];
 
-	// Success - reset backoff state and clear any auth errors
-	await setBackoffState({ consecutiveFailures: 0, nextRetryAt: 0 });
-	await setAuthErrorState({ hasAuthError: false, lastAuthErrorAt: 0 });
-	await updateBadge(remaining.length, false);
+		// Remove submitted events from the front; keep rejected items in deadletter.
+		for (let i = 0; i < outbox.length; i += 1) {
+			if (i < batch.length) {
+				const reason = rejectedByIndex.get(i);
+				if (reason) {
+					deadletter.push({ at_ms: Date.now(), reason, event: outbox[i] });
+				}
+				continue;
+			}
+			remaining.push(outbox[i]);
+		}
 
-	if (deadletter.length > 0) {
-		await appendDeadletter(deadletter);
-		console.warn(
-			'[append][outbox] dropped rejected events',
-			deadletter.map((d) => ({ event_id: d.event.event_id, reason: d.reason }))
-		);
+		await setOutbox(remaining);
+
+		// Success - reset backoff state and clear any auth errors
+		await setBackoffState({ consecutiveFailures: 0, nextRetryAt: 0 });
+		await setAuthErrorState({ hasAuthError: false, lastAuthErrorAt: 0 });
+		await updateBadge(remaining.length, false);
+
+		if (deadletter.length > 0) {
+			await appendDeadletter(deadletter);
+			console.warn(
+				'[append][outbox] dropped rejected events',
+				deadletter.map((d) => ({ event_id: d.event.event_id, reason: d.reason }))
+			);
+		}
+	} finally {
+		flushing = false;
 	}
 }
