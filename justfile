@@ -14,6 +14,9 @@ sync-secrets:
   @echo "Adding local dev configuration overrides..."
   @echo '' >> packages/api/.dev.vars
   @echo '# Local development configuration (not secrets, managed in justfile)' >> packages/api/.dev.vars
+  @echo '# NOTE: These are developer-specific values for solo-dev convenience.' >> packages/api/.dev.vars
+  @echo '# New contributors should update ALLOWED_EMAIL and E2E_AUTH_EMAIL to their own email.' >> packages/api/.dev.vars
+  @echo '# See ADR 0022 for exceptions to Doppler-canonical-secrets policy.' >> packages/api/.dev.vars
   @echo 'APP_ENV="local"' >> packages/api/.dev.vars
   @echo 'BETTER_AUTH_URL="http://localhost:8787"' >> packages/api/.dev.vars
   @echo 'ALLOWED_EMAIL="tindejphachon@gmail.com"' >> packages/api/.dev.vars
