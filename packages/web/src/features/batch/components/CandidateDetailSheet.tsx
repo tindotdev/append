@@ -48,11 +48,7 @@ export function CandidateDetailSheet({
 	}, [candidate]);
 
 	if (!candidate) {
-		return (
-			<Sheet open={false}>
-				<SheetContent />
-			</Sheet>
-		);
+		return null;
 	}
 
 	const status = getCandidateStatus(candidate);
