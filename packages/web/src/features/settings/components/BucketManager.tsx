@@ -253,8 +253,8 @@ export function BucketManager() {
 					</DialogHeader>
 
 					{deleteTarget && deleteTarget.senseCount > 0 && (
-						<Alert className="bg-yellow-900/20 border-yellow-800">
-							<AlertDescription className="text-yellow-300">
+						<Alert variant="destructive">
+							<AlertDescription>
 								This bucket contains {deleteTarget.senseCount} item{deleteTarget.senseCount !== 1 ? 's' : ''}. You must move or delete all items
 								before deleting the bucket.
 							</AlertDescription>

@@ -11,24 +11,12 @@ import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { SLUG_REGEX, slugify } from '@/lib/bucket-utils';
 import { useCreateBucket } from '../api/user-bucket';
-
-// Slug validation regex: lowercase alphanumeric with hyphens
-const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 interface BucketCreateSheetProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-}
-
-function slugify(text: string): string {
-	return text
-		.toLowerCase()
-		.trim()
-		.replace(/[^\w\s-]/g, '')
-		.replace(/[\s_]+/g, '-')
-		.replace(/^-+|-+$/g, '')
-		.slice(0, 50);
 }
 
 export function BucketCreateSheet({ open, onOpenChange }: BucketCreateSheetProps) {
@@ -90,7 +78,7 @@ export function BucketCreateSheet({ open, onOpenChange }: BucketCreateSheetProps
 							validators={{
 								onChange: ({ value }) => {
 									if (!value.trim()) return 'Name is required';
-									if (value.length > 100) return 'Name must be 100 characters or less';
+									if (value.length > 64) return 'Name must be 64 characters or less';
 									return undefined;
 								},
 							}}
@@ -111,7 +99,7 @@ export function BucketCreateSheet({ open, onOpenChange }: BucketCreateSheetProps
 										}}
 										onBlur={field.handleBlur}
 										placeholder="e.g., Backend Patterns"
-										maxLength={100}
+										maxLength={64}
 										disabled={createBucketMutation.isPending}
 									/>
 									{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
@@ -124,8 +112,9 @@ export function BucketCreateSheet({ open, onOpenChange }: BucketCreateSheetProps
 							validators={{
 								onChange: ({ value }) => {
 									if (!value.trim()) return 'Slug is required';
+									if (value.length < 2) return 'Slug must be at least 2 characters';
 									if (!SLUG_REGEX.test(value)) return 'Slug must be lowercase letters, numbers, and hyphens only';
-									if (value.length > 50) return 'Slug must be 50 characters or less';
+									if (value.length > 32) return 'Slug must be 32 characters or less';
 									return undefined;
 								},
 							}}
@@ -153,7 +142,7 @@ export function BucketCreateSheet({ open, onOpenChange }: BucketCreateSheetProps
 										}}
 										onBlur={field.handleBlur}
 										placeholder="e.g., backend-patterns"
-										maxLength={50}
+										maxLength={32}
 										disabled={createBucketMutation.isPending}
 									/>
 									{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
@@ -166,7 +155,7 @@ export function BucketCreateSheet({ open, onOpenChange }: BucketCreateSheetProps
 							validators={{
 								onChange: ({ value }) => {
 									if (!value.trim()) return 'Description is required';
-									if (value.length > 500) return 'Description must be 500 characters or less';
+									if (value.length > 256) return 'Description must be 256 characters or less';
 									return undefined;
 								},
 							}}
@@ -181,7 +170,7 @@ export function BucketCreateSheet({ open, onOpenChange }: BucketCreateSheetProps
 										onChange={(e) => field.handleChange(e.target.value)}
 										onBlur={field.handleBlur}
 										placeholder="e.g., Server-side patterns, APIs, databases"
-										maxLength={500}
+										maxLength={256}
 										disabled={createBucketMutation.isPending}
 									/>
 									{field.state.meta.errors.length > 0 && <FieldError>{field.state.meta.errors[0]}</FieldError>}
