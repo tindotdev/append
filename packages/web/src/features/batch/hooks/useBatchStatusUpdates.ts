@@ -78,22 +78,27 @@ export function useBatchStatusUpdates(options: BatchStatusUpdatesOptions = {}) {
 	const [trackedBatches, setTrackedBatches] = useState<Set<string>>(new Set());
 	const [batchProgress, setBatchProgress] = useState<Map<string, BatchProgress>>(new Map());
 
-	// Use refs to avoid recreating abort controllers in effect
+	// Use refs to avoid recreating abort controllers in effect and prevent stale closures
 	const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 	const progressRef = useRef<Map<string, BatchProgress>>(new Map());
+	const trackedBatchesRef = useRef<Set<string>>(new Set());
 
-	// Keep progress ref in sync
+	// Keep refs in sync
 	useEffect(() => {
 		progressRef.current = batchProgress;
 	}, [batchProgress]);
+
+	useEffect(() => {
+		trackedBatchesRef.current = trackedBatches;
+	}, [trackedBatches]);
 
 	/**
 	 * Start tracking a batch's suggestion generation progress
 	 */
 	const trackBatch = useCallback(
 		async (batchId: string): Promise<void> => {
-			// Skip if already tracking
-			if (trackedBatches.has(batchId)) {
+			// Skip if already tracking (use ref to avoid stale closure)
+			if (trackedBatchesRef.current.has(batchId)) {
 				return;
 			}
 
@@ -116,102 +121,106 @@ export function useBatchStatusUpdates(options: BatchStatusUpdatesOptions = {}) {
 			setBatchProgress((prev) => new Map(prev).set(batchId, initialProgress));
 
 			try {
-				await generateSuggestions(batchId, {
-					onStart: (event: SuggestStartEvent) => {
-						const updatedProgress: BatchProgress = {
-							batchId,
-							total: event.eligibleCount,
-							processed: 0,
-							succeeded: 0,
-							failed: 0,
-							status: 'active',
-						};
-						setBatchProgress((prev) => new Map(prev).set(batchId, updatedProgress));
-						onStart?.(batchId, event);
-					},
-
-					onCandidate: (event: SuggestCandidateEvent) => {
-						setBatchProgress((prev) => {
-							const current = prev.get(batchId) || initialProgress;
-							const updated: BatchProgress = {
-								...current,
-								processed: current.processed + 1,
-								succeeded: event.status === 'ok' || event.status === 'cached' ? current.succeeded + 1 : current.succeeded,
-								failed: event.status === 'error' ? current.failed + 1 : current.failed,
+				await generateSuggestions(
+					batchId,
+					{
+						onStart: (event: SuggestStartEvent) => {
+							const updatedProgress: BatchProgress = {
+								batchId,
+								total: event.eligibleCount,
+								processed: 0,
+								succeeded: 0,
+								failed: 0,
+								status: 'active',
 							};
+							setBatchProgress((prev) => new Map(prev).set(batchId, updatedProgress));
+							onStart?.(batchId, event);
+						},
 
-							// Call progress callback
-							onProgress?.(batchId, updated);
+						onCandidate: (event: SuggestCandidateEvent) => {
+							setBatchProgress((prev) => {
+								const current = prev.get(batchId) || initialProgress;
+								const updated: BatchProgress = {
+									...current,
+									processed: current.processed + 1,
+									succeeded: event.status === 'ok' || event.status === 'cached' ? current.succeeded + 1 : current.succeeded,
+									failed: event.status === 'error' ? current.failed + 1 : current.failed,
+								};
 
-							return new Map(prev).set(batchId, updated);
-						});
-					},
+								// Call progress callback
+								onProgress?.(batchId, updated);
 
-					onDone: (event: SuggestDoneEvent) => {
-						setBatchProgress((prev) => {
-							const current = prev.get(batchId) || initialProgress;
-							const updated: BatchProgress = {
-								...current,
-								status: 'completed',
-							};
-							return new Map(prev).set(batchId, updated);
-						});
+								return new Map(prev).set(batchId, updated);
+							});
+						},
 
-						// Show toast notification
-						if (showToasts) {
-							if (event.failed > 0) {
-								toast.warning(`Batch completed: ${event.ok + event.cached} succeeded, ${event.failed} failed`);
-							} else if (event.ok + event.cached > 0) {
-								toast.success(`Batch completed: ${event.ok + event.cached} suggestions generated`);
-							} else {
-								toast.info('Batch completed: no suggestions generated');
+						onDone: (event: SuggestDoneEvent) => {
+							setBatchProgress((prev) => {
+								const current = prev.get(batchId) || initialProgress;
+								const updated: BatchProgress = {
+									...current,
+									status: 'completed',
+								};
+								return new Map(prev).set(batchId, updated);
+							});
+
+							// Show toast notification
+							if (showToasts) {
+								if (event.failed > 0) {
+									toast.warning(`Batch completed: ${event.ok + event.cached} succeeded, ${event.failed} failed`);
+								} else if (event.ok + event.cached > 0) {
+									toast.success(`Batch completed: ${event.ok + event.cached} suggestions generated`);
+								} else {
+									toast.info('Batch completed: no suggestions generated');
+								}
 							}
-						}
 
-						// Call completion callback
-						onComplete?.(batchId, event);
+							// Call completion callback
+							onComplete?.(batchId, event);
 
-						// Auto-refresh batch list
-						if (autoRefresh) {
-							void queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
-						}
+							// Auto-refresh batch list
+							if (autoRefresh) {
+								void queryClient.invalidateQueries({ queryKey: batchKeys.lists() });
+							}
 
-						// Clean up tracking
-						setTrackedBatches((prev) => {
-							const next = new Set(prev);
-							next.delete(batchId);
-							return next;
-						});
-						abortControllersRef.current.delete(batchId);
+							// Clean up tracking
+							setTrackedBatches((prev) => {
+								const next = new Set(prev);
+								next.delete(batchId);
+								return next;
+							});
+							abortControllersRef.current.delete(batchId);
+						},
+
+						onError: (error: string) => {
+							setBatchProgress((prev) => {
+								const current = prev.get(batchId) || initialProgress;
+								const updated: BatchProgress = {
+									...current,
+									status: 'error',
+								};
+								return new Map(prev).set(batchId, updated);
+							});
+
+							// Show error toast
+							if (showToasts) {
+								toast.error(`Batch failed: ${error}`);
+							}
+
+							// Call error callback
+							onError?.(batchId, error);
+
+							// Clean up tracking
+							setTrackedBatches((prev) => {
+								const next = new Set(prev);
+								next.delete(batchId);
+								return next;
+							});
+							abortControllersRef.current.delete(batchId);
+						},
 					},
-
-					onError: (error: string) => {
-						setBatchProgress((prev) => {
-							const current = prev.get(batchId) || initialProgress;
-							const updated: BatchProgress = {
-								...current,
-								status: 'error',
-							};
-							return new Map(prev).set(batchId, updated);
-						});
-
-						// Show error toast
-						if (showToasts) {
-							toast.error(`Batch failed: ${error}`);
-						}
-
-						// Call error callback
-						onError?.(batchId, error);
-
-						// Clean up tracking
-						setTrackedBatches((prev) => {
-							const next = new Set(prev);
-							next.delete(batchId);
-							return next;
-						});
-						abortControllersRef.current.delete(batchId);
-					},
-				});
+					abortController.signal
+				);
 			} catch (err) {
 				// Handle unexpected errors
 				const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -240,7 +249,7 @@ export function useBatchStatusUpdates(options: BatchStatusUpdatesOptions = {}) {
 				abortControllersRef.current.delete(batchId);
 			}
 		},
-		[trackedBatches, onStart, onProgress, onComplete, onError, showToasts, autoRefresh, queryClient]
+		[onStart, onProgress, onComplete, onError, showToasts, autoRefresh, queryClient]
 	);
 
 	/**

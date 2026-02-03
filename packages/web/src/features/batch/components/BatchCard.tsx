@@ -76,7 +76,7 @@ export function BatchCard({
 	const remainingCount = batch.candidateCount - 3;
 
 	return (
-		<Card className={isSelected ? 'ring-2 ring-blue-500' : ''}>
+		<Card className={isSelected ? 'ring-2 ring-ring' : ''}>
 			<Collapsible open={isExpanded} onOpenChange={onToggleExpanded}>
 				<CardHeader>
 					<div className="flex items-start gap-3">
