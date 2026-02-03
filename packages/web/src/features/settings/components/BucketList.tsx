@@ -6,7 +6,7 @@ import { closestCenter, DndContext, type DragEndEvent, KeyboardSensor, PointerSe
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Pencil, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { UserBucket } from '../api/user-bucket';
@@ -83,9 +83,9 @@ export function BucketList({ buckets, onReorder, onEdit, onDelete, isReordering 
 	const [items, setItems] = useState(buckets);
 
 	// Keep local state in sync with props
-	if (buckets !== items && buckets.length !== items.length) {
+	useEffect(() => {
 		setItems(buckets);
-	}
+	}, [buckets]);
 
 	const sensors = useSensors(
 		useSensor(PointerSensor),
