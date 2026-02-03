@@ -20,7 +20,7 @@
 | **Auto-Format** | | |
 | Format + lint | `pnpm check` | Biome format + lint (writes fixes) |
 | **Deploy Workflow** | | |
-| Sync secrets | `just secrets:prod` | Syncs Doppler → Cloudflare Worker |
+| Sync secrets | `just secrets-prod` | Syncs Doppler → Cloudflare Worker |
 | Verify secrets | (included in deploy) | Validates required secret names exist |
 | Apply D1 migrations | (included in deploy) | Applies database migrations to production |
 | Deploy API | (included in deploy) | Deploys Worker to production |
@@ -93,7 +93,7 @@ just deploy
 SKIP_CHECKS=1 just deploy
 
 # Sync secrets only
-just secrets:prod
+just secrets-prod
 ```
 
 ## Pre-commit Hooks
@@ -120,7 +120,7 @@ Pulls from Doppler `apps/dev_append` config and writes to `packages/api/.dev.var
 
 ```bash
 # Sync secrets to production Worker
-just secrets:prod
+just secrets-prod
 ```
 
 Requires either:
