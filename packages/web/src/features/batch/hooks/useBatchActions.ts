@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { handleApiError } from '@/lib/handle-api-error';
 import { acceptBatch } from '../api/accept-batch';
@@ -15,6 +15,11 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 	const [deletingBatches, setDeletingBatches] = useState<Set<string>>(new Set());
 	const [batchToDelete, setBatchToDelete] = useState<BatchListItem | null>(null);
 
+	// Use refs for guard state to avoid unnecessary callback recreation
+	const acceptingBatchesRef = useRef<Set<string>>(new Set());
+	const retryingBatchesRef = useRef<Set<string>>(new Set());
+	const deletingBatchesRef = useRef<Set<string>>(new Set());
+
 	// Bulk operations state
 	const [isBulkAccepting, setIsBulkAccepting] = useState(false);
 	const [isBulkRetrying, setIsBulkRetrying] = useState(false);
@@ -23,8 +28,9 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 
 	const handleAcceptAllReady = useCallback(
 		async (batch: BatchListItem) => {
-			if (acceptingBatches.has(batch.id)) return;
+			if (acceptingBatchesRef.current.has(batch.id)) return;
 
+			acceptingBatchesRef.current.add(batch.id);
 			setAcceptingBatches((prev) => new Set(prev).add(batch.id));
 
 			try {
@@ -46,6 +52,7 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 					onDefault: () => toast.error('Accept failed. Please try again.'),
 				});
 			} finally {
+				acceptingBatchesRef.current.delete(batch.id);
 				setAcceptingBatches((prev) => {
 					const next = new Set(prev);
 					next.delete(batch.id);
@@ -53,13 +60,14 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 				});
 			}
 		},
-		[acceptingBatches, queryClient]
+		[queryClient]
 	);
 
 	const handleRetry = useCallback(
 		async (batch: BatchListItem) => {
-			if (retryingBatches.has(batch.id)) return;
+			if (retryingBatchesRef.current.has(batch.id)) return;
 
+			retryingBatchesRef.current.add(batch.id);
 			setRetryingBatches((prev) => new Set(prev).add(batch.id));
 
 			try {
@@ -67,6 +75,7 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 			} catch {
 				// Error handling is done in the hook
 			} finally {
+				retryingBatchesRef.current.delete(batch.id);
 				setRetryingBatches((prev) => {
 					const next = new Set(prev);
 					next.delete(batch.id);
@@ -74,7 +83,7 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 				});
 			}
 		},
-		[retryingBatches, trackBatch]
+		[trackBatch]
 	);
 
 	const handleDelete = useCallback((batch: BatchListItem) => {
@@ -83,10 +92,11 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 
 	const handleConfirmDelete = useCallback(async () => {
 		if (!batchToDelete) return;
-		if (deletingBatches.has(batchToDelete.id)) return;
+		if (deletingBatchesRef.current.has(batchToDelete.id)) return;
 
 		const batch = batchToDelete;
 		setBatchToDelete(null);
+		deletingBatchesRef.current.add(batch.id);
 		setDeletingBatches((prev) => new Set(prev).add(batch.id));
 
 		try {
@@ -102,13 +112,14 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 				onDefault: () => toast.error('Failed to delete batch. Please try again.'),
 			});
 		} finally {
+			deletingBatchesRef.current.delete(batch.id);
 			setDeletingBatches((prev) => {
 				const next = new Set(prev);
 				next.delete(batch.id);
 				return next;
 			});
 		}
-	}, [batchToDelete, deletingBatches, queryClient]);
+	}, [batchToDelete, queryClient]);
 
 	const handleBulkAcceptAllReady = useCallback(
 		async (selectedBatchIds: string[]) => {
@@ -167,7 +178,9 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 			}
 
 			setIsBulkRetrying(false);
-			return true; // signal to clear selection
+
+			// Only clear selection if at least some batches succeeded
+			return failedCount !== selectedBatchIds.length;
 		},
 		[isBulkRetrying, trackBatch]
 	);

@@ -78,9 +78,10 @@ export function useBatchStatusUpdates(options: BatchStatusUpdatesOptions = {}) {
 	const [trackedBatches, setTrackedBatches] = useState<Set<string>>(new Set());
 	const [batchProgress, setBatchProgress] = useState<Map<string, BatchProgress>>(new Map());
 
-	// Use refs to avoid recreating abort controllers in effect
+	// Use refs to avoid recreating abort controllers in effect and to prevent stale closure issues
 	const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 	const progressRef = useRef<Map<string, BatchProgress>>(new Map());
+	const trackingRef = useRef<Set<string>>(new Set());
 
 	// Keep progress ref in sync
 	useEffect(() => {
@@ -92,12 +93,13 @@ export function useBatchStatusUpdates(options: BatchStatusUpdatesOptions = {}) {
 	 */
 	const trackBatch = useCallback(
 		async (batchId: string): Promise<void> => {
-			// Skip if already tracking
-			if (trackedBatches.has(batchId)) {
+			// Skip if already tracking (use ref to avoid stale closure)
+			if (trackingRef.current.has(batchId)) {
 				return;
 			}
 
-			// Add to tracked set
+			// Add to tracked set immediately
+			trackingRef.current.add(batchId);
 			setTrackedBatches((prev) => new Set(prev).add(batchId));
 
 			// Create abort controller for this batch
@@ -116,8 +118,10 @@ export function useBatchStatusUpdates(options: BatchStatusUpdatesOptions = {}) {
 			setBatchProgress((prev) => new Map(prev).set(batchId, initialProgress));
 
 			try {
-				await generateSuggestions(batchId, {
-					onStart: (event: SuggestStartEvent) => {
+				await generateSuggestions(
+					batchId,
+					{
+						onStart: (event: SuggestStartEvent) => {
 						const updatedProgress: BatchProgress = {
 							batchId,
 							total: event.eligibleCount,
@@ -177,6 +181,7 @@ export function useBatchStatusUpdates(options: BatchStatusUpdatesOptions = {}) {
 						}
 
 						// Clean up tracking
+						trackingRef.current.delete(batchId);
 						setTrackedBatches((prev) => {
 							const next = new Set(prev);
 							next.delete(batchId);
@@ -204,6 +209,7 @@ export function useBatchStatusUpdates(options: BatchStatusUpdatesOptions = {}) {
 						onError?.(batchId, error);
 
 						// Clean up tracking
+						trackingRef.current.delete(batchId);
 						setTrackedBatches((prev) => {
 							const next = new Set(prev);
 							next.delete(batchId);
@@ -211,7 +217,9 @@ export function useBatchStatusUpdates(options: BatchStatusUpdatesOptions = {}) {
 						});
 						abortControllersRef.current.delete(batchId);
 					},
-				});
+					},
+					abortController.signal
+				);
 			} catch (err) {
 				// Handle unexpected errors
 				const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -232,6 +240,7 @@ export function useBatchStatusUpdates(options: BatchStatusUpdatesOptions = {}) {
 				onError?.(batchId, errorMessage);
 
 				// Clean up
+				trackingRef.current.delete(batchId);
 				setTrackedBatches((prev) => {
 					const next = new Set(prev);
 					next.delete(batchId);
@@ -240,7 +249,7 @@ export function useBatchStatusUpdates(options: BatchStatusUpdatesOptions = {}) {
 				abortControllersRef.current.delete(batchId);
 			}
 		},
-		[trackedBatches, onStart, onProgress, onComplete, onError, showToasts, autoRefresh, queryClient]
+		[onStart, onProgress, onComplete, onError, showToasts, autoRefresh, queryClient]
 	);
 
 	/**
@@ -255,6 +264,7 @@ export function useBatchStatusUpdates(options: BatchStatusUpdatesOptions = {}) {
 		}
 
 		// Remove from tracking
+		trackingRef.current.delete(batchId);
 		setTrackedBatches((prev) => {
 			const next = new Set(prev);
 			next.delete(batchId);
