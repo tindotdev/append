@@ -91,7 +91,7 @@ export function ExportPage() {
 					}));
 				} catch (err) {
 					// Single bucket failure doesn't abort entire download
-					const errorResult = { success: false, error: String(err) };
+					const errorResult = { success: false as const, error: String(err) };
 					newResults[bucket] = errorResult;
 					setState((prev) => ({
 						...prev,
