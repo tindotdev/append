@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { shouldUseApi, useDashboardHeatmap } from '../api/dashboard';
+import { useApiToggle, useDashboardHeatmap } from '../api/dashboard';
 import { useTelemetrySnapshot } from '../telemetry/hooks';
 import { computeHeatmapData } from '../telemetry/rollups';
 import type { HeatmapData, HeatmapStatsData } from '../types';
@@ -44,7 +44,7 @@ function getComputed(revision: number, events: Parameters<typeof computeHeatmapD
 
 export function useHeatmapData(options: UseHeatmapDataOptions = {}) {
 	const { forceEmpty = false, forceLoading = false } = options;
-	const useApi = shouldUseApi();
+	const useApi = useApiToggle();
 	const { isReady, events, timezone, revision } = useTelemetrySnapshot();
 	const year = yearInTimezone(timezone);
 	const apiQuery = useDashboardHeatmap(year, timezone);

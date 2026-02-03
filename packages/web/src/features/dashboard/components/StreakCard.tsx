@@ -51,7 +51,7 @@ export function StreakCard() {
 					{data.currentStreak} day{data.currentStreak !== 1 ? 's' : ''}
 				</CardTitle>
 				<CardAction>
-					<Flame className="size-5 text-orange-400" />
+					<Flame className="size-5 text-streak-accent" />
 				</CardAction>
 			</CardHeader>
 		</Card>
