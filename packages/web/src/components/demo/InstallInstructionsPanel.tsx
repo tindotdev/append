@@ -1,4 +1,5 @@
-import { Download, ExternalLink, Puzzle } from 'lucide-react';
+import { Download, Puzzle } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -17,27 +18,32 @@ export function InstallInstructionsPanel({ downloadUrl }: { downloadUrl?: string
 			</CardHeader>
 			<CardContent className="space-y-3 text-sm">
 				{downloadUrl ? (
-					<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-						<Button size="sm" asChild>
-							<a href={downloadUrl} target="_blank" rel="noreferrer">
-								<Download className="mr-2 size-4" />
-								Download extension (.zip)
-							</a>
-						</Button>
-						<Button variant="outline" size="sm" asChild>
-							<a href="chrome://extensions" target="_blank" rel="noreferrer">
-								<ExternalLink className="mr-2 size-4" />
-								Open chrome://extensions
-							</a>
-						</Button>
-					</div>
+					<Button size="sm" asChild>
+						<a href={downloadUrl} target="_blank" rel="noreferrer">
+							<Download className="mr-2 size-4" />
+							Download extension (.zip)
+						</a>
+					</Button>
 				) : (
 					<p className="text-xs text-muted-foreground">Extension download link not configured.</p>
 				)}
 
 				<ol className="list-decimal space-y-1 pl-5 text-xs text-card-foreground">
 					<li>Download the zip and unzip it.</li>
-					<li>Open Chrome extensions page and toggle "Developer mode".</li>
+					<li>
+						Navigate to{' '}
+						<button
+							type="button"
+							onClick={() => {
+								navigator.clipboard.writeText('chrome://extensions');
+								toast.success('Copied to clipboard');
+							}}
+							className="font-mono text-xs underline hover:text-card-foreground"
+						>
+							chrome://extensions
+						</button>{' '}
+						in your address bar and toggle "Developer mode".
+					</li>
 					<li>Click "Load unpacked" and select the unzipped folder.</li>
 				</ol>
 

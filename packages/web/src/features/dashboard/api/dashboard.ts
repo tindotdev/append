@@ -182,7 +182,7 @@ export function useDashboardToday(timezone?: string) {
 	useEffect(() => {
 		if (query.error) {
 			console.error("[Dashboard] Failed to load today's data:", query.error);
-			toast.error('Failed to load dashboard. Please try again.');
+			toast.error('Failed to load dashboard. Please try again.', { id: 'dashboard-today-error' });
 		}
 	}, [query.error]);
 
@@ -209,7 +209,7 @@ export function useDashboardWeek(start: string, timezone?: string) {
 	useEffect(() => {
 		if (query.error) {
 			console.error('[Dashboard] Failed to load weekly data:', query.error);
-			toast.error('Failed to load weekly dashboard. Please try again.');
+			toast.error('Failed to load weekly dashboard. Please try again.', { id: 'dashboard-week-error' });
 		}
 	}, [query.error]);
 
@@ -236,7 +236,7 @@ export function useDashboardHeatmap(year: number, timezone?: string) {
 	useEffect(() => {
 		if (query.error) {
 			console.error('[Dashboard] Failed to load heatmap data:', query.error);
-			toast.error('Failed to load heatmap. Please try again.');
+			toast.error('Failed to load heatmap. Please try again.', { id: 'dashboard-heatmap-error' });
 		}
 	}, [query.error]);
 

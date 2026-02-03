@@ -30,7 +30,7 @@ function BarListItem({ item, maxMinutes }: BarListItemProps) {
 		<div className="group relative flex items-center gap-3 px-2 py-1">
 			{/* Background bar */}
 			<div className="absolute inset-y-0 left-0 right-0 overflow-hidden rounded">
-				<div className="h-full bg-emerald-400/10 transition-all group-hover:bg-emerald-400/15" style={{ width: `${percentage}%` }} />
+				<div className="h-full bg-viz-primary-subtle transition-all group-hover:bg-viz-primary-medium" style={{ width: `${percentage}%` }} />
 			</div>
 			{/* Content */}
 			<span className="relative z-10 flex-1 truncate text-[13px] text-card-foreground">{item.label}</span>
