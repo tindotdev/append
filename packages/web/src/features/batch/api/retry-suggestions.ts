@@ -13,12 +13,17 @@ export interface GenerateSuggestionsCallbacks {
  * Generate suggestions for a batch using SSE streaming.
  * Updates are delivered via callbacks as they arrive.
  */
-export async function generateSuggestions(batchId: string, callbacks: GenerateSuggestionsCallbacks): Promise<void> {
+export async function generateSuggestions(
+	batchId: string,
+	callbacks: GenerateSuggestionsCallbacks,
+	signal?: AbortSignal
+): Promise<void> {
 	const { onStart, onCandidate, onDone, onError } = callbacks;
 
 	await fetchEventSource(`${API_URL}/api/batch/${batchId}/suggest`, {
 		method: 'POST',
 		credentials: 'include',
+		signal,
 		onmessage(ev) {
 			if (!ev.data) return;
 

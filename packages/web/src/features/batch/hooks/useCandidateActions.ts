@@ -91,6 +91,8 @@ export function useCandidateActions(
 			setIsBulkAccepting(true);
 			let successCount = 0;
 			let failedCount = 0;
+			let alreadyAcceptedCount = 0;
+			let versionConflictCount = 0;
 
 			for (const candidate of selectedCandidates) {
 				try {
@@ -115,23 +117,58 @@ export function useCandidateActions(
 					});
 
 					successCount++;
-				} catch {
+				} catch (err) {
 					failedCount++;
+
+					// Track specific error types
+					handleApiError(err, {
+						onConflict: (code) => {
+							if (code === 'ALREADY_ACCEPTED') {
+								alreadyAcceptedCount++;
+							} else if (code === 'VERSION_CONFLICT') {
+								versionConflictCount++;
+							}
+						},
+						onDefault: () => {
+							// Other errors - no specific tracking
+						},
+					});
 				}
 			}
 
 			setRowSelection({});
 			setIsBulkAccepting(false);
 
+			// Provide detailed feedback based on error types
 			if (failedCount === selectedCandidates.length) {
-				toast.error('All accepts failed. Please try again.');
+				if (alreadyAcceptedCount === failedCount) {
+					toast.info('All selected candidates were already accepted.');
+				} else if (versionConflictCount > 0) {
+					toast.error(`All accepts failed (${versionConflictCount} version conflicts). Please refresh.`);
+				} else {
+					toast.error('All accepts failed. Please try again.');
+				}
 			} else if (failedCount > 0) {
-				toast.warning(`Accepted ${successCount}, ${failedCount} failed`);
+				const errorDetails: string[] = [];
+				if (alreadyAcceptedCount > 0) {
+					errorDetails.push(`${alreadyAcceptedCount} already accepted`);
+				}
+				if (versionConflictCount > 0) {
+					errorDetails.push(`${versionConflictCount} version conflicts`);
+				}
+				const otherErrors = failedCount - alreadyAcceptedCount - versionConflictCount;
+				if (otherErrors > 0) {
+					errorDetails.push(`${otherErrors} other errors`);
+				}
+				toast.warning(`Accepted ${successCount}, ${failedCount} failed (${errorDetails.join(', ')})`);
+				if (versionConflictCount > 0) {
+					fetchBatch();
+				}
 			} else {
 				toast.success(`Accepted ${successCount} terms`);
 			}
 		},
-		[batch, setBatch]
+		[batch, setBatch, fetchBatch]
 	);
 
 	const handleEditCandidate = useCallback((candidate: Candidate, setSelectedCandidate: (c: Candidate | null) => void) => {
