@@ -92,7 +92,10 @@ export function BatchHeader({ batch, isRetrying, generationProgress, onRetryFail
 					{/* Progress indicator */}
 					{generationProgress && (
 						<div className="flex items-center gap-2 ml-auto">
-							<Progress value={(generationProgress.completed / generationProgress.total) * 100} className="h-2 w-24" />
+							<Progress
+								value={generationProgress.total > 0 ? Math.round((generationProgress.completed / generationProgress.total) * 100) : 0}
+								className="h-2 w-24"
+							/>
 							<span className="text-sm text-muted-foreground">
 								{generationProgress.completed}/{generationProgress.total}
 							</span>
