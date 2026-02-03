@@ -6,7 +6,7 @@
 
 import { and, asc, eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { type BatchStatus, batch, candidate, normalize, type schema, type TermSenseSource, term, termSense } from '../../../db';
+import { type BatchStatus, batch, bucket, candidate, normalize, type schema, type TermSenseSource, term, termSense } from '../../../db';
 import { sha256Hex } from '../../../shared/crypto';
 import { checkIdempotencyKey, createIdempotencyKeyStatement, findIdempotencyKey } from '../../../shared/idempotency/keys';
 import { decodeJsonResultRef, encodeJsonResultRef } from '../../../shared/idempotency/result-ref';
@@ -197,6 +197,29 @@ export async function acceptAll(
 		primarySenseBucketMap.set(ps.id, ps.bucket);
 	}
 
+	// Pre-fetch bucket IDs for all unique effective buckets
+	const uniqueBuckets = [...new Set(unmaterializedCandidates.map((c) => c.effectiveBucket).filter((b): b is string => b !== null))];
+	type BucketIdRow = { slug: string; id: string };
+	let bucketIdRows: BucketIdRow[] = [];
+	if (uniqueBuckets.length > 0) {
+		bucketIdRows = await db
+			.select({ slug: bucket.slug, id: bucket.id })
+			.from(bucket)
+			.where(
+				and(
+					eq(bucket.userId, userId),
+					sql`${bucket.slug} IN (${sql.join(
+						uniqueBuckets.map((slug) => sql`${slug}`),
+						sql`, `
+					)})`
+				)
+			);
+	}
+	const bucketSlugToIdMap = new Map<string, string>();
+	for (const b of bucketIdRows) {
+		bucketSlugToIdMap.set(b.slug, b.id);
+	}
+
 	// Build canonical → termId map (including new terms to create)
 	// Also track which candidates are "term creators"
 	const canonicalToTermId = new Map<string, string>();
@@ -273,12 +296,14 @@ export async function acceptAll(
 		}
 
 		// INSERT OR IGNORE INTO term_sense
+		const effectiveBucketId = bucketSlugToIdMap.get(effectiveBucket) ?? null;
 		const senseStmt = db
 			.insert(termSense)
 			.values({
 				id: termSenseId,
 				termId,
 				bucket: effectiveBucket,
+				bucketId: effectiveBucketId,
 				text: effectiveText,
 				source: 'batch' as TermSenseSource,
 				flaggedReason,

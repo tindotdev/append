@@ -7,7 +7,7 @@
 
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { type BatchStatus, candidate, normalize, type schema, type TermSenseSource, term, termSense } from '../../../db';
+import { type BatchStatus, bucket, candidate, normalize, type schema, type TermSenseSource, term, termSense } from '../../../db';
 import { sha256Hex } from '../../../shared/crypto';
 import { checkIdempotencyKey, createIdempotencyKeyStatement, findIdempotencyKey } from '../../../shared/idempotency/keys';
 import { decodeJsonResultRef, encodeJsonResultRef } from '../../../shared/idempotency/result-ref';
@@ -139,6 +139,14 @@ export async function acceptCandidate(
 
 	const termSenseId = `term_sense:${candidateId}`;
 
+	// Resolve bucket ID from slug
+	const bucketRows = await db
+		.select({ id: bucket.id })
+		.from(bucket)
+		.where(and(eq(bucket.userId, userId), eq(bucket.slug, effectiveBucket)));
+
+	const effectiveBucketId = bucketRows[0]?.id ?? null;
+
 	// Check for bucket conflict if term exists
 	let flaggedReason: string | null = null;
 	if (existingTerm?.primarySenseId) {
@@ -179,6 +187,7 @@ export async function acceptCandidate(
 			id: termSenseId,
 			termId,
 			bucket: effectiveBucket,
+			bucketId: effectiveBucketId,
 			text: effectiveText,
 			source: 'batch' as TermSenseSource,
 			flaggedReason,
@@ -189,7 +198,10 @@ export async function acceptCandidate(
 
 	statements.push(rawDb.prepare(senseStmt.sql).bind(...senseStmt.params));
 
-	// Update candidate with materialization pointers
+	// Update candidate with materialization pointers (atomic version check)
+	// Note: Parent batch status is NOT updated. Individual accepts leave the batch
+	// in its current state (captured/suggested). Only acceptAll sets batch.status='accepted'.
+	// This is intentional: batch status reflects bulk operations, not individual progress.
 	const newVersion = candidateRow.version + 1;
 	const candStmt = db
 		.update(candidate)
@@ -200,7 +212,7 @@ export async function acceptCandidate(
 			version: newVersion,
 			updatedAt: now,
 		})
-		.where(eq(candidate.id, candidateId))
+		.where(and(eq(candidate.id, candidateId), eq(candidate.version, expectedVersion)))
 		.toSQL();
 
 	statements.push(rawDb.prepare(candStmt.sql).bind(...candStmt.params));

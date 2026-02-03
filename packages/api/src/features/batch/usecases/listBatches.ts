@@ -172,20 +172,34 @@ async function fetchSampleTerms(db: DrizzleD1Database<typeof schema>, batchIds: 
 	const sampleTermsMap: Map<string, string[]> = new Map();
 	if (batchIds.length === 0) return sampleTermsMap;
 
-	for (const batchId of batchIds) {
-		const terms = await db
-			.select({
-				term: candidate.term,
-			})
-			.from(candidate)
-			.where(eq(candidate.batchId, batchId))
-			.orderBy(candidate.position)
-			.limit(3);
+	// Use a single query with ROW_NUMBER() window function to get first 3 terms per batch
+	type SampleTermRow = { batchId: string; term: string };
+	const sampleTerms: SampleTermRow[] = await db.all(
+		sql`
+			WITH ranked_terms AS (
+				SELECT
+					${candidate.batchId} as batch_id,
+					${candidate.term} as term,
+					ROW_NUMBER() OVER (PARTITION BY ${candidate.batchId} ORDER BY ${candidate.position}) as row_num
+				FROM ${candidate}
+				WHERE ${candidate.batchId} IN (${sql.join(
+					batchIds.map((id) => sql`${id}`),
+					sql`, `
+				)})
+			)
+			SELECT batch_id as batchId, term
+			FROM ranked_terms
+			WHERE row_num <= 3
+			ORDER BY batch_id, row_num
+		`
+	);
 
-		sampleTermsMap.set(
-			batchId,
-			terms.map((t) => t.term)
-		);
+	// Group by batch ID
+	for (const row of sampleTerms) {
+		if (!sampleTermsMap.has(row.batchId)) {
+			sampleTermsMap.set(row.batchId, []);
+		}
+		sampleTermsMap.get(row.batchId)?.push(row.term);
 	}
 
 	return sampleTermsMap;
