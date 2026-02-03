@@ -93,6 +93,7 @@ summary::-webkit-details-marker {
 	--color-viz-primary-medium: var(--viz-primary-medium);
 	--color-viz-primary-subtle: var(--viz-primary-subtle);
 	--color-viz-empty: var(--viz-empty);
+	--color-streak-accent: var(--streak-accent);
 	--color-border: var(--border);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
@@ -167,6 +168,7 @@ summary::-webkit-details-marker {
 	--viz-primary-medium: oklch(0.72 0.15 165 / 0.4);
 	--viz-primary-subtle: oklch(0.72 0.15 165 / 0.2);
 	--viz-empty: oklch(1 0 0 / 0.04);
+	--streak-accent: oklch(0.72 0.15 45);
 	--border: oklch(0.92 0 0);
 	--input: oklch(0.94 0 0);
 	--ring: oklch(0 0 0);
@@ -233,6 +235,7 @@ summary::-webkit-details-marker {
 	--viz-primary-medium: oklch(0.65 0.15 165 / 0.4);
 	--viz-primary-subtle: oklch(0.65 0.15 165 / 0.2);
 	--viz-empty: oklch(0 0 0 / 0.04);
+	--streak-accent: oklch(0.68 0.15 45);
 	--border: oklch(0.26 0 0);
 	--input: oklch(0.32 0 0);
 	--ring: oklch(0.72 0 0);
