@@ -29,7 +29,7 @@ for arg in "$@"; do
 done
 
 echo "╔════════════════════════════════════════════════════════════════╗"
-echo "║                   PRODUCTION DEPLOYMENT                        ║"
+echo "║                  PRODUCTION DEPLOYMENT                         ║"
 echo "╚════════════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -129,7 +129,7 @@ echo "✓ Web app deployed"
 echo ""
 
 echo "╔════════════════════════════════════════════════════════════════╗"
-echo "║              ✅ PRODUCTION DEPLOYMENT COMPLETE                 ║"
+echo "║             ✅ PRODUCTION DEPLOYMENT COMPLETE                  ║"
 echo "╚════════════════════════════════════════════════════════════════╝"
 echo ""
 echo "Production URLs:"
