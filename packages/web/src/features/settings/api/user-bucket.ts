@@ -33,6 +33,7 @@ export function useCreateBucket() {
 					slug: input.slug,
 					name: input.name,
 					description: input.description,
+					icon: input.icon ?? undefined,
 				},
 			});
 

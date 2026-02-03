@@ -33,7 +33,7 @@ interface SidebarBucketItemProps {
 	};
 	onEdit: () => void;
 	onIconChange: (icon: string | null) => void;
-	onNameChange: (name: string) => void;
+	onNameChange: (name: string) => Promise<void>;
 	onExport: () => void;
 	onDelete: () => void;
 	onDuplicate?: () => void;

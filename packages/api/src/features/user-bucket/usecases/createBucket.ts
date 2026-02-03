@@ -3,7 +3,7 @@
  * Validates bucket limit and slug uniqueness.
  */
 
-import { and, count, eq } from 'drizzle-orm';
+import { and, count, desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { bucket, type schema } from '../../../db';
 import { MAX_BUCKETS_PER_USER } from '../../../db/default-buckets';
@@ -49,7 +49,12 @@ export async function createBucket(
 	}
 
 	// Get next order value (find max and add 1)
-	const [maxOrder] = await db.select({ value: bucket.order }).from(bucket).where(eq(bucket.userId, userId)).orderBy(bucket.order).limit(1);
+	const [maxOrder] = await db
+		.select({ value: bucket.order })
+		.from(bucket)
+		.where(eq(bucket.userId, userId))
+		.orderBy(desc(bucket.order))
+		.limit(1);
 
 	const nextOrder = maxOrder ? maxOrder.value + 1 : 0;
 
