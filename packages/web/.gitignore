@@ -8,3 +8,6 @@ count.txt
 .nitro
 .tanstack
 .wrangler
+
+# TanStack Router generated route tree
+routeTree.gen.ts

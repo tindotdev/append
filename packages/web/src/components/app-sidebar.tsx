@@ -144,7 +144,7 @@ function useBucketActions(buckets: UserBucket[], navigate: ReturnType<typeof use
 	const handleExportBucket = (bucketId: string) => {
 		const bucket = buckets.find((b) => b.id === bucketId);
 		if (bucket) {
-			navigate({ to: '/export', search: { bucket: bucket.slug } });
+			navigate({ to: '/export' });
 		}
 	};
 
