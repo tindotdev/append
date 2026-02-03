@@ -10,7 +10,7 @@ export function CandidateHeader({ candidate, index, showSuccess }: { candidate: 
 			<span className="text-muted-foreground text-sm font-mono w-6 text-right flex-shrink-0">{index + 1}</span>
 			<div className="min-w-0 flex-1">
 				<div className="flex items-center gap-2">
-					<p className="text-white font-medium">{candidate.term}</p>
+					<p className="text-foreground font-medium">{candidate.term}</p>
 					{isSuggestionPending && <Badge variant="secondary">Pending</Badge>}
 					{isSuggestionInProgress && <Badge variant="info">Generating...</Badge>}
 					{isSuggestionError && (

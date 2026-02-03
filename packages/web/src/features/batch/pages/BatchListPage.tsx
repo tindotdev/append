@@ -131,7 +131,7 @@ export function BatchListPage() {
 						<div className="flex items-center justify-between">
 							<div className="flex items-center gap-3">
 								<Badge variant={getStatusBadgeVariant(batch.status)}>{getStatusLabel(batch.status)}</Badge>
-								<span className="text-white">
+								<span className="text-foreground">
 									{batch.candidateCount} term{batch.candidateCount !== 1 ? 's' : ''}
 								</span>
 							</div>

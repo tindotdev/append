@@ -61,7 +61,7 @@ export function CandidateList({
 						{acceptedCandidates.map((candidate) => (
 							<div key={candidate.id} className="p-3">
 								<div className="flex items-center gap-2">
-									<span className="text-green-400 text-xs">✓</span>
+									<span className="text-success text-xs">✓</span>
 									<span className="font-medium">{candidate.term}</span>
 									<span className="text-xs text-muted-foreground">→ {candidate.chosenBucket ?? candidate.suggestedBucket}</span>
 								</div>

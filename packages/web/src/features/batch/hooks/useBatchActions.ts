@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { handleApiError } from '@/lib/handle-api-error';
 import { acceptBatch } from '../api/accept-batch';
@@ -15,6 +15,14 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 	const [deletingBatches, setDeletingBatches] = useState<Set<string>>(new Set());
 	const [batchToDelete, setBatchToDelete] = useState<BatchListItem | null>(null);
 
+	// Use ref to avoid recreating callback on every state change
+	const acceptingBatchesRef = useRef<Set<string>>(new Set());
+
+	// Keep ref in sync with state
+	useEffect(() => {
+		acceptingBatchesRef.current = acceptingBatches;
+	}, [acceptingBatches]);
+
 	// Bulk operations state
 	const [isBulkAccepting, setIsBulkAccepting] = useState(false);
 	const [isBulkRetrying, setIsBulkRetrying] = useState(false);
@@ -23,7 +31,7 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 
 	const handleAcceptAllReady = useCallback(
 		async (batch: BatchListItem) => {
-			if (acceptingBatches.has(batch.id)) return;
+			if (acceptingBatchesRef.current.has(batch.id)) return;
 
 			setAcceptingBatches((prev) => new Set(prev).add(batch.id));
 
@@ -53,7 +61,7 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 				});
 			}
 		},
-		[acceptingBatches, queryClient]
+		[queryClient]
 	);
 
 	const handleRetry = useCallback(
