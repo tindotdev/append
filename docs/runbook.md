@@ -264,8 +264,8 @@ GitHub Actions are disabled for deployment:
 
 - `.github/workflows/deploy.yml` — **Disabled** (use `just deploy` instead)
 - `.github/workflows/preview.yml` — **Disabled** (preview environment removed)
-- `.github/workflows/ci.yml` — Active as optional backstop (manual/on-demand)
-- `.github/workflows/auto-format.yml` — Active as safety net (should be no-op with local pre-commit)
+- `.github/workflows/ci.yml.disabled` — **Disabled** (use `just ci` locally)
+- `.github/workflows/auto-format.yml.disabled` — **Disabled** (use pre-commit hooks)
 
 ## Publishing Chrome Extension
 

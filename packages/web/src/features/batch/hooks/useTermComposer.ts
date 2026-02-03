@@ -46,15 +46,15 @@ export function validateTerm(value: string, existingTerms: string[], currentInde
 }
 
 export const validationDotClass: Record<ValidationStatus, string> = {
-	valid: 'bg-green-500',
-	duplicate: 'bg-amber-500',
+	valid: 'bg-success',
+	duplicate: 'bg-warning',
 	'too-long': 'bg-destructive',
 	'forbidden-delimiter': 'bg-destructive',
 	empty: 'bg-border',
 };
 
 export const validationMessageClass: Partial<Record<ValidationStatus, string>> = {
-	duplicate: 'text-amber-400',
+	duplicate: 'text-warning',
 	'too-long': 'text-destructive',
 	'forbidden-delimiter': 'text-destructive',
 };
