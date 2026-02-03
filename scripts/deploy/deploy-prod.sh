@@ -33,24 +33,28 @@ echo "║                  PRODUCTION DEPLOYMENT                         ║"
 echo "╚════════════════════════════════════════════════════════════════╝"
 echo ""
 
-# Guardrail: Verify Cloudflare credentials
-if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
-  echo "❌ Error: Missing Cloudflare credentials"
-  echo "Required environment variables:"
-  echo "  - CLOUDFLARE_API_TOKEN"
-  echo "  - CLOUDFLARE_ACCOUNT_ID"
-  exit 1
-fi
-
-# Guardrail: Verify wrangler whoami works and shows expected account
+# Guardrail: Verify Cloudflare authentication (OAuth or API token)
 echo "🔍 Verifying Cloudflare authentication..."
 WHOAMI_OUTPUT="$(cd "$API_DIR" && pnpm exec wrangler whoami 2>&1 || true)"
-if ! echo "$WHOAMI_OUTPUT" | grep -q "You are logged in"; then
+
+if echo "$WHOAMI_OUTPUT" | grep -q "You are logged in with an OAuth Token"; then
+  echo "✓ Authenticated with OAuth (wrangler login)"
+  # OAuth authentication - no env vars needed
+elif echo "$WHOAMI_OUTPUT" | grep -q "You are logged in"; then
+  echo "✓ Authenticated with API token"
+  # API token authentication - verify env vars are set
+  if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+    echo "⚠️  Warning: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID not set"
+    echo "   Authentication may work via wrangler credentials, but setting env vars is recommended for CI/CD"
+  fi
+else
   echo "❌ Error: Wrangler authentication failed"
+  echo "Please run 'wrangler login' or set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID"
+  echo ""
+  echo "Output from wrangler whoami:"
   echo "$WHOAMI_OUTPUT"
   exit 1
 fi
-echo "✓ Cloudflare authentication verified"
 echo ""
 
 # Guardrail: Require explicit confirmation for production deploy

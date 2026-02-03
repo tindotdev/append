@@ -35,7 +35,7 @@ doppler secrets download \
   --config prd_append \
   --format json \
   --no-file | \
-  jq -c 'with_entries(.value = .value.computed) | del(.DOPPLER_PROJECT, .DOPPLER_CONFIG, .DOPPLER_ENVIRONMENT, .DOPPLER_ENVIRONMENT_SLUG, .DOPPLER_PROJECT_NAME, .DOPPLER_CONFIG_NAME)' | \
+  jq -c 'del(.DOPPLER_PROJECT, .DOPPLER_CONFIG, .DOPPLER_ENVIRONMENT, .DOPPLER_ENVIRONMENT_SLUG, .DOPPLER_PROJECT_NAME, .DOPPLER_CONFIG_NAME)' | \
   pnpm exec wrangler secret bulk --env production --config wrangler.jsonc
 
 SYNC_EXIT_CODE=$?
