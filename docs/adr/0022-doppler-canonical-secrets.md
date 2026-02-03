@@ -41,7 +41,9 @@ Remove Cloudflare Secrets Store binding for `OPENAI_API_KEY` — it becomes a re
 - **GitHub Actions secrets**: Require `DOPPLER_TOKEN_PREVIEW_APPEND` and `DOPPLER_TOKEN_PROD_APPEND` service tokens
 - **Never edit Cloudflare directly**: Worker secrets will be overwritten on next deploy
 
-## Exceptions: E2E_AUTH_EMAIL
+## Exceptions
+
+### E2E_AUTH_EMAIL (preview/CI)
 
 **`E2E_AUTH_EMAIL` is intentionally excluded from Doppler** and set dynamically by the preview workflow per pull request (see ADR 0019).
 
@@ -52,7 +54,25 @@ Rationale:
 
 **`E2E_AUTH_EMAIL` is set by**: `.github/workflows/preview.yml` step "Set PR-specific E2E auth email" (after Doppler sync).
 
-This is the only exception to the "Doppler is canonical" rule. All other secrets follow the standard Doppler workflow.
+### Local dev configuration values (justfile)
+
+**Local dev configuration values are set in the `justfile`** instead of Doppler for solo-developer convenience:
+
+- `APP_ENV="local"`
+- `BETTER_AUTH_URL="http://localhost:8787"`
+- `ALLOWED_EMAIL` (developer's email)
+- `ALLOWED_EXTENSION_IDS` (developer's extension ID)
+- `ENABLE_TEST_EMAIL_PASSWORD_AUTH="1"`
+- `E2E_AUTH_EMAIL` (developer's email for local testing)
+- `GOOGLE_CLIENT_ID` (OAuth client ID for local dev)
+
+**Rationale:**
+- Single-developer workflow eliminates need for shared Doppler dev config
+- Reduces onboarding friction (no Doppler service token required for first run)
+- These are non-secret configuration values specific to the local environment
+- New contributors should update `ALLOWED_EMAIL` and `E2E_AUTH_EMAIL` to their own email in the justfile
+
+**Trade-off:** Personal email visible in version control. Acceptable for a solo-dev project with a single known contributor.
 
 ## Migration
 
