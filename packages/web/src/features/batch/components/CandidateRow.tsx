@@ -43,7 +43,7 @@ export function CandidateRow({
 					onSave={() => onSave(candidate)}
 					onClear={() => onClear(candidate)}
 				/>
-				{rowError && <p className="text-red-400 text-sm">{rowError}</p>}
+				{rowError && <p className="text-destructive text-sm">{rowError}</p>}
 			</div>
 		</div>
 	);
