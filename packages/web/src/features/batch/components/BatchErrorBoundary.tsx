@@ -33,6 +33,9 @@ export class BatchErrorBoundary extends Component<BatchErrorBoundaryProps, Batch
 	}
 
 	handleReset = () => {
+		// Note: This clears the error state and attempts to re-render children.
+		// If the error was caused by bad data, it will immediately re-trigger.
+		// For persistent errors, users should use the "Reload Page" button.
 		this.setState({ hasError: false, error: null });
 	};
 

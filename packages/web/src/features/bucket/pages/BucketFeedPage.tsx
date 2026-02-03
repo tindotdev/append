@@ -116,7 +116,7 @@ function FeedLoadingState({ title }: { title: string }) {
 
 function FeedErrorState({ title, error, onRetry }: { title: string; error: unknown; onRetry: () => void }) {
 	const errorMessage =
-		error instanceof Error && error.message.includes('401')
+		error instanceof ApiRequestError && error.status === 401
 			? 'Your session has expired. Please sign in again.'
 			: 'Something went wrong. Please try again.';
 

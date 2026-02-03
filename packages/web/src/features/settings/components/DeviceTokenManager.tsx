@@ -40,7 +40,7 @@ function TokenRow({ token, onRevoke }: { token: DeviceTokenListItem; onRevoke: (
 					<div className="font-medium text-card-foreground truncate">{token.label || 'Untitled token'}</div>
 					<div className="text-xs text-muted-foreground">({token.token_prefix}…)</div>
 					{revoked && <span className="text-xs rounded bg-muted px-2 py-0.5 text-muted-foreground">Revoked</span>}
-					{!revoked && expired && <span className="text-xs rounded bg-orange-900/50 px-2 py-0.5 text-orange-300">Expired</span>}
+					{!revoked && expired && <span className="text-xs rounded bg-warning/50 px-2 py-0.5 text-warning-foreground">Expired</span>}
 				</div>
 				<div className="mt-1 grid grid-cols-1 gap-1 text-xs text-muted-foreground @md/main:grid-cols-2">
 					<div>
@@ -50,7 +50,7 @@ function TokenRow({ token, onRevoke }: { token: DeviceTokenListItem; onRevoke: (
 						<span className="text-muted-foreground">Last used:</span> {formatDate(token.last_used_at_ms)}
 					</div>
 					{token.expires_at_ms && (
-						<div className={expired ? 'text-orange-400' : ''}>
+						<div className={expired ? 'text-warning-foreground' : ''}>
 							<span className="text-muted-foreground">Expires:</span> {formatDate(token.expires_at_ms)}
 						</div>
 					)}
