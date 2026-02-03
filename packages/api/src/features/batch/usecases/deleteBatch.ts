@@ -3,6 +3,14 @@
  *
  * Performs a hard delete - candidates are automatically
  * removed via foreign key cascade.
+ *
+ * Exception to soft-delete policy (CLAUDE.md): Batches are transient
+ * staging data for the capture → suggest → accept flow. Once candidates
+ * are accepted, the materialized Term/TermSense rows persist independently.
+ * Hard delete is acceptable here since:
+ * - Batches have no audit/compliance requirements
+ * - Accepted terms are preserved via materialization pointers
+ * - Users expect "delete batch" to remove the staging data completely
  */
 
 import { eq } from 'drizzle-orm';
