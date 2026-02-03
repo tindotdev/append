@@ -127,7 +127,7 @@ export function ExportHistory() {
 			<CardContent>
 				<div className="divide-y divide-border">
 					{data.items.map((item) => (
-						<ExportHistoryItemRow key={item.id} item={item} onClick={(item) => console.log('Export history item clicked:', item)} />
+						<ExportHistoryItemRow key={item.id} item={item} />
 					))}
 				</div>
 				{data.hasMore && <p className="text-xs text-muted-foreground text-center mt-3">Showing last {data.items.length} exports</p>}

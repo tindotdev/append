@@ -63,7 +63,7 @@ export function BucketDetailDrawer({ bucket, onClose, onDownload, isDownloading 
 								<Button onClick={() => onDownload(bucket)} disabled={isDownloading} className="w-full" size="lg">
 									{isDownloading ? (
 										<>
-											<span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+											<span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2" />
 											Downloading...
 										</>
 									) : (
