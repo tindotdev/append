@@ -49,7 +49,9 @@ export async function downloadEventsExport(params: EventsExportParams): Promise<
 	const cursor = res.headers.get('X-Export-Cursor');
 
 	// Generate filename with date range and optional part number
-	const partSuffix = params.partNumber ? `.part-${String(params.partNumber).padStart(3, '0')}` : '';
+	// If first export is truncated and no partNumber was provided, use part 1
+	const effectivePartNumber = params.partNumber ?? (truncated ? 1 : undefined);
+	const partSuffix = effectivePartNumber ? `.part-${String(effectivePartNumber).padStart(3, '0')}` : '';
 	const filename = `events_${params.from}_${params.to}${partSuffix}.ndjson`;
 
 	// Get response as blob and trigger browser download

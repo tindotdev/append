@@ -47,14 +47,23 @@ export function ExportPage() {
 			results: { ...prev.results, [bucket]: null },
 		}));
 
-		const result = await downloadBucketExport(bucket);
+		try {
+			const result = await downloadBucketExport(bucket);
 
-		setState((prev) => ({
-			...prev,
-			isDownloading: false,
-			currentBucket: null,
-			results: { ...prev.results, [bucket]: result },
-		}));
+			setState((prev) => ({
+				...prev,
+				isDownloading: false,
+				currentBucket: null,
+				results: { ...prev.results, [bucket]: result },
+			}));
+		} catch (err) {
+			setState((prev) => ({
+				...prev,
+				isDownloading: false,
+				currentBucket: null,
+				results: { ...prev.results, [bucket]: { success: false, error: String(err) } },
+			}));
+		}
 	};
 
 	const downloadAll = async () => {
@@ -68,23 +77,35 @@ export function ExportPage() {
 
 		const newResults = { ...resetResults };
 
-		// Download sequentially to preserve order
-		for (const bucket of BUCKETS) {
-			setState((prev) => ({ ...prev, currentBucket: bucket }));
-			const result = await downloadBucketExport(bucket);
-			newResults[bucket] = result;
-			// Update state after each download to show progress
+		try {
+			// Download sequentially to preserve order
+			for (const bucket of BUCKETS) {
+				setState((prev) => ({ ...prev, currentBucket: bucket }));
+				try {
+					const result = await downloadBucketExport(bucket);
+					newResults[bucket] = result;
+					// Update state after each download to show progress
+					setState((prev) => ({
+						...prev,
+						results: { ...prev.results, [bucket]: result },
+					}));
+				} catch (err) {
+					// Single bucket failure doesn't abort entire download
+					const errorResult = { success: false, error: String(err) };
+					newResults[bucket] = errorResult;
+					setState((prev) => ({
+						...prev,
+						results: { ...prev.results, [bucket]: errorResult },
+					}));
+				}
+			}
+		} finally {
 			setState((prev) => ({
 				...prev,
-				results: { ...prev.results, [bucket]: result },
+				isDownloading: false,
+				currentBucket: null,
 			}));
 		}
-
-		setState((prev) => ({
-			...prev,
-			isDownloading: false,
-			currentBucket: null,
-		}));
 	};
 
 	const hasAnyResults = Object.values(state.results).some((r) => r !== null);
@@ -121,6 +142,7 @@ export function ExportPage() {
 							size="sm"
 							onClick={downloadAll}
 							disabled={state.isDownloading}
+							aria-label={`Download all ${BUCKETS.length} files`}
 							title={
 								state.isDownloading && state.currentBucket === null
 									? 'Starting download...'
@@ -130,9 +152,9 @@ export function ExportPage() {
 							}
 						>
 							{state.isDownloading && state.currentBucket === null ? (
-								<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+								<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-foreground" />
 							) : state.isDownloading ? (
-								<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+								<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-foreground" />
 							) : (
 								<>
 									<Download className="size-3.5" />({BUCKETS.length})
@@ -194,10 +216,11 @@ export function ExportPage() {
 													downloadSingle(bucket);
 												}}
 												disabled={state.isDownloading}
+												aria-label={`Download ${BUCKET_TITLES[bucket]}`}
 												title={isCurrentlyDownloading ? 'Downloading...' : 'Download'}
 											>
 												{isCurrentlyDownloading ? (
-													<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+													<span className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-foreground" />
 												) : (
 													<Download className="size-4" />
 												)}
