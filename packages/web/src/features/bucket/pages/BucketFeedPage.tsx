@@ -237,86 +237,84 @@ function FeedContent({
 	const selectedCount = Object.keys(rowSelection).length;
 
 	return (
-		<>
-			<div className="w-full space-y-4">
-				<Breadcrumb>
-					<BreadcrumbList>
-						<BreadcrumbItem>
-							<BreadcrumbLink asChild>
-								<Link to="/dashboard">Home</Link>
-							</BreadcrumbLink>
-						</BreadcrumbItem>
-						<BreadcrumbSeparator />
-						<BreadcrumbItem>
-							<span className="text-muted-foreground">Buckets</span>
-						</BreadcrumbItem>
-						<BreadcrumbSeparator />
-						<BreadcrumbItem>
-							<BreadcrumbPage>{title}</BreadcrumbPage>
-						</BreadcrumbItem>
-					</BreadcrumbList>
-				</Breadcrumb>
+		<div className="w-full space-y-4">
+			<Breadcrumb>
+				<BreadcrumbList>
+					<BreadcrumbItem>
+						<BreadcrumbLink asChild>
+							<Link to="/dashboard">Home</Link>
+						</BreadcrumbLink>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<span className="text-muted-foreground">Buckets</span>
+					</BreadcrumbItem>
+					<BreadcrumbSeparator />
+					<BreadcrumbItem>
+						<BreadcrumbPage>{title}</BreadcrumbPage>
+					</BreadcrumbItem>
+				</BreadcrumbList>
+			</Breadcrumb>
 
-				<Card>
-					<CardHeader>
-						<CardTitle>{title}</CardTitle>
-						<CardDescription>
-							{items.length} item{items.length !== 1 ? 's' : ''}
-							{hasNextPage ? ' (more available)' : ''}
-						</CardDescription>
-					</CardHeader>
+			<Card>
+				<CardHeader>
+					<CardTitle>{title}</CardTitle>
+					<CardDescription>
+						{items.length} item{items.length !== 1 ? 's' : ''}
+						{hasNextPage ? ' (more available)' : ''}
+					</CardDescription>
+				</CardHeader>
 
-					<CardContent>
-						{/* Search input */}
-						<div className="relative">
-							<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-							<Input
-								type="search"
-								placeholder="Filter items..."
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-								className="pl-9"
-							/>
+				<CardContent>
+					{/* Search input */}
+					<div className="relative">
+						<Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							type="search"
+							placeholder="Filter items..."
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							className="pl-9"
+						/>
+					</div>
+
+					{/* Filtered count */}
+					{searchQuery && (
+						<div className="flex items-center gap-2 text-sm text-muted-foreground mt-4">
+							{isFiltering && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+							<span>{isFiltering ? 'Filtering...' : `${filteredItems.length} of ${items.length} items`}</span>
 						</div>
+					)}
 
-						{/* Filtered count */}
-						{searchQuery && (
-							<div className="flex items-center gap-2 text-sm text-muted-foreground mt-4">
-								{isFiltering && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-								<span>{isFiltering ? 'Filtering...' : `${filteredItems.length} of ${items.length} items`}</span>
-							</div>
-						)}
+					{/* Table */}
+					<div className="mt-4">
+						<BucketTable
+							columns={columns}
+							data={filteredItems}
+							onRowClick={onRowClick}
+							rowSelection={rowSelection}
+							onRowSelectionChange={onRowSelectionChange}
+						/>
+					</div>
 
-						{/* Table */}
-						<div className="mt-4">
-							<BucketTable
-								columns={columns}
-								data={filteredItems}
-								onRowClick={onRowClick}
-								rowSelection={rowSelection}
-								onRowSelectionChange={onRowSelectionChange}
-							/>
+					{/* Load more button */}
+					{hasNextPage && (
+						<div className="mt-6 flex justify-center">
+							<Button variant="secondary" onClick={onFetchNextPage} disabled={isFetchingNextPage}>
+								{isFetchingNextPage && <Loader2 className="size-4 animate-spin mr-2" />}
+								Load more
+							</Button>
 						</div>
+					)}
 
-						{/* Load more button */}
-						{hasNextPage && (
-							<div className="mt-6 flex justify-center">
-								<Button variant="secondary" onClick={onFetchNextPage} disabled={isFetchingNextPage}>
-									{isFetchingNextPage && <Loader2 className="size-4 animate-spin mr-2" />}
-									Load more
-								</Button>
-							</div>
-						)}
+					{/* Term detail sheet */}
+					<TermDetailSheet termId={selectedTermId} onClose={onClosePanel} />
+				</CardContent>
+			</Card>
 
-						{/* Term detail sheet */}
-						<TermDetailSheet termId={selectedTermId} onClose={onClosePanel} />
-					</CardContent>
-				</Card>
-
-				{/* Bulk action bar */}
-				<BulkActionBar selectedCount={selectedCount} onClear={onClearSelection} onBulkDelete={onBulkDelete} onBulkMove={onBulkMove} />
-			</div>
-		</>
+			{/* Bulk action bar */}
+			<BulkActionBar selectedCount={selectedCount} onClear={onClearSelection} onBulkDelete={onBulkDelete} onBulkMove={onBulkMove} />
+		</div>
 	);
 }
 
