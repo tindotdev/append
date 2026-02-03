@@ -88,12 +88,12 @@ export const candidateRoutes = app
 					message: 'Candidate has already been accepted',
 				},
 				suggestion_in_progress: {
-					status: 409,
+					status: 400,
 					code: 'SUGGESTION_IN_PROGRESS',
 					message: 'Cannot accept: suggestion is still being generated',
 				},
 				missing_effective_fields: {
-					status: 409,
+					status: 400,
 					code: 'CANDIDATE_NOT_READY',
 					message: 'Cannot accept: candidate is missing bucket or definition',
 				},
