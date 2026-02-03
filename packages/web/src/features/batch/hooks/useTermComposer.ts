@@ -54,7 +54,7 @@ export const validationDotClass: Record<ValidationStatus, string> = {
 };
 
 export const validationMessageClass: Partial<Record<ValidationStatus, string>> = {
-	duplicate: 'text-warning',
+	duplicate: 'text-warning-foreground',
 	'too-long': 'text-destructive',
 	'forbidden-delimiter': 'text-destructive',
 };
