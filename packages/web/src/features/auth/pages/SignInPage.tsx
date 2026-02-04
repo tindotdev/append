@@ -1,4 +1,4 @@
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -30,7 +30,7 @@ export function SignInPage() {
 			<Card className="w-full max-w-xs py-5">
 				<CardHeader className="px-5 text-center">
 					<img src="/android-chrome-192x192.png" alt="append logo" className="mx-auto mb-1 h-10 w-10 rounded-lg" />
-					<p className="text-xs text-muted-foreground/70">Welcome back</p>
+					<p className="text-xs text-muted-foreground/70">Sign in or create an account</p>
 				</CardHeader>
 				<CardContent className="flex justify-center px-5">
 					<Button
@@ -54,6 +54,11 @@ export function SignInPage() {
 					</Button>
 				</CardContent>
 			</Card>
+			<p className="mt-4 text-xs text-muted-foreground">
+				<Link to="/demo" className="hover:text-foreground">
+					Try demo
+				</Link>
+			</p>
 		</div>
 	);
 }
