@@ -9,7 +9,7 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import * as v from 'valibot';
-import { deviceToken } from '../../db';
+import { account, deviceToken } from '../../db';
 import { generateDeviceToken, sha256Hex } from '../../lib/auth/device-token';
 import type { Bindings, Variables } from '../../platform/env';
 import { apiError } from '../../shared/api-error';
@@ -29,6 +29,25 @@ export const deviceTokenRoutes = app
 	.post('/', async (c) => {
 		const userId = c.get('userId');
 		const db = c.get('db');
+
+		// Telemetry pairing gate (ADR 0025): in public mode, restrict device-token minting
+		if (c.env.AUTH_MODE === 'public') {
+			if (c.env.TELEMETRY_PAIRING_ENABLED !== '1') {
+				// Check if user is in the per-sub allowlist
+				const allowedSubs = c.env.ALLOWED_TELEMETRY_SUBS?.split(',').map((s) => s.trim()) ?? [];
+
+				const userAccount = await db
+					.select({ accountId: account.accountId })
+					.from(account)
+					.where(and(eq(account.userId, userId), eq(account.providerId, 'google')))
+					.limit(1);
+
+				const userSub = userAccount[0]?.accountId;
+				if (!userSub || !allowedSubs.includes(userSub)) {
+					return apiError(c, 403, 'TELEMETRY_PAIRING_DISABLED', 'Telemetry pairing is not enabled for your account');
+				}
+			}
+		}
 
 		const body = (await c.req.json()) as unknown;
 		const parsed = v.safeParse(CreateDeviceTokenRequestSchema, body);
