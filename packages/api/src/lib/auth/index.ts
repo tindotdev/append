@@ -21,7 +21,7 @@ type Env = {
 	// Allowlist (ADR 0001)
 	ALLOWED_SUB?: string;
 	ALLOWED_EMAIL?: string;
-	// Test-only: enable email/password auth (§5.2)
+	// Test-only: enable email/password auth (see wrangler.jsonc "test" environment)
 	ENABLE_TEST_EMAIL_PASSWORD_AUTH?: string;
 	// E2E Auth Bootstrap (ADR 0019)
 	APP_ENV?: string;
@@ -178,7 +178,7 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 	// Use actual DB for runtime, empty object for CLI
 	const db = env ? drizzle(env.DB, { schema }) : ({} as any);
 
-	// Email/password auth is only enabled in test environment (§5.2)
+	// Email/password auth is only enabled in test environment (see wrangler.jsonc "test" environment)
 	const emailPasswordEnabled = isEmailPasswordAuthEnabled(env);
 
 	// Preview-only cookie config (ADR 0019): SameSite=None for cross-site pages.dev → workers.dev
@@ -218,7 +218,7 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 						clientSecret: env?.GOOGLE_CLIENT_SECRET || '',
 					},
 				},
-				// Email/password auth for test environment only (§5.2)
+				// Email/password auth for test environment only (see wrangler.jsonc "test" environment)
 				...(emailPasswordEnabled
 					? {
 							emailAndPassword: {
