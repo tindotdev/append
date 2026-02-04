@@ -87,6 +87,14 @@ function assertAllowlistConfigured(env: Env): void {
 }
 
 /**
+ * Check if public sign-up is enabled (ADR 0025).
+ * Returns true when AUTH_MODE=public and kill switch is not pulled.
+ */
+function isPublicSignupEnabled(env: Env): boolean {
+	return env.AUTH_MODE === 'public' && env.PUBLIC_SIGNUP_ENABLED !== '0';
+}
+
+/**
  * Check if email/password auth should be enabled.
  * Only allowed in test environment with localhost URL.
  */
@@ -161,6 +169,22 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 					user: {
 						create: {
 							before: async (user) => {
+								// Public mode (ADR 0025): allow any user with an email
+								if (env.AUTH_MODE === 'public') {
+									if (env.PUBLIC_SIGNUP_ENABLED === '0') {
+										throw new APIError('FORBIDDEN', {
+											message: 'Sign-up is temporarily disabled',
+										});
+									}
+									if (!user.email) {
+										throw new APIError('FORBIDDEN', {
+											message: 'Access denied: email not provided',
+										});
+									}
+									return;
+								}
+
+								// Restricted mode (default): enforce allowlist (ADR 0001)
 								assertAllowlistConfigured(env);
 								if (!user.email) {
 									throw new APIError('FORBIDDEN', {
@@ -200,6 +224,18 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 						create: {
 							// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-provider allowlist checks
 							before: async (account) => {
+								// Public mode (ADR 0025): skip allowlist checks
+								if (isPublicSignupEnabled(env)) {
+									return;
+								}
+
+								// E2E provider (ADR 0019): bypass allowlist check here since
+								// the E2E endpoint performs its own validation before reaching this point
+								if (account.providerId === 'e2e') {
+									return;
+								}
+
+								// Restricted mode (default): enforce allowlist (ADR 0001)
 								assertAllowlistConfigured(env);
 
 								// Google: enforce sub allowlist if configured (ADR 0001 primary rule)
@@ -209,12 +245,6 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 											message: 'Access denied: not on allowlist',
 										});
 									}
-									return;
-								}
-
-								// E2E provider (ADR 0019): bypass allowlist check here since
-								// the E2E endpoint performs its own validation before reaching this point
-								if (account.providerId === 'e2e') {
 									return;
 								}
 
