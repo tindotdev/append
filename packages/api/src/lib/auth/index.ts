@@ -269,17 +269,30 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 							},
 							// Seed default buckets after user creation (Phase 5B)
 							after: async (user) => {
-								const bucketValues = DEFAULT_BUCKETS.map((b) => ({
-									id: crypto.randomUUID(),
-									userId: user.id,
-									slug: b.slug,
-									name: b.name,
-									description: b.description,
-									color: null,
-									order: b.order,
-								}));
+								try {
+									const bucketValues = DEFAULT_BUCKETS.map((b) => ({
+										id: crypto.randomUUID(),
+										userId: user.id,
+										slug: b.slug,
+										name: b.name,
+										description: b.description,
+										color: null,
+										order: b.order,
+									}));
 
-								await db.insert(bucket).values(bucketValues);
+									await db.insert(bucket).values(bucketValues);
+								} catch (error) {
+									// Critical: User creation should fail if we cannot seed default buckets
+									console.error('Failed to seed default buckets during user creation', {
+										userId: user.id,
+										userEmail: user.email,
+										error: error instanceof Error ? error.message : String(error),
+										stack: error instanceof Error ? error.stack : undefined,
+									});
+
+									// Rethrow to prevent user creation with broken state
+									throw error;
+								}
 							},
 						},
 					},
