@@ -14,8 +14,10 @@ Append is **WakaTime-for-learning**:
 - Product core: events-first learning telemetry + dashboard-first UX (ADR: `docs/adr/0020-events-first-learning-telemetry.md`).
 - Canonical store: events-first in `append` (append-only; derived rollups are rebuildable).
 - App architecture: SPA (React + TanStack Router) + Hono on Cloudflare Workers (ADR: `docs/adr/0004-spa-hono-workers.md`).
-- Auth/access: Google SSO allowlist (ADR: `docs/adr/0001-google-allowlist-auth.md`).
+- Auth/access: Google SSO with public sign-up switch + telemetry pairing separation (ADR: `docs/adr/0025-public-auth-and-telemetry-separation.md`).
 - Public demo: `/demo` route uses synthetic local events (no auth, no writes).
+- AI suggestions: term suggestions are bounded (3 lifetime + global budget) (ADR: `docs/adr/0026-term-suggestion-quotas-and-global-budget.md`).
+- Data retention: retain user-owned portfolio data + AI suggestions by default; hard delete on account deletion (ADR: `docs/adr/0027-data-retention-and-account-deletion.md`).
 - Web UI: Linear-style sidebar layout (ADR: `docs/adr/0015-web-ui-linear-sidebar-layout.md`).
 - Capture UX: outbox-backed submit semantics (ADR: `docs/adr/0018-outbox-backed-capture-semantics.md`) applied to capture events (not Term entities).
 

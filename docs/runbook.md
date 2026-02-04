@@ -150,12 +150,19 @@ pnpm wrangler secret list
 
 ## Auth configuration
 
-Append uses Google SSO with a strict allowlist (ADR 0001). At least one of the
-following must be configured, or auth will **fail closed** at runtime:
+Append uses Google SSO via Better Auth. Auth posture is controlled by `AUTH_MODE` (ADR 0025):
+
+- `AUTH_MODE=restricted` (default): allowlist-only
+  - At least one of the allowlist vars below must be configured or auth will **fail closed**
+- `AUTH_MODE=public`: public sign-in/sign-up enabled
+  - Any Google account can sign in (sign-in creates account)
+  - Allowlist vars are optional (still useful for telemetry pairing allowlist)
+
+Allowlist variables (used when `AUTH_MODE=restricted`, and optionally elsewhere):
 
 - `ALLOWED_SUB` (preferred) — Google account `sub`
-- `ALLOWED_EMAIL` (fallback) — case-insensitive email, supports wildcard patterns
-  for plus-addressing (e.g., `e2e-bot+*@append.test` matches `e2e-bot+pr-123@append.test`)
+- `ALLOWED_EMAIL` (fallback) — case-insensitive email; supports wildcard patterns for plus-addressing
+  (e.g., `e2e-bot+*@append.test` matches `e2e-bot+pr-123@append.test`)
 
 Required auth secrets:
 
@@ -163,6 +170,10 @@ Required auth secrets:
 - `GOOGLE_CLIENT_SECRET`
 - `BETTER_AUTH_SECRET`
 - `BETTER_AUTH_URL`
+
+Public sign-up kill switch (optional):
+
+- `PUBLIC_SIGNUP_ENABLED=0|1` (when `0` and `AUTH_MODE=public`, sign-ups are disabled)
 
 Auth endpoints:
 
@@ -172,7 +183,7 @@ Auth endpoints:
 
 ### Bootstrapping `ALLOWED_SUB` (recommended)
 
-`ALLOWED_SUB` is the stable Google account identifier ("sub"). The simplest flow is:
+`ALLOWED_SUB` is the stable Google account identifier ("sub"). The simplest flow (for `AUTH_MODE=restricted`, or to populate telemetry allowlists) is:
 
 1. Set `ALLOWED_EMAIL` temporarily (to allow your first login).
 2. Sign in once.
@@ -192,6 +203,23 @@ Production (remote D1):
 cd packages/api
 pnpm wrangler d1 execute append-db --remote --command "SELECT account_id FROM account WHERE provider_id='google' LIMIT 1;"
 ```
+
+### Telemetry pairing (extension)
+
+Extension ingest remains protected by device tokens + extension ID allowlist (ADR 0021). Control the highest-volume write path by gating token minting (ADR 0025):
+
+- `TELEMETRY_PAIRING_ENABLED=0|1` (default: `0`)
+- `ALLOWED_TELEMETRY_SUBS` (optional) — comma-separated Google `sub` values allowed to mint device tokens
+  - In `AUTH_MODE=public`, token minting is blocked unless `TELEMETRY_PAIRING_ENABLED=1` or the user is allowlisted via `ALLOWED_TELEMETRY_SUBS`
+
+### AI suggestions (term suggestions)
+
+Operational controls for term suggestions (ADR 0026):
+
+- `SUGGESTIONS_ENABLED=0|1` (kill switch)
+- `SUGGESTIONS_PROVIDER=gemini|openai|stub|disabled`
+- `GEMINI_API_KEY` (secret, if using Gemini)
+- `ADMIN_SUB` (Google `sub` for the admin identity)
 
 ## Deploy steps
 

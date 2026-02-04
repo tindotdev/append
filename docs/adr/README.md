@@ -10,7 +10,7 @@ Rules:
 
 ## Index
 
-- `0001-google-allowlist-auth.md` — Google SSO with allowlist (sub-first, email fallback)
+- `0001-google-allowlist-auth.md` — Google SSO with allowlist (sub-first, email fallback) _(Superseded by 0025)_
 - `0002-term-sense-duplicates.md` — Duplicate handling via `Term` + `TermSense` (allowed-but-flagged) _(Superseded by 0020)_
 - `0003-bucket-feed-primary-sense.md` — Bucket feed shows primary sense by default (expand for more; review mode) _(Superseded by 0020)_
 - `0004-spa-hono-workers.md` — SPA (React + TanStack Router) + Hono on Workers (no SSR)
@@ -34,3 +34,6 @@ Rules:
 - `0022-m1-dashboard-read-models-and-export.md` — M1 dashboard read models + raw events export
 - `0023-term-archival-and-bulk-actions.md` — Term archival + bulk actions (delete/move)
 - `0024-accept-individual-candidates.md` — Accept individual candidates with data table UI
+- `0025-public-auth-and-telemetry-separation.md` — Public auth with AUTH_MODE switch + telemetry access separation (supersedes 0001)
+- `0026-term-suggestion-quotas-and-global-budget.md` — Per-user lifetime quotas (3) + global monthly budget (100 shared + 100 admin-reserved)
+- `0027-data-retention-and-account-deletion.md` — Indefinite retention by default + hard delete on account deletion
