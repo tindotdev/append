@@ -29,6 +29,15 @@ export function AppShell() {
 	const { data: bucketsData } = useUserBuckets({ enabled: isAuthenticated });
 	const buckets = bucketsData?.buckets ?? [];
 
+	// Redirect to sign-in when auth resolves to unauthenticated
+	// This handles the case where auth state changes while on a protected route
+	// (beforeLoad only runs during navigation, not when auth state updates)
+	useEffect(() => {
+		if (!isPending && !isAuthenticated) {
+			navigate({ to: '/sign-in' });
+		}
+	}, [isPending, isAuthenticated, navigate]);
+
 	// Global keyboard shortcuts
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
