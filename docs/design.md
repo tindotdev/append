@@ -17,7 +17,7 @@ Append is **WakaTime-for-learning**:
 - Auth/access: Google SSO with public sign-up switch + telemetry pairing separation (ADR: `docs/adr/0025-public-auth-and-telemetry-separation.md`).
   - `AUTH_MODE`: `restricted` (allowlist) or `public` (open sign-up). Default: `restricted`.
   - `PUBLIC_SIGNUP_ENABLED`: `0` | `1` (default: `1`). Kill switch for public mode account creation: when `0` and `AUTH_MODE=public`, new account sign-ups are disabled (recommended: set explicitly in production; flip to `0` for emergency shutoff).
-  - Telemetry ingest gated via `TELEMETRY_PAIRING_ENABLED` + `ALLOWED_TELEMETRY_SUBS`.
+  - Telemetry pairing gate (public mode): **device-token minting** is allowed when `TELEMETRY_PAIRING_ENABLED=1` **or** the signed-in Google sub is in `ALLOWED_TELEMETRY_SUBS` (comma-separated). Ingest is effectively gated by whether a device token can be minted.
 - Public demo: `/demo` route uses synthetic local events (no auth, no writes).
 - AI suggestions: term suggestions are bounded (3 lifetime + global budget) (ADR: `docs/adr/0026-term-suggestion-quotas-and-global-budget.md`).
 - Data retention: retain user-owned portfolio data + AI suggestions by default; hard delete on account deletion (ADR: `docs/adr/0027-data-retention-and-account-deletion.md`).
