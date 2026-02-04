@@ -1,7 +1,8 @@
 # ADR 0001 — Google SSO allowlist (sub-first)
 
-Status: Accepted
+Status: Superseded
 Date: 2025-12-19
+Superseded by: ADR 0025 (public auth with AUTH_MODE switch)
 
 ## Context
 

@@ -1,10 +1,10 @@
 # Agent Guide
 
-## **THIS BRANCH: `feat/event-ingest`**
+## Current focus
+
+Making the application public with guest accounts and sign up capabilities.
 
 **Product direction:** events-first learning telemetry (WakaTime-for-learning) → dashboard-first UX (ADR 0020).
-
-Primary focus for this branch is shipping the **real ingest path** and the client emitters (extension) that feed it.
 
 ---
 
@@ -36,15 +36,9 @@ Primary focus for this branch is shipping the **real ingest path** and the clien
 - Track progress/plans in PR descriptions and the issue tracker (avoid persisting plan/proposal docs).
 - Material decision change → add a new ADR and mark the old one “Superseded”.
 
-## Scope notes (implementation)
-
-- Prefer **append-only, idempotent** event ingestion (dedupe by `(user_id, device_id, event_id)`).
-- Keep client emitters retry-safe (outbox + acked deletes; never drop silently).
-- Keep the web telemetry simulator available as a dev tool, but treat API + extension as source of truth.
-
 ## Current stage
 
-- See `docs/design.md` ("Current stage").
+- See `docs/design.md` for product details and current architecture.
 
 ## Engineering defaults (unless an ADR says otherwise)
 
