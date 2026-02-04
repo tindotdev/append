@@ -86,12 +86,80 @@ function assertAllowlistConfigured(env: Env): void {
 	}
 }
 
+function assertPublicSignupEnabledOrThrow(env: Pick<Env, 'AUTH_MODE' | 'PUBLIC_SIGNUP_ENABLED'>): void {
+	if (env.AUTH_MODE === 'public' && !isPublicSignupEnabled(env)) {
+		throw new APIError('FORBIDDEN', {
+			message: 'Sign-up is temporarily disabled',
+		});
+	}
+}
+
 /**
  * Check if public sign-up is enabled (ADR 0025).
  * Returns true when AUTH_MODE=public and kill switch is not pulled.
  */
-function isPublicSignupEnabled(env: Env): boolean {
+function isPublicSignupEnabled(env: Pick<Env, 'AUTH_MODE' | 'PUBLIC_SIGNUP_ENABLED'>): boolean {
 	return env.AUTH_MODE === 'public' && env.PUBLIC_SIGNUP_ENABLED !== '0';
+}
+
+type AccountCreateRow = {
+	providerId: string;
+	userId: string;
+	accountId?: string | null;
+};
+
+type AccountCreateDb = {
+	query: {
+		user: {
+			findFirst: (args: any) => Promise<{ email: string | null } | undefined>;
+		};
+	};
+};
+
+export async function accountCreateBeforeHook(env: Env, db: AccountCreateDb, account: AccountCreateRow): Promise<void> {
+	// Public mode (ADR 0025): explicitly gate on kill switch and never fall back to allowlist logic.
+	if (env.AUTH_MODE === 'public') {
+		assertPublicSignupEnabledOrThrow(env);
+		return;
+	}
+
+	// E2E provider (ADR 0019): bypass allowlist check here since
+	// the E2E endpoint performs its own validation before reaching this point
+	if (account.providerId === 'e2e') {
+		return;
+	}
+
+	// Restricted mode (default): enforce allowlist (ADR 0001)
+	assertAllowlistConfigured(env);
+
+	// Google: enforce sub allowlist if configured (ADR 0001 primary rule)
+	if (account.providerId === 'google' && env.ALLOWED_SUB) {
+		if (!account.accountId || account.accountId !== env.ALLOWED_SUB) {
+			throw new APIError('FORBIDDEN', {
+				message: 'Access denied: not on allowlist',
+			});
+		}
+		return;
+	}
+
+	// Non-Google providers: sub allowlist does not apply.
+	// Require ALLOWED_EMAIL match (fail closed if missing).
+	if (!env.ALLOWED_EMAIL) {
+		throw new APIError('FORBIDDEN', {
+			message: 'Access denied: email allowlist required',
+		});
+	}
+
+	const userRow = await db.query.user.findFirst({
+		columns: { email: true },
+		where: (u: typeof user) => eq(u.id, account.userId),
+	});
+
+	if (!userRow?.email || !isEmailAllowed(env, userRow.email)) {
+		throw new APIError('FORBIDDEN', {
+			message: 'Access denied: not on allowlist',
+		});
+	}
 }
 
 /**
@@ -171,11 +239,7 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 							before: async (user) => {
 								// Public mode (ADR 0025): allow any user with an email
 								if (env.AUTH_MODE === 'public') {
-									if (env.PUBLIC_SIGNUP_ENABLED === '0') {
-										throw new APIError('FORBIDDEN', {
-											message: 'Sign-up is temporarily disabled',
-										});
-									}
+									assertPublicSignupEnabledOrThrow(env);
 									if (!user.email) {
 										throw new APIError('FORBIDDEN', {
 											message: 'Access denied: email not provided',
@@ -224,48 +288,7 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 						create: {
 							// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-provider allowlist checks
 							before: async (account) => {
-								// Public mode (ADR 0025): skip allowlist checks
-								if (isPublicSignupEnabled(env)) {
-									return;
-								}
-
-								// E2E provider (ADR 0019): bypass allowlist check here since
-								// the E2E endpoint performs its own validation before reaching this point
-								if (account.providerId === 'e2e') {
-									return;
-								}
-
-								// Restricted mode (default): enforce allowlist (ADR 0001)
-								assertAllowlistConfigured(env);
-
-								// Google: enforce sub allowlist if configured (ADR 0001 primary rule)
-								if (account.providerId === 'google' && env.ALLOWED_SUB) {
-									if (!account.accountId || account.accountId !== env.ALLOWED_SUB) {
-										throw new APIError('FORBIDDEN', {
-											message: 'Access denied: not on allowlist',
-										});
-									}
-									return;
-								}
-
-								// Non-Google providers: sub allowlist does not apply.
-								// Require ALLOWED_EMAIL match (fail closed if missing).
-								if (!env.ALLOWED_EMAIL) {
-									throw new APIError('FORBIDDEN', {
-										message: 'Access denied: email allowlist required',
-									});
-								}
-
-								const userRow = await db.query.user.findFirst({
-									columns: { email: true },
-									where: (u: typeof user) => eq(u.id, account.userId),
-								});
-
-								if (!userRow?.email || !isEmailAllowed(env, userRow.email)) {
-									throw new APIError('FORBIDDEN', {
-										message: 'Access denied: not on allowlist',
-									});
-								}
+								await accountCreateBeforeHook(env, db as unknown as AccountCreateDb, account as AccountCreateRow);
 							},
 						},
 					},
