@@ -142,18 +142,35 @@ export async function accountCreateBeforeHook(env: Env, db: AccountCreateDb, acc
 		return;
 	}
 
-	// Non-Google providers: sub allowlist does not apply.
-	// Require ALLOWED_EMAIL match (fail closed if missing).
+	// Non-Google providers (including e2e, email/password): Google sub allowlist does not apply
+	// because 'sub' is provider-specific and not portable across OAuth providers.
+	// Fall back to email allowlist for these providers (fail closed if ALLOWED_EMAIL is not set).
 	if (!env.ALLOWED_EMAIL) {
 		throw new APIError('FORBIDDEN', {
 			message: 'Access denied: email allowlist required',
 		});
 	}
 
-	const userRow = await db.query.user.findFirst({
-		columns: { email: true },
-		where: (u: typeof user) => eq(u.id, account.userId),
-	});
+	let userRow: { email: string | null } | undefined;
+	try {
+		userRow = await db.query.user.findFirst({
+			columns: { email: true },
+			where: (u: typeof user) => eq(u.id, account.userId),
+		});
+	} catch (error) {
+		console.error('Database query failed during account allowlist check', {
+			userId: account.userId,
+			providerId: account.providerId,
+			accountId: account.accountId,
+			error: error instanceof Error ? error.message : String(error),
+			stack: error instanceof Error ? error.stack : undefined,
+		});
+
+		// Don't mask database errors as auth failures
+		throw new APIError('SERVICE_UNAVAILABLE', {
+			message: 'Unable to verify access. Please try again.',
+		});
+	}
 
 	if (!userRow?.email || !isEmailAllowed(env, userRow.email)) {
 		throw new APIError('FORBIDDEN', {
