@@ -15,6 +15,9 @@ type Env = {
 	GOOGLE_CLIENT_SECRET?: string;
 	BETTER_AUTH_SECRET?: string;
 	BETTER_AUTH_URL?: string;
+	// Auth mode (ADR 0025)
+	AUTH_MODE?: string; // 'restricted' | 'public'
+	PUBLIC_SIGNUP_ENABLED?: string; // kill switch ('0' = disabled)
 	// Allowlist (ADR 0001)
 	ALLOWED_SUB?: string;
 	ALLOWED_EMAIL?: string;
