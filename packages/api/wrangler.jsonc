@@ -52,6 +52,7 @@
 	// - Preview/Production: Synced from Doppler at deploy time (see .github/workflows/)
 	"vars": {
 		"APP_ENV": "production",
+		"AUTH_MODE": "restricted",
 		"BETTER_AUTH_URL": "https://api.append.tindev.dev",
 		// AI Gateway configuration for OpenAI routing (Step 3)
 		"SUGGESTIONS_PROVIDER": "openai",
@@ -103,6 +104,7 @@
 			"name": "append-api-preview",
 			"vars": {
 				"APP_ENV": "preview",
+				"AUTH_MODE": "restricted",
 				"BETTER_AUTH_URL": "https://append-api-preview.tindotdev.workers.dev",
 				"SUGGESTIONS_PROVIDER": "stub",
 				"AI_GATEWAY_ID": "append-gateway-preview",
@@ -141,6 +143,7 @@
 			"name": "append-api",
 			"vars": {
 				"APP_ENV": "production",
+				"AUTH_MODE": "restricted",
 				"BETTER_AUTH_URL": "https://api.append.tindev.dev",
 				"SUGGESTIONS_PROVIDER": "openai",
 				"AI_GATEWAY_ID": "append-gateway",
@@ -177,6 +180,7 @@
 		"test": {
 			"vars": {
 				"APP_ENV": "test",
+				"AUTH_MODE": "restricted",
 				"ENABLE_TEST_EMAIL_PASSWORD_AUTH": "1",
 				"BETTER_AUTH_URL": "http://localhost:8787",
 				"BETTER_AUTH_SECRET": "test-secret-min-32-chars-for-cookie-signing",
