@@ -53,12 +53,6 @@ export const suggestionsRoutes = app.post('/batch/:id/suggest', vValidator('quer
 		return apiError(c, 503, 'SUGGESTIONS_DISABLED', 'Suggestions are temporarily disabled');
 	}
 
-	// Create LLM client (async due to Secrets Store)
-	const llm = await createLlmClient(c.env);
-	if (!llm) {
-		return apiError(c, 503, 'SERVICE_UNAVAILABLE', 'Suggestions are disabled');
-	}
-
 	// 2. Check if user is admin (for reserved pool access)
 	const isAdmin = await isUserAdmin(db, userId, c.env.ADMIN_SUB);
 
@@ -111,6 +105,14 @@ export const suggestionsRoutes = app.post('/batch/:id/suggest', vValidator('quer
 
 	if (userBuckets.length === 0) {
 		return apiError(c, 400, 'VALIDATION_ERROR', 'No buckets configured. Please add at least one bucket.');
+	}
+
+	// Create LLM client (async due to Secrets Store).
+	// Delay this until after preflight checks so quota/budget/circuit-breaker failures don't
+	// pay client init cost or fail early due to missing secrets.
+	const llm = await createLlmClient(c.env);
+	if (!llm) {
+		return apiError(c, 503, 'SERVICE_UNAVAILABLE', 'Suggestions are disabled');
 	}
 
 	// 7. Consume quota: user quota first, then global budget.
