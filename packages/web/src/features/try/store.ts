@@ -12,8 +12,47 @@ let revision = 0;
 
 let initState: 'uninitialized' | 'ready' = 'uninitialized';
 
+let storageCapability: boolean | null = null;
+let lastStorageRef: unknown = null;
+let didWarnPersistFailure = false;
+
 function canUseStorage() {
-	return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+	if (typeof window === 'undefined') return false;
+
+	let storageRef: unknown;
+	try {
+		storageRef = window.localStorage;
+	} catch {
+		storageCapability = false;
+		lastStorageRef = null;
+		return false;
+	}
+
+	if (storageCapability !== null && lastStorageRef === storageRef) return storageCapability;
+	lastStorageRef = storageRef;
+
+	try {
+		if (!storageRef || typeof storageRef !== 'object') {
+			storageCapability = false;
+			return false;
+		}
+
+		const storage = storageRef as Storage;
+		if (typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function' || typeof storage.removeItem !== 'function') {
+			storageCapability = false;
+			return false;
+		}
+
+		const probeKey = `${STORAGE_KEY}.probe`;
+		storage.setItem(probeKey, '1');
+		storage.removeItem(probeKey);
+
+		storageCapability = true;
+		return true;
+	} catch {
+		storageCapability = false;
+		return false;
+	}
 }
 
 function notify() {
@@ -39,7 +78,11 @@ function writeToStorage(state: TryState) {
 	try {
 		window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 	} catch (error) {
-		console.warn('[try-store] Failed to persist state to localStorage:', error);
+		storageCapability = false;
+		if (!didWarnPersistFailure) {
+			didWarnPersistFailure = true;
+			console.warn('[try-store] Failed to persist state to localStorage:', error);
+		}
 	}
 }
 
