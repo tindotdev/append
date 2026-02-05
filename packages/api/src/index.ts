@@ -10,6 +10,7 @@ import { dashboardRoutes } from './features/dashboard/routes';
 import { deviceTokenRoutes } from './features/device-tokens/routes';
 import { eventsRoutes } from './features/events/routes';
 import { exportRoutes } from './features/export/routes';
+import { guestRoutes } from './features/guest/routes';
 import { importRoutes } from './features/import/routes';
 import { suggestionsRoutes } from './features/suggestions/routes';
 import { termRoutes } from './features/term/routes';
@@ -385,6 +386,7 @@ const apiRoutes = app
 	.route('/api/dashboard', dashboardRoutes)
 	.route('/api/device-tokens', deviceTokenRoutes)
 	.route('/api/export', exportRoutes)
+	.route('/api/guest', guestRoutes)
 	.route('/api/import', importRoutes)
 	.route('/api', suggestionsRoutes)
 	.route('/api/term', termRoutes)

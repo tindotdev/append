@@ -19,6 +19,7 @@ Append is **WakaTime-for-learning**:
   - `PUBLIC_SIGNUP_ENABLED`: `0` | `1` (default: `1`). Kill switch for public mode account creation: when `0` and `AUTH_MODE=public`, new account sign-ups are disabled (recommended: set explicitly in production; flip to `0` for emergency shutoff).
   - Telemetry pairing gate (public mode): **device-token minting** is allowed when `TELEMETRY_PAIRING_ENABLED=1` **or** the signed-in Google sub is in `ALLOWED_TELEMETRY_SUBS` (comma-separated). Ingest is effectively gated by whether a device token can be minted.
 - Public demo: `/demo` route uses synthetic local events (no auth, no writes).
+- Public trial: `/try` route is local-only term capture + bucket browsing (seeded examples + user-created terms). Data stays in the browser until the user signs up, at which point trial terms are imported into their account and local trial data is cleared.
 - AI suggestions: term suggestions are bounded (3 lifetime + global budget) (ADR: `docs/adr/0026-term-suggestion-quotas-and-global-budget.md`).
 - Data retention: retain user-owned portfolio data + AI suggestions by default; hard delete on account deletion (ADR: `docs/adr/0027-data-retention-and-account-deletion.md`).
 - Web UI: Linear-style sidebar layout (ADR: `docs/adr/0015-web-ui-linear-sidebar-layout.md`).

@@ -58,6 +58,10 @@ export function SignInPage() {
 				<Link to="/demo" className="hover:text-foreground">
 					Try demo
 				</Link>
+				<span className="mx-2 text-border">•</span>
+				<Link to="/try" className="hover:text-foreground">
+					Try without account
+				</Link>
 			</p>
 		</div>
 	);
