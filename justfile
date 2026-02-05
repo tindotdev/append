@@ -24,6 +24,7 @@ sync-secrets:
   @echo 'ENABLE_TEST_EMAIL_PASSWORD_AUTH="1"' >> packages/api/.dev.vars
   @echo 'E2E_AUTH_EMAIL="tindejphachon@gmail.com"' >> packages/api/.dev.vars
   @echo 'GOOGLE_CLIENT_ID="888108815812-edd7uq5bo4isrl7uuh4dhsbr7df4jtl5.apps.googleusercontent.com"' >> packages/api/.dev.vars
+  @echo 'AUTH_MODE="public"' >> packages/api/.dev.vars
   @echo "✓ Secrets synced and local dev config applied"
 
 # First-time setup: install deps, sync secrets, run migrations
