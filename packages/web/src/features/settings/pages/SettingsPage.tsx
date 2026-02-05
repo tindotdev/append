@@ -2,6 +2,7 @@
  * Settings page with bucket manager.
  */
 
+import { AccountDeletionCard } from '@/components/account/AccountDeletionCard';
 import { BucketManager } from '../components/BucketManager';
 import { DeviceTokenManager } from '../components/DeviceTokenManager';
 
@@ -18,6 +19,7 @@ export function SettingsPage() {
 			<div className="space-y-4">
 				<BucketManager />
 				<DeviceTokenManager />
+				<AccountDeletionCard />
 			</div>
 		</div>
 	);

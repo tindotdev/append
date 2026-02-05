@@ -186,9 +186,9 @@ export function TermsPage() {
 				</CardHeader>
 				<CardContent className="space-y-4 text-sm text-muted-foreground leading-relaxed">
 					<p>
-						You may terminate your account at any time by requesting account deletion through the Service. We may terminate or suspend your
-						account and access to the Service immediately, without prior notice, for conduct that we believe violates these Terms or is harmful to
-						other users, us, or third parties.
+						You may terminate your account at any time by deleting your account through the Service (Settings → Delete account). We may terminate
+						or suspend your account and access to the Service immediately, without prior notice, for conduct that we believe violates these Terms
+						or is harmful to other users, us, or third parties.
 					</p>
 				</CardContent>
 			</Card>
