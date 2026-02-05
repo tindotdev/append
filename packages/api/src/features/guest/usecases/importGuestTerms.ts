@@ -20,80 +20,75 @@ export type ImportGuestTermsResult = {
 	skippedExistingCount: number;
 };
 
+type ImportGuestTermsResponse =
+	| { success: true; result: ImportGuestTermsResult; isReplay: boolean }
+	| { success: false; error: ImportGuestTermsError };
+
 function stableRequestString(input: ImportGuestTermsInput): string {
 	// Preserve client order; this is only used for conflict detection (same key, different payload).
 	return input.items.map((i) => `${i.term}\n${i.definition}\n${i.bucketSlug}\n${i.createdAtMs}\n${i.clientTermId}`).join('\n---\n');
 }
 
-export async function importGuestTerms(
+type BucketRow = { slug: string; id: string };
+async function fetchBucketSlugToId(
 	db: DrizzleD1Database<typeof schema>,
-	rawDb: D1Database,
 	userId: string,
-	input: ImportGuestTermsInput
-): Promise<{ success: true; result: ImportGuestTermsResult; isReplay: boolean } | { success: false; error: ImportGuestTermsError }> {
-	const requestHash = await sha256Hex(stableRequestString(input));
+	slugs: string[]
+): Promise<{ success: true; bucketSlugToId: Map<string, string> } | { success: false; error: ImportGuestTermsError }> {
+	if (slugs.length === 0) return { success: true, bucketSlugToId: new Map() };
 
-	const idem = await checkIdempotencyKey(db, userId, IDEMPOTENCY_SCOPE, input.clientRequestId, requestHash);
-	if (idem.status === 'replay') {
-		const decoded = decodeJsonResultRef<ImportGuestTermsResult>('guest_import_terms', idem.resultRef);
-		if (!decoded) {
-			return { success: false, error: { type: 'internal_error', message: 'Invalid idempotency result reference' } };
-		}
-		return { success: true, result: decoded, isReplay: true };
-	}
-
-	if (idem.status === 'conflict') {
-		return { success: false, error: { type: 'idempotency_conflict', message: 'clientRequestId was used with different request body' } };
-	}
-
-	const uniqueBucketSlugs = [...new Set(input.items.map((i) => i.bucketSlug))];
-	type BucketRow = { slug: string; id: string };
-	const bucketRows: BucketRow[] =
-		uniqueBucketSlugs.length > 0
-			? await db
-					.select({ slug: bucket.slug, id: bucket.id })
-					.from(bucket)
-					.where(
-						and(
-							eq(bucket.userId, userId),
-							sql`${bucket.slug} IN (${sql.join(
-								uniqueBucketSlugs.map((s) => sql`${s}`),
-								sql`, `
-							)})`
-						)
-					)
-			: [];
+	const bucketRows: BucketRow[] = await db
+		.select({ slug: bucket.slug, id: bucket.id })
+		.from(bucket)
+		.where(
+			and(
+				eq(bucket.userId, userId),
+				sql`${bucket.slug} IN (${sql.join(
+					slugs.map((s) => sql`${s}`),
+					sql`, `
+				)})`
+			)
+		);
 
 	const bucketSlugToId = new Map(bucketRows.map((b) => [b.slug, b.id]));
-	for (const slug of uniqueBucketSlugs) {
+	for (const slug of slugs) {
 		if (!bucketSlugToId.has(slug)) {
 			return { success: false, error: { type: 'invalid_bucket', slug, message: `Invalid bucket: '${slug}' does not exist` } };
 		}
 	}
 
-	const uniqueCanonicals = [...new Set(input.items.map((i) => i.canonical))];
-	type ExistingTermRow = { id: string; canonical: string };
-	const existingTerms: ExistingTermRow[] =
-		uniqueCanonicals.length > 0
-			? await db
-					.select({ id: term.id, canonical: term.canonical })
-					.from(term)
-					.where(
-						and(
-							eq(term.userId, userId),
-							sql`${term.canonical} IN (${sql.join(
-								uniqueCanonicals.map((c) => sql`${c}`),
-								sql`, `
-							)})`
-						)
-					)
-			: [];
+	return { success: true, bucketSlugToId };
+}
 
-	const existingCanonicalSet = new Set(existingTerms.map((t) => t.canonical));
+type ExistingTermRow = { id: string; canonical: string };
+async function fetchExistingCanonicalSet(db: DrizzleD1Database<typeof schema>, userId: string, canonicals: string[]): Promise<Set<string>> {
+	if (canonicals.length === 0) return new Set();
 
-	const now = new Date();
+	const existingTerms: ExistingTermRow[] = await db
+		.select({ id: term.id, canonical: term.canonical })
+		.from(term)
+		.where(
+			and(
+				eq(term.userId, userId),
+				sql`${term.canonical} IN (${sql.join(
+					canonicals.map((c) => sql`${c}`),
+					sql`, `
+				)})`
+			)
+		);
+
+	return new Set(existingTerms.map((t) => t.canonical));
+}
+
+function buildImportStatements(
+	db: DrizzleD1Database<typeof schema>,
+	rawDb: D1Database,
+	userId: string,
+	input: ImportGuestTermsInput,
+	bucketSlugToId: Map<string, string>,
+	existingCanonicalSet: Set<string>
+): { success: true; statements: D1PreparedStatement[]; result: ImportGuestTermsResult } | { success: false; error: ImportGuestTermsError } {
 	const statements: D1PreparedStatement[] = [];
-
 	let createdTermCount = 0;
 	let createdSenseCount = 0;
 	let skippedExistingCount = 0;
@@ -111,7 +106,6 @@ export async function importGuestTerms(
 		const termId = generateUUID();
 		const senseId = generateUUID();
 		const createdAt = new Date(item.createdAtMs);
-
 		const bucketId = bucketSlugToId.get(item.bucketSlug);
 		if (!bucketId) {
 			return { success: false, error: { type: 'internal_error', message: `Missing bucket id for slug '${item.bucketSlug}'` } };
@@ -153,13 +147,54 @@ export async function importGuestTerms(
 		createdSenseCount += 1;
 	}
 
-	const result: ImportGuestTermsResult = {
-		importedCount: input.items.length,
-		createdTermCount,
-		createdSenseCount,
-		skippedExistingCount,
+	return {
+		success: true,
+		statements,
+		result: {
+			importedCount: input.items.length,
+			createdTermCount,
+			createdSenseCount,
+			skippedExistingCount,
+		},
 	};
+}
 
+function isUniqueConstraintError(error: unknown): boolean {
+	return error instanceof Error && error.message.includes('UNIQUE constraint failed');
+}
+
+async function resolveIdempotencyRace(
+	db: DrizzleD1Database<typeof schema>,
+	userId: string,
+	clientRequestId: string,
+	requestHash: string
+): Promise<ImportGuestTermsResponse | null> {
+	const racedKey = await findIdempotencyKey(db, userId, IDEMPOTENCY_SCOPE, clientRequestId);
+	if (!racedKey) return null;
+
+	if (racedKey.requestHash !== requestHash) {
+		return {
+			success: false,
+			error: { type: 'idempotency_conflict', message: 'clientRequestId was used with different request body' },
+		};
+	}
+
+	const decoded = decodeJsonResultRef<ImportGuestTermsResult>('guest_import_terms', racedKey.resultRef);
+	if (!decoded) return null;
+
+	return { success: true, result: decoded, isReplay: true };
+}
+
+async function executeBatch(
+	db: DrizzleD1Database<typeof schema>,
+	rawDb: D1Database,
+	userId: string,
+	input: ImportGuestTermsInput,
+	requestHash: string,
+	now: Date,
+	statements: D1PreparedStatement[],
+	result: ImportGuestTermsResult
+): Promise<ImportGuestTermsResponse> {
 	const resultRef = encodeJsonResultRef('guest_import_terms', result);
 	const idemStmt = createIdempotencyKeyStatement(db, userId, IDEMPOTENCY_SCOPE, input.clientRequestId, requestHash, resultRef, {
 		createdAt: now,
@@ -172,21 +207,9 @@ export async function importGuestTerms(
 		return { success: true, result, isReplay: false };
 	} catch (error) {
 		// Handle race condition: idempotency key insert can fail due to PK conflict.
-		if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
-			const racedKey = await findIdempotencyKey(db, userId, IDEMPOTENCY_SCOPE, input.clientRequestId);
-			if (racedKey) {
-				if (racedKey.requestHash !== requestHash) {
-					return {
-						success: false,
-						error: { type: 'idempotency_conflict', message: 'clientRequestId was used with different request body' },
-					};
-				}
-
-				const decoded = decodeJsonResultRef<ImportGuestTermsResult>('guest_import_terms', racedKey.resultRef);
-				if (decoded) {
-					return { success: true, result: decoded, isReplay: true };
-				}
-			}
+		if (isUniqueConstraintError(error)) {
+			const raced = await resolveIdempotencyRace(db, userId, input.clientRequestId, requestHash);
+			if (raced) return raced;
 		}
 
 		console.error('[importGuestTerms] Import failed', {
@@ -197,4 +220,39 @@ export async function importGuestTerms(
 		});
 		return { success: false, error: { type: 'internal_error', message: 'Import failed' } };
 	}
+}
+
+export async function importGuestTerms(
+	db: DrizzleD1Database<typeof schema>,
+	rawDb: D1Database,
+	userId: string,
+	input: ImportGuestTermsInput
+): Promise<ImportGuestTermsResponse> {
+	const requestHash = await sha256Hex(stableRequestString(input));
+
+	const idem = await checkIdempotencyKey(db, userId, IDEMPOTENCY_SCOPE, input.clientRequestId, requestHash);
+	if (idem.status === 'replay') {
+		const decoded = decodeJsonResultRef<ImportGuestTermsResult>('guest_import_terms', idem.resultRef);
+		if (!decoded) {
+			return { success: false, error: { type: 'internal_error', message: 'Invalid idempotency result reference' } };
+		}
+		return { success: true, result: decoded, isReplay: true };
+	}
+
+	if (idem.status === 'conflict') {
+		return { success: false, error: { type: 'idempotency_conflict', message: 'clientRequestId was used with different request body' } };
+	}
+
+	const uniqueBucketSlugs = [...new Set(input.items.map((i) => i.bucketSlug))];
+	const buckets = await fetchBucketSlugToId(db, userId, uniqueBucketSlugs);
+	if (!buckets.success) return buckets;
+
+	const uniqueCanonicals = [...new Set(input.items.map((i) => i.canonical))];
+	const existingCanonicalSet = await fetchExistingCanonicalSet(db, userId, uniqueCanonicals);
+
+	const now = new Date();
+	const built = buildImportStatements(db, rawDb, userId, input, buckets.bucketSlugToId, existingCanonicalSet);
+	if (!built.success) return built;
+	const { statements, result } = built;
+	return executeBatch(db, rawDb, userId, input, requestHash, now, statements, result);
 }
