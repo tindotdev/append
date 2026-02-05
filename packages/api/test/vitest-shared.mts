@@ -56,6 +56,9 @@ export function getCommonTestBindings(migrations: any) {
 		E2E_AUTH_SECRET: 'test-e2e-secret-min-32-chars-for-hmac',
 		E2E_AUTH_EMAIL: 'test+a@example.com',
 
+		// Admin sub for quota tests (ADR 0026)
+		ADMIN_SUB: 'test-admin-google-sub-123',
+
 		// D1 migrations
 		TEST_MIGRATIONS: migrations,
 	} as const;
