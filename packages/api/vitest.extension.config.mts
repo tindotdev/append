@@ -10,6 +10,8 @@ export default defineWorkersConfig({
 		exclude: ['**/node_modules/**'],
 		poolOptions: {
 			workers: {
+				// Keep all bindings local in tests (avoid remote proxy sessions).
+				remoteBindings: false,
 				wrangler: {
 					configPath: './wrangler.jsonc',
 					environment: 'test',

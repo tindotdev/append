@@ -17,6 +17,28 @@ export function setupXdgConfig(): void {
 	const xdgConfigHome = resolve(process.cwd(), '..', '..', 'tmp', 'xdg-config');
 	mkdirSync(xdgConfigHome, { recursive: true });
 	process.env.XDG_CONFIG_HOME = xdgConfigHome;
+
+	// This repo runs in a workspace-limited sandbox where writing to `$HOME` is
+	// disallowed. Wrangler/Miniflare may use XDG data/cache/state directories for
+	// local persistence (including D1). Point all XDG roots at writable paths.
+	const xdgDataHome = resolve(process.cwd(), '..', '..', 'tmp', 'xdg-data');
+	const xdgCacheHome = resolve(process.cwd(), '..', '..', 'tmp', 'xdg-cache');
+	const xdgStateHome = resolve(process.cwd(), '..', '..', 'tmp', 'xdg-state');
+	mkdirSync(xdgDataHome, { recursive: true });
+	mkdirSync(xdgCacheHome, { recursive: true });
+	mkdirSync(xdgStateHome, { recursive: true });
+	process.env.XDG_DATA_HOME = xdgDataHome;
+	process.env.XDG_CACHE_HOME = xdgCacheHome;
+	process.env.XDG_STATE_HOME = xdgStateHome;
+
+	// Miniflare uses the OS temp directory for local persistence when no explicit
+	// persist root is configured. In this environment, `/tmp` is tmpfs, which can
+	// trigger workerd sqlite `SQLITE_CANTOPEN`. Point temp at a workspace path.
+	const testTmpDir = resolve(process.cwd(), '..', '..', 'tmp', 'miniflare-tmp');
+	mkdirSync(testTmpDir, { recursive: true });
+	process.env.TMPDIR = testTmpDir;
+	process.env.TMP = testTmpDir;
+	process.env.TEMP = testTmpDir;
 }
 
 /**
@@ -33,6 +55,8 @@ export function setupXdgConfig(): void {
  */
 export function getCommonTestBindings(migrations: any) {
 	return {
+		APP_ENV: 'test',
+
 		// Auth configuration
 		ENABLE_TEST_EMAIL_PASSWORD_AUTH: '1',
 		BETTER_AUTH_URL: 'http://localhost:8787',

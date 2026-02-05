@@ -9,6 +9,8 @@ export default defineWorkersConfig({
 		exclude: ['**/*.preview.spec.ts', '**/*.extension.spec.ts', '**/node_modules/**'],
 		poolOptions: {
 			workers: {
+				// Keep all bindings local in tests (avoid remote proxy sessions).
+				remoteBindings: false,
 				wrangler: {
 					configPath: './wrangler.jsonc',
 					environment: 'test', // Use test environment with email/password auth (§5.2)
