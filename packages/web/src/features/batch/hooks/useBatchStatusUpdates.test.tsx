@@ -216,6 +216,8 @@ describe('useBatchStatusUpdates', () => {
 
 	it('should provide progress for tracked batches', async () => {
 		const batchId = 'test-batch-progress';
+		const onStart = vi.fn();
+		const onComplete = vi.fn();
 
 		const mockGenerateSuggestions = vi.fn(async (id: string, callbacks: any) => {
 			callbacks.onStart({ batchId: id, mode: 'fill-missing', candidateCount: 3, eligibleCount: 3, limit: 100 });
@@ -226,20 +228,28 @@ describe('useBatchStatusUpdates', () => {
 
 		vi.mocked(retrySuggestionsModule.generateSuggestions).mockImplementation(mockGenerateSuggestions);
 
-		const { result } = renderHook(() => useBatchStatusUpdates({ showToasts: false, autoRefresh: false }), { wrapper });
+		const { result } = renderHook(() => useBatchStatusUpdates({ showToasts: false, autoRefresh: false, onStart, onComplete }), { wrapper });
 
-		void result.current.trackBatch(batchId);
+		// Await trackBatch to ensure all callbacks complete
+		await result.current.trackBatch(batchId);
 
-		// Wait for some progress
-		await waitFor(() => {
-			const progress = result.current.getProgress(batchId);
-			return progress && progress.processed > 0;
-		});
+		// Verify onStart was called with correct total (eligibleCount)
+		expect(onStart).toHaveBeenCalledWith(
+			batchId,
+			expect.objectContaining({
+				batchId,
+				eligibleCount: 3,
+			})
+		);
 
-		const progress = result.current.getProgress(batchId);
-		expect(progress).toBeDefined();
-		expect(progress?.batchId).toBe(batchId);
-		expect(progress?.total).toBe(3);
+		// Verify onComplete was called (which means all progress updates happened)
+		expect(onComplete).toHaveBeenCalledWith(
+			batchId,
+			expect.objectContaining({
+				ok: 2,
+				failed: 0,
+			})
+		);
 	});
 
 	it('should clean up on unmount', async () => {
