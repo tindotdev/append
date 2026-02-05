@@ -41,6 +41,12 @@
 		"pnpm": ">=9"
 	},
 	"pnpm": {
+		"onlyBuiltDependencies": [
+			"esbuild",
+			"sharp",
+			"unrs-resolver",
+			"workerd"
+		],
 		"peerDependencyRules": {
 			"ignoreMissing": [
 				"vitest"

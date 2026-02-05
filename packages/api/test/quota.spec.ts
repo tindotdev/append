@@ -140,7 +140,7 @@ afterEach(async () => {
 
 describe('per-user suggestion quota', () => {
 	it('allows requests within quota limit', async () => {
-		const authCookie = await getAuthCookie('quota-test-1@example.com', 'test-pass', 'Quota Test 1');
+		const authCookie = await getAuthCookie('test+quota-test-1@example.com', 'test-pass', 'Quota Test 1');
 		const batchId = await createBatch(authCookie);
 
 		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
@@ -155,7 +155,7 @@ describe('per-user suggestion quota', () => {
 	});
 
 	it('increments user quota after successful request', async () => {
-		const { cookie: authCookie, userId } = await getAuthCookieAndUserId('quota-test-2@example.com', 'test-pass', 'Quota Test 2');
+		const { cookie: authCookie, userId } = await getAuthCookieAndUserId('test+quota-test-2@example.com', 'test-pass', 'Quota Test 2');
 		const batchId = await createBatch(authCookie);
 
 		// Make a suggestion request
@@ -175,7 +175,7 @@ describe('per-user suggestion quota', () => {
 	});
 
 	it('returns 429 when user quota is exhausted', async () => {
-		const { cookie: authCookie, userId } = await getAuthCookieAndUserId('quota-test-3@example.com', 'test-pass', 'Quota Test 3');
+		const { cookie: authCookie, userId } = await getAuthCookieAndUserId('test+quota-test-3@example.com', 'test-pass', 'Quota Test 3');
 
 		// Exhaust user quota (set to max)
 		await db.insert(userSuggestionQuota).values({
@@ -200,7 +200,7 @@ describe('per-user suggestion quota', () => {
 	});
 
 	it('tracks quota correctly across multiple requests', async () => {
-		const { cookie: authCookie, userId } = await getAuthCookieAndUserId('quota-test-4@example.com', 'test-pass', 'Quota Test 4');
+		const { cookie: authCookie, userId } = await getAuthCookieAndUserId('test+quota-test-4@example.com', 'test-pass', 'Quota Test 4');
 
 		// Make first request
 		const batchId1 = await createBatch(authCookie);
@@ -254,7 +254,7 @@ describe('per-user suggestion quota', () => {
 
 describe('global budget pool', () => {
 	it('increments shared pool counter on successful request', async () => {
-		const authCookie = await getAuthCookie('budget-test-1@example.com', 'test-pass', 'Budget Test 1');
+		const authCookie = await getAuthCookie('test+budget-test-1@example.com', 'test-pass', 'Budget Test 1');
 		const batchId = await createBatch(authCookie);
 
 		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
@@ -277,7 +277,7 @@ describe('global budget pool', () => {
 			.set({ sharedUsedCount: 100 }) // Max shared limit
 			.where(eq(llmBudget.feature, FEATURE_TERM_SUGGESTION));
 
-		const authCookie = await getAuthCookie('budget-test-2@example.com', 'test-pass', 'Budget Test 2');
+		const authCookie = await getAuthCookie('test+budget-test-2@example.com', 'test-pass', 'Budget Test 2');
 		const batchId = await createBatch(authCookie);
 
 		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
@@ -296,7 +296,7 @@ describe('global budget pool', () => {
 		const futureTime = Date.now() + 60 * 60 * 1000; // 1 hour from now
 		await db.update(llmBudget).set({ disabledUntilMs: futureTime }).where(eq(llmBudget.feature, FEATURE_TERM_SUGGESTION));
 
-		const authCookie = await getAuthCookie('budget-test-3@example.com', 'test-pass', 'Budget Test 3');
+		const authCookie = await getAuthCookie('test+budget-test-3@example.com', 'test-pass', 'Budget Test 3');
 		const batchId = await createBatch(authCookie);
 
 		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
@@ -320,7 +320,7 @@ describe('global budget pool', () => {
 		// Create admin user with Google account linked
 		// ADMIN_SUB is pre-configured in vitest-shared.mts as 'test-admin-google-sub-123'
 		const adminSub = 'test-admin-google-sub-123';
-		const { cookie: authCookie, userId } = await getAuthCookieAndUserId('admin-test@example.com', 'test-pass', 'Admin Test');
+		const { cookie: authCookie, userId } = await getAuthCookieAndUserId('test+admin-test@example.com', 'test-pass', 'Admin Test');
 
 		// Link Google account to user with matching adminSub
 		await db.insert(account).values({
@@ -357,7 +357,7 @@ describe('global budget pool', () => {
 	});
 
 	it('handles concurrent requests without bypassing quota limit', async () => {
-		const { cookie: authCookie, userId } = await getAuthCookieAndUserId('concurrent-test@example.com', 'test-pass', 'Concurrent Test');
+		const { cookie: authCookie, userId } = await getAuthCookieAndUserId('test+concurrent-test@example.com', 'test-pass', 'Concurrent Test');
 
 		// Pre-set user quota to 2/3 used
 		await db.insert(userSuggestionQuota).values({
@@ -437,7 +437,7 @@ describe('global budget pool', () => {
 				.where(eq(llmBudget.feature, FEATURE_TERM_SUGGESTION));
 
 			// Make a request in current month (February 2026)
-			const authCookie = await getAuthCookie('window-test@example.com', 'test-pass', 'Window Test');
+			const authCookie = await getAuthCookie('test+window-test@example.com', 'test-pass', 'Window Test');
 			const batchId = await createBatch(authCookie);
 
 			const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
@@ -480,7 +480,7 @@ describe('suggestions kill switch', () => {
 		// Actual kill switch behavior is tested via env var in wrangler.jsonc for test env.
 
 		// For now, just verify the route exists and works when enabled
-		const authCookie = await getAuthCookie('killswitch-test@example.com', 'test-pass', 'Killswitch Test');
+		const authCookie = await getAuthCookie('test+killswitch-test@example.com', 'test-pass', 'Killswitch Test');
 		const batchId = await createBatch(authCookie);
 
 		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {

@@ -589,6 +589,27 @@ For preview builds to call the correct API, `VITE_API_URL` must be set in **both
 
 **Recommended**: After merging the preview workflow to main, disable Cloudflare's automatic Git integration (Settings → Builds & deployments → Disconnect Git) to use only GitHub Actions for deployments.
 
+### Web security headers (Cloudflare Pages)
+
+The web app sets security headers via Cloudflare Pages’ `_headers` file:
+
+- Source file: `packages/web/public/_headers` (Vite copies this into the build output root)
+- Applies to: all routes (`/*`)
+
+Current baseline includes:
+
+- Clickjacking protection: `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`
+- MIME sniffing protection: `X-Content-Type-Options: nosniff`
+- Referrer policy: `Referrer-Policy: strict-origin-when-cross-origin`
+- Feature restrictions: `Permissions-Policy: …=()`
+- CSP (enforced): blocks plugins (`object-src 'none'`), restricts base URL (`base-uri 'self'`), and limits script execution to same-origin (`script-src 'self'`)
+
+**CSP tightening plan** (when we have the production origins nailed down):
+
+1. Replace broad `connect-src https: wss:` with explicit API + websocket origins (e.g. the `VITE_API_URL` origin and any preview origins needed).
+2. Remove `style-src 'unsafe-inline'` once we’ve confirmed we don’t rely on inline styles (or move to `style-src-attr 'unsafe-inline'` + `style-src-elem 'self'`).
+3. Consider adding COOP/COEP/CORP only after verifying OAuth / cross-site cookie flows still work in preview and production.
+
 </details>
 
 ## Developer checks (local)
