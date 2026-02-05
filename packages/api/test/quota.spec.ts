@@ -12,7 +12,7 @@ import { env, SELF } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { batch, candidate, idempotencyKey, llmBudget, schema, suggestionCache, userSuggestionQuota } from '../src/db';
+import { account, batch, candidate, idempotencyKey, llmBudget, schema, suggestionCache, userSuggestionQuota } from '../src/db';
 import { FEATURE_TERM_SUGGESTION, getUtcMonthWindow } from '../src/shared/quota';
 import { generateTerms, generateUUID, getAuthCookie, getAuthCookieAndUserId } from './helpers';
 import { applyMigrations } from './setup';
@@ -308,6 +308,155 @@ describe('global budget pool', () => {
 		const body = (await res.json()) as any;
 		expect(body.error.code).toBe('SERVICE_UNAVAILABLE');
 		expect(body.details.retry_after).toBeDefined();
+	});
+
+	it('allows admin to fall back to reserved pool when shared is exhausted', async () => {
+		// Exhaust shared pool
+		await db
+			.update(llmBudget)
+			.set({ sharedUsedCount: 100 }) // Max shared limit
+			.where(eq(llmBudget.feature, FEATURE_TERM_SUGGESTION));
+
+		// Create admin user with Google account
+		const adminSub = 'test-admin-google-sub-123';
+		const { cookie: authCookie, userId } = await getAuthCookieAndUserId('admin-test@example.com', 'test-pass', 'Admin Test');
+
+		// Link Google account to user
+		await db.insert(account).values({
+			id: generateUUID(),
+			accountId: adminSub,
+			providerId: 'google',
+			userId,
+			accessToken: null,
+			refreshToken: null,
+			idToken: null,
+			accessTokenExpiresAt: null,
+			refreshTokenExpiresAt: null,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+
+		// Set ADMIN_SUB env var (mock it by patching env object)
+		const originalAdminSub = env.ADMIN_SUB;
+		env.ADMIN_SUB = adminSub;
+
+		try {
+			const batchId = await createBatch(authCookie);
+
+			const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
+				method: 'POST',
+				headers: { cookie: authCookie },
+			});
+
+			expect(res.status).toBe(200);
+			await res.text(); // Consume response
+
+			// Verify reserved pool was used
+			const budget = await db.query.llmBudget.findFirst({
+				where: eq(llmBudget.feature, FEATURE_TERM_SUGGESTION),
+			});
+
+			expect(budget?.sharedUsedCount).toBe(100); // Should remain at max
+			expect(budget?.reservedUsedCount).toBe(1); // Should increment
+		} finally {
+			// Restore original value
+			env.ADMIN_SUB = originalAdminSub;
+		}
+	});
+
+	it('handles concurrent requests without bypassing quota limit', async () => {
+		const { cookie: authCookie, userId } = await getAuthCookieAndUserId('concurrent-test@example.com', 'test-pass', 'Concurrent Test');
+
+		// Pre-set user quota to 2/3 used
+		await db.insert(userSuggestionQuota).values({
+			userId,
+			lifetimeUsedCount: 2,
+			createdAtMs: Date.now(),
+			updatedAtMs: Date.now(),
+		});
+
+		// Create 5 batches
+		const batchIds = await Promise.all([
+			createBatch(authCookie),
+			createBatch(authCookie),
+			createBatch(authCookie),
+			createBatch(authCookie),
+			createBatch(authCookie),
+		]);
+
+		// Fire 5 parallel requests
+		const results = await Promise.all(
+			batchIds.map((batchId) =>
+				SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
+					method: 'POST',
+					headers: { cookie: authCookie },
+				})
+			)
+		);
+
+		// Count successes and failures
+		const statuses = await Promise.all(
+			results.map(async (res) => {
+				const status = res.status;
+				await res.text(); // Consume response
+				return status;
+			})
+		);
+
+		const successCount = statuses.filter((s) => s === 200).length;
+		const failureCount = statuses.filter((s) => s === 429).length;
+
+		// Exactly 1 should succeed (bringing total to 3/3), 4 should fail
+		expect(successCount).toBe(1);
+		expect(failureCount).toBe(4);
+
+		// Verify final quota is exactly 3
+		const quota = await db.query.userSuggestionQuota.findFirst({
+			where: eq(userSuggestionQuota.userId, userId),
+		});
+		expect(quota?.lifetimeUsedCount).toBe(3);
+	});
+
+	it('resets budget counters when monthly window rotates', async () => {
+		// Set window to last month (January 2026)
+		const jan1_2026 = Date.UTC(2026, 0, 1, 0, 0, 0, 0);
+		const jan_windowMs = 31 * 24 * 60 * 60 * 1000; // January has 31 days
+
+		// Set budget with old window and exhausted shared pool
+		await db
+			.update(llmBudget)
+			.set({
+				windowStartMs: jan1_2026,
+				windowMs: jan_windowMs,
+				sharedUsedCount: 100, // Exhausted
+				reservedUsedCount: 50,
+			})
+			.where(eq(llmBudget.feature, FEATURE_TERM_SUGGESTION));
+
+		// Make a request in current month (February 2026)
+		const authCookie = await getAuthCookie('window-test@example.com', 'test-pass', 'Window Test');
+		const batchId = await createBatch(authCookie);
+
+		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
+			method: 'POST',
+			headers: { cookie: authCookie },
+		});
+
+		expect(res.status).toBe(200);
+		await res.text(); // Consume response
+
+		// Verify window was rotated and counter reset
+		const budget = await db.query.llmBudget.findFirst({
+			where: eq(llmBudget.feature, FEATURE_TERM_SUGGESTION),
+		});
+
+		// Window should be updated to February 2026
+		const feb1_2026 = Date.UTC(2026, 1, 1, 0, 0, 0, 0);
+		expect(budget?.windowStartMs).toBe(feb1_2026);
+
+		// Counters should be reset and new request should be counted
+		expect(budget?.sharedUsedCount).toBe(1); // Not 101!
+		expect(budget?.reservedUsedCount).toBe(0); // Reset
 	});
 });
 
