@@ -245,6 +245,16 @@ export async function consumeGlobalBudget(db: DrizzleD1Database<typeof schema>, 
 		status = buildStatus(finalBudget, nowMs);
 	}
 
+	console.warn('[quota] Global budget exhausted', {
+		feature: FEATURE_TERM_SUGGESTION,
+		isAdmin,
+		sharedUsed: status.sharedUsed,
+		sharedLimit: status.sharedLimit,
+		reservedUsed: status.reservedUsed,
+		reservedLimit: status.reservedLimit,
+		resetAt: status.resetAt,
+	});
+
 	return { ok: false, error: 'budget_exhausted', status };
 }
 
@@ -255,6 +265,13 @@ export async function consumeGlobalBudget(db: DrizzleD1Database<typeof schema>, 
 export async function tripCircuitBreaker(db: DrizzleD1Database<typeof schema>): Promise<void> {
 	const nowMs = Date.now();
 	const disabledUntilMs = nowMs + CIRCUIT_BREAKER_DURATION_MS;
+
+	console.warn('[quota] Circuit breaker tripped', {
+		feature: FEATURE_TERM_SUGGESTION,
+		disabledUntilMs,
+		disabledUntilIso: new Date(disabledUntilMs).toISOString(),
+		durationMs: CIRCUIT_BREAKER_DURATION_MS,
+	});
 
 	await db
 		.update(llmBudget)
@@ -281,7 +298,7 @@ export async function resetCircuitBreaker(db: DrizzleD1Database<typeof schema>):
 }
 
 /**
- * Get current budget status (read-only, no side effects except window rotation).
+ * Get current budget status. May trigger window rotation if expired, which resets counters.
  */
 export async function getGlobalBudgetStatus(db: DrizzleD1Database<typeof schema>): Promise<BudgetStatus> {
 	const nowMs = Date.now();
