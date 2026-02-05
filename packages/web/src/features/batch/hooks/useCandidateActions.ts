@@ -15,6 +15,92 @@ function updateBatchCandidate(batch: BatchResponse | null, candidate: Candidate)
 	};
 }
 
+type BulkAcceptCounts = {
+	successCount: number;
+	failedCount: number;
+	alreadyAcceptedCount: number;
+	versionConflictCount: number;
+};
+
+async function acceptCandidateAndUpdateBatch(
+	candidate: Candidate,
+	setBatch: React.Dispatch<React.SetStateAction<BatchResponse | null>>
+): Promise<{ ok: true } | { ok: false; error: unknown }> {
+	try {
+		const result = await acceptCandidate(candidate.id, candidate.version);
+		setBatch((prev) => {
+			if (!prev) return prev;
+			return {
+				...prev,
+				candidates: prev.candidates.map((c) =>
+					c.id === candidate.id
+						? {
+								...c,
+								status: 'accepted',
+								materializedTermId: result.termId,
+								materializedTermSenseId: result.termSenseId,
+								version: result.candidate.version,
+							}
+						: c
+				),
+			};
+		});
+		return { ok: true };
+	} catch (error) {
+		return { ok: false, error };
+	}
+}
+
+function trackBulkAcceptError(error: unknown, counts: BulkAcceptCounts): void {
+	handleApiError(error, {
+		onConflict: (code) => {
+			if (code === 'ALREADY_ACCEPTED') {
+				counts.alreadyAcceptedCount += 1;
+			} else if (code === 'VERSION_CONFLICT') {
+				counts.versionConflictCount += 1;
+			}
+		},
+		onDefault: () => {
+			// Other errors - no specific tracking
+		},
+	});
+}
+
+async function showBulkAcceptToast(counts: BulkAcceptCounts, totalSelected: number, fetchBatch: () => Promise<void>): Promise<void> {
+	if (counts.failedCount === totalSelected) {
+		if (counts.alreadyAcceptedCount === counts.failedCount) {
+			toast.info('All selected candidates were already accepted.');
+		} else if (counts.versionConflictCount > 0) {
+			toast.error(`All accepts failed (${counts.versionConflictCount} version conflicts). Please refresh.`);
+		} else {
+			toast.error('All accepts failed. Please try again.');
+		}
+		return;
+	}
+
+	if (counts.failedCount > 0) {
+		const errorDetails: string[] = [];
+		if (counts.alreadyAcceptedCount > 0) {
+			errorDetails.push(`${counts.alreadyAcceptedCount} already accepted`);
+		}
+		if (counts.versionConflictCount > 0) {
+			errorDetails.push(`${counts.versionConflictCount} version conflicts`);
+		}
+		const otherErrors = counts.failedCount - counts.alreadyAcceptedCount - counts.versionConflictCount;
+		if (otherErrors > 0) {
+			errorDetails.push(`${otherErrors} other errors`);
+		}
+
+		toast.warning(`Accepted ${counts.successCount}, ${counts.failedCount} failed (${errorDetails.join(', ')})`);
+		if (counts.versionConflictCount > 0) {
+			await fetchBatch();
+		}
+		return;
+	}
+
+	toast.success(`Accepted ${counts.successCount} terms`);
+}
+
 export function useCandidateActions(
 	batch: BatchResponse | null,
 	setBatch: React.Dispatch<React.SetStateAction<BatchResponse | null>>,
@@ -89,84 +175,27 @@ export function useCandidateActions(
 			if (selectedCandidates.length === 0) return;
 
 			setIsBulkAccepting(true);
-			let successCount = 0;
-			let failedCount = 0;
-			let alreadyAcceptedCount = 0;
-			let versionConflictCount = 0;
+			const counts: BulkAcceptCounts = {
+				successCount: 0,
+				failedCount: 0,
+				alreadyAcceptedCount: 0,
+				versionConflictCount: 0,
+			};
 
 			for (const candidate of selectedCandidates) {
-				try {
-					const result = await acceptCandidate(candidate.id, candidate.version);
-
-					setBatch((prev) => {
-						if (!prev) return prev;
-						return {
-							...prev,
-							candidates: prev.candidates.map((c) =>
-								c.id === candidate.id
-									? {
-											...c,
-											status: 'accepted',
-											materializedTermId: result.termId,
-											materializedTermSenseId: result.termSenseId,
-											version: result.candidate.version,
-										}
-									: c
-							),
-						};
-					});
-
-					successCount++;
-				} catch (err) {
-					failedCount++;
-
-					// Track specific error types
-					handleApiError(err, {
-						onConflict: (code) => {
-							if (code === 'ALREADY_ACCEPTED') {
-								alreadyAcceptedCount++;
-							} else if (code === 'VERSION_CONFLICT') {
-								versionConflictCount++;
-							}
-						},
-						onDefault: () => {
-							// Other errors - no specific tracking
-						},
-					});
+				const outcome = await acceptCandidateAndUpdateBatch(candidate, setBatch);
+				if (outcome.ok) {
+					counts.successCount += 1;
+					continue;
 				}
+				counts.failedCount += 1;
+				trackBulkAcceptError(outcome.error, counts);
 			}
 
 			setRowSelection({});
 			setIsBulkAccepting(false);
 
-			// Provide detailed feedback based on error types
-			if (failedCount === selectedCandidates.length) {
-				if (alreadyAcceptedCount === failedCount) {
-					toast.info('All selected candidates were already accepted.');
-				} else if (versionConflictCount > 0) {
-					toast.error(`All accepts failed (${versionConflictCount} version conflicts). Please refresh.`);
-				} else {
-					toast.error('All accepts failed. Please try again.');
-				}
-			} else if (failedCount > 0) {
-				const errorDetails: string[] = [];
-				if (alreadyAcceptedCount > 0) {
-					errorDetails.push(`${alreadyAcceptedCount} already accepted`);
-				}
-				if (versionConflictCount > 0) {
-					errorDetails.push(`${versionConflictCount} version conflicts`);
-				}
-				const otherErrors = failedCount - alreadyAcceptedCount - versionConflictCount;
-				if (otherErrors > 0) {
-					errorDetails.push(`${otherErrors} other errors`);
-				}
-				toast.warning(`Accepted ${successCount}, ${failedCount} failed (${errorDetails.join(', ')})`);
-				if (versionConflictCount > 0) {
-					fetchBatch();
-				}
-			} else {
-				toast.success(`Accepted ${successCount} terms`);
-			}
+			await showBulkAcceptToast(counts, selectedCandidates.length, fetchBatch);
 		},
 		[batch, setBatch, fetchBatch]
 	);

@@ -179,6 +179,36 @@ export async function accountCreateBeforeHook(env: Env, db: AccountCreateDb, acc
 	}
 }
 
+async function userCreateBeforeHook(env: Env, user: { email?: string | null }): Promise<void> {
+	// Public mode (ADR 0025): allow any user with an email.
+	if (env.AUTH_MODE === 'public') {
+		assertPublicSignupEnabledOrThrow(env);
+		if (!user.email) {
+			throw new APIError('FORBIDDEN', {
+				message: 'Access denied: email not provided',
+			});
+		}
+		return;
+	}
+
+	// Restricted mode (default): enforce allowlist (ADR 0001)
+	assertAllowlistConfigured(env);
+	if (!user.email) {
+		throw new APIError('FORBIDDEN', {
+			message: 'Access denied: email not provided',
+		});
+	}
+
+	// For first sign-in, we only have email (sub is in account, created after)
+	// If ALLOWED_SUB is set, we defer to account.create hook
+	// If only ALLOWED_EMAIL is set, check here
+	if (!env.ALLOWED_SUB && env.ALLOWED_EMAIL && !isUserAllowed(env, user.email)) {
+		throw new APIError('FORBIDDEN', {
+			message: 'Access denied: not on allowlist',
+		});
+	}
+}
+
 /**
  * Check if email/password auth should be enabled.
  * Only allowed in test environment with localhost URL.
@@ -253,37 +283,7 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 					// Check on user creation (first sign-in)
 					user: {
 						create: {
-							before: async (user) => {
-								// Public mode (ADR 0025): allow any user with an email
-								if (env.AUTH_MODE === 'public') {
-									assertPublicSignupEnabledOrThrow(env);
-									if (!user.email) {
-										throw new APIError('FORBIDDEN', {
-											message: 'Access denied: email not provided',
-										});
-									}
-									return;
-								}
-
-								// Restricted mode (default): enforce allowlist (ADR 0001)
-								assertAllowlistConfigured(env);
-								if (!user.email) {
-									throw new APIError('FORBIDDEN', {
-										message: 'Access denied: email not provided',
-									});
-								}
-
-								// For first sign-in, we only have email (sub is in account, created after)
-								// If ALLOWED_SUB is set, we defer to account.create hook
-								// If only ALLOWED_EMAIL is set, check here
-								if (!env.ALLOWED_SUB && env.ALLOWED_EMAIL) {
-									if (!isUserAllowed(env, user.email)) {
-										throw new APIError('FORBIDDEN', {
-											message: 'Access denied: not on allowlist',
-										});
-									}
-								}
-							},
+							before: async (user) => userCreateBeforeHook(env, user),
 							// Seed default buckets after user creation (Phase 5B)
 							after: async (user) => {
 								try {
@@ -316,7 +316,6 @@ function createAuth(env?: Env, cf?: IncomingRequestCfProperties) {
 					// Check sub on account creation (for ALLOWED_SUB)
 					account: {
 						create: {
-							// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-provider allowlist checks
 							before: async (account) => {
 								await accountCreateBeforeHook(env, db as unknown as AccountCreateDb, account as AccountCreateRow);
 							},

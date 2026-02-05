@@ -19,6 +19,17 @@ export interface FetchEventsResult {
 	scanned: number;
 }
 
+type EventCursor = { emittedAt: Date; deviceId: string; eventId: string };
+
+function isRowAfterCursor(row: DbEventRow, cursor: EventCursor): boolean {
+	// Implement lexicographic comparison: (emittedAt, deviceId, eventId) > cursor
+	const rowMs = row.emittedAt.getTime();
+	const cursorMs = cursor.emittedAt.getTime();
+	if (rowMs !== cursorMs) return rowMs > cursorMs;
+	if (row.deviceId !== cursor.deviceId) return row.deviceId > cursor.deviceId;
+	return row.eventId > cursor.eventId;
+}
+
 /**
  * Fetch events with pagination, respecting scan limit.
  *
@@ -55,7 +66,7 @@ export async function fetchEventsPaged(
 	maxScan: number
 ): Promise<FetchEventsResult> {
 	const rows: DbEventRow[] = [];
-	let cursor: { emittedAt: Date; deviceId: string; eventId: string } | null = null;
+	let cursor: EventCursor | null = null;
 	let scanned = 0;
 
 	while (scanned < maxScan) {
@@ -107,18 +118,8 @@ export async function fetchEventsPaged(
 		// Filter out rows at or before cursor (removes duplicates from over-fetch)
 		let filtered = page;
 		if (cursor) {
-			// Capture cursor in a const to help TypeScript narrow the type
 			const currentCursor = cursor;
-			filtered = page.filter((r) => {
-				// Implement lexicographic comparison: (emittedAt, deviceId, eventId) > cursor
-				const rMs = r.emittedAt.getTime();
-				const cMs = currentCursor.emittedAt.getTime();
-				if (rMs > cMs) return true;
-				if (rMs < cMs) return false;
-				if (r.deviceId > currentCursor.deviceId) return true;
-				if (r.deviceId < currentCursor.deviceId) return false;
-				return r.eventId > currentCursor.eventId;
-			});
+			filtered = page.filter((r) => isRowAfterCursor(r, currentCursor));
 		}
 
 		if (filtered.length === 0) break;
