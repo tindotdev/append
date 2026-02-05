@@ -67,9 +67,9 @@ if [ "$SKIP_CONFIRMATION" != "1" ]; then
   echo "  3. Deploy API Worker to production"
   echo "  4. Deploy web app to production Pages"
   echo ""
-  read -p "Continue? (yes/no): " -r
+  read -p "Continue? (y/n): " -r
   echo ""
-  if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+  if [[ ! $REPLY =~ ^[Yy]([Ee][Ss])?$ ]]; then
     echo "Deployment cancelled"
     exit 0
   fi
