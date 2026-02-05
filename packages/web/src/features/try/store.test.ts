@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	clearTryState,
 	deleteTryTerm,
@@ -12,8 +12,27 @@ import {
 } from './store';
 
 describe('try store', () => {
+	const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
+
+	function setLocalStorage(descriptor: PropertyDescriptor) {
+		Object.defineProperty(window, 'localStorage', {
+			configurable: true,
+			...descriptor,
+		});
+	}
+
+	function restoreLocalStorage() {
+		if (!originalLocalStorageDescriptor) return;
+		Object.defineProperty(window, 'localStorage', originalLocalStorageDescriptor);
+	}
+
 	beforeEach(() => {
+		restoreLocalStorage();
 		clearTryState();
+	});
+
+	afterEach(() => {
+		restoreLocalStorage();
 	});
 
 	it('seeds state on first load', () => {
@@ -82,5 +101,50 @@ describe('try store', () => {
 		expect(getTryState().terms.length).toBe(beforeDelete - 1);
 		expect(getTryState().terms.find((t) => t.termId === term1.termId)).toBeUndefined();
 		expect(getTryState().terms.find((t) => t.termId === term2.termId)).toBeDefined();
+	});
+
+	it('does not warn when localStorage is present but unusable', () => {
+		setLocalStorage({ value: {} });
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+		expect(() => ensureTryReady()).not.toThrow();
+		expect(warn).not.toHaveBeenCalled();
+
+		warn.mockRestore();
+	});
+
+	it('does not warn when accessing localStorage throws', () => {
+		setLocalStorage({
+			get() {
+				throw new Error('blocked');
+			},
+		});
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+		expect(() => ensureTryReady()).not.toThrow();
+		expect(warn).not.toHaveBeenCalled();
+
+		warn.mockRestore();
+	});
+
+	it('warns at most once if persistence fails after probe', () => {
+		setLocalStorage({
+			value: {
+				getItem: () => null,
+				setItem: (key: string) => {
+					if (key.endsWith('.probe')) return;
+					throw new Error('quota');
+				},
+				removeItem: () => {},
+			} as unknown as Storage,
+		});
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+		ensureTryReady();
+		upsertTryTerm({ displayTerm: 'A', definition: 'B', bucket: 'backend' });
+		upsertTryTerm({ displayTerm: 'C', definition: 'D', bucket: 'backend' });
+
+		expect(warn).toHaveBeenCalledTimes(1);
+		warn.mockRestore();
 	});
 });
