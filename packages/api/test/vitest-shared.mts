@@ -49,6 +49,9 @@ export function getCommonTestBindings(migrations: any) {
 		// Provider stubs
 		SUGGESTIONS_PROVIDER: 'stub',
 
+		// Telemetry pairing gate (ADR 0025): bypass in tests for test user flexibility
+		TELEMETRY_PAIRING_ENABLED: '1',
+
 		// E2E Auth Bootstrap (ADR 0019)
 		E2E_AUTH_SECRET: 'test-e2e-secret-min-32-chars-for-hmac',
 		E2E_AUTH_EMAIL: 'test+a@example.com',
