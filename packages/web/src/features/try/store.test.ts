@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearTryState, ensureTryReady, getTryState, listTryBuckets, listTryTermsByBucket, resetTryToSeed, upsertTryTerm } from './store';
+import {
+	clearTryState,
+	deleteTryTerm,
+	ensureTryReady,
+	getTryState,
+	listTryBuckets,
+	listTryTermsByBucket,
+	moveTryTerm,
+	resetTryToSeed,
+	upsertTryTerm,
+} from './store';
 
 describe('try store', () => {
 	beforeEach(() => {
@@ -38,5 +48,39 @@ describe('try store', () => {
 		ensureTryReady();
 		const buckets = listTryBuckets();
 		expect(buckets[0]?.order).toBe(0);
+	});
+
+	it('moves term between buckets and increments versions', () => {
+		ensureTryReady();
+		const { term } = upsertTryTerm({ displayTerm: 'CRDT', definition: 'Conflict-free replicated data type', bucket: 'backend' });
+
+		const beforeMove = getTryState().terms.find((t) => t.termId === term.termId);
+		expect(beforeMove?.primarySense.bucket).toBe('backend');
+		const beforeTermVersion = beforeMove?.termVersion ?? 0;
+		const beforeSenseVersion = beforeMove?.primarySense.version ?? 0;
+
+		moveTryTerm(term.termId, 'frontend');
+
+		const afterMove = getTryState().terms.find((t) => t.termId === term.termId);
+		expect(afterMove?.primarySense.bucket).toBe('frontend');
+		expect(afterMove?.termVersion).toBe(beforeTermVersion + 1);
+		expect(afterMove?.primarySense.version).toBe(beforeSenseVersion + 1);
+	});
+
+	it('deletes term by termId', () => {
+		ensureTryReady();
+		resetTryToSeed();
+		const { term: term1 } = upsertTryTerm({ displayTerm: 'GraphQL', definition: 'Query language for APIs', bucket: 'backend' });
+		const { term: term2 } = upsertTryTerm({ displayTerm: 'REST', definition: 'Representational state transfer', bucket: 'backend' });
+
+		const beforeDelete = getTryState().terms.length;
+		expect(getTryState().terms.find((t) => t.termId === term1.termId)).toBeDefined();
+		expect(getTryState().terms.find((t) => t.termId === term2.termId)).toBeDefined();
+
+		deleteTryTerm(term1.termId);
+
+		expect(getTryState().terms.length).toBe(beforeDelete - 1);
+		expect(getTryState().terms.find((t) => t.termId === term1.termId)).toBeUndefined();
+		expect(getTryState().terms.find((t) => t.termId === term2.termId)).toBeDefined();
 	});
 });

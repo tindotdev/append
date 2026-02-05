@@ -38,8 +38,8 @@ function writeToStorage(state: TryState) {
 	if (!canUseStorage()) return;
 	try {
 		window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-	} catch {
-		// Ignore quota/storage errors. Trial mode should degrade gracefully.
+	} catch (error) {
+		console.warn('[try-store] Failed to persist state to localStorage:', error);
 	}
 }
 
@@ -186,8 +186,8 @@ export function clearTryState() {
 	if (canUseStorage()) {
 		try {
 			window.localStorage.removeItem(STORAGE_KEY);
-		} catch {
-			// ignore
+		} catch (error) {
+			console.warn('[try-store] Failed to clear localStorage:', error);
 		}
 	}
 	notify();
