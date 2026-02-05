@@ -74,6 +74,33 @@ describe('POST /api/guest/import-terms', () => {
 		expect(keys.length).toBe(1);
 	});
 
+	it('accepts schema-valid payloads larger than 64KB', async () => {
+		const clientRequestId = generateUUID();
+		const definition = 'x'.repeat(2000);
+		const itemCount = 40; // ~80KB of definition text alone, plus JSON overhead.
+		const payload = {
+			clientRequestId,
+			items: Array.from({ length: itemCount }, (_, i) => ({
+				clientTermId: generateUUID(),
+				term: `Large payload term ${i}`,
+				definition,
+				bucketSlug: 'backend',
+				createdAtMs: Date.now() - 60_000 - i * 1_000,
+			})),
+		};
+
+		const res = await authFetch('/api/guest/import-terms', {
+			method: 'POST',
+			cookie: authCookie,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(payload),
+		});
+		expect(res.status).toBe(201);
+		const body = (await res.json()) as any;
+		expect(body.createdTermCount).toBe(itemCount);
+		expect(body.createdSenseCount).toBe(itemCount);
+	});
+
 	it('dedupes canonicals within a single request (no 500, no FK failure)', async () => {
 		const clientRequestId = generateUUID();
 		const payload = {

@@ -14,9 +14,15 @@ import { ImportGuestTermsSchema, withCanonicals } from './validation/importGuest
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
+const IMPORT_GUEST_TERMS_MAX_BYTES = 512 * 1024; // Align with schema max payload size.
+
 export const guestRoutes = app.post(
 	'/import-terms',
-	bodyLimit({ maxSize: 64 * 1024, onError: (c) => apiError(c, 413, 'PAYLOAD_TOO_LARGE', 'Request body too large') }),
+	bodyLimit({
+		maxSize: IMPORT_GUEST_TERMS_MAX_BYTES,
+		onError: (c) =>
+			apiError(c, 413, 'PAYLOAD_TOO_LARGE', `Request body too large (max ${Math.floor(IMPORT_GUEST_TERMS_MAX_BYTES / 1024)}KB)`),
+	}),
 	vValidator('json', ImportGuestTermsSchema, validationHook),
 	async (c) => {
 		const userId = c.get('userId');
