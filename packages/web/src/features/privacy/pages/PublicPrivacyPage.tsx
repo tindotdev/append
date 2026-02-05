@@ -206,7 +206,7 @@ export function PublicPrivacyPage() {
 						</li>
 						<li className="flex items-start gap-2.5">
 							<span className="mt-1.5 size-1 rounded-full bg-muted-foreground/30 shrink-0" />
-							<span>Request deletion of your account and all associated data</span>
+							<span>Delete your account and all associated data (self-serve in Settings when signed in)</span>
 						</li>
 					</ul>
 

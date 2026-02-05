@@ -2,6 +2,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { deviceToken } from './db';
+import { accountRoutes } from './features/account/routes';
 // Feature routes (vertical slice architecture)
 import { batchRoutes } from './features/batch/routes';
 import { bucketRoutes } from './features/bucket/routes';
@@ -380,6 +381,7 @@ app.route('/events', eventsRoutes);
 // Feature routes (vertical slice architecture)
 // Chain routes for Hono RPC type inference
 const apiRoutes = app
+	.route('/api/account', accountRoutes)
 	.route('/api/batch', batchRoutes)
 	.route('/api/bucket', bucketRoutes)
 	.route('/api/candidate', candidateRoutes)
