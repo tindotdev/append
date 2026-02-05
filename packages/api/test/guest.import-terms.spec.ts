@@ -74,6 +74,95 @@ describe('POST /api/guest/import-terms', () => {
 		expect(keys.length).toBe(1);
 	});
 
+	it('dedupes canonicals within a single request (no 500, no FK failure)', async () => {
+		const clientRequestId = generateUUID();
+		const payload = {
+			clientRequestId,
+			items: [
+				{
+					clientTermId: generateUUID(),
+					term: 'CAP theorem',
+					definition: 'Consistency vs Availability under partitions',
+					bucketSlug: 'deep-concepts',
+					createdAtMs: Date.now() - 60_000,
+				},
+				{
+					clientTermId: generateUUID(),
+					term: '  cap   theorem  ',
+					definition: 'Duplicate with different spacing/casing',
+					bucketSlug: 'deep-concepts',
+					createdAtMs: Date.now() - 30_000,
+				},
+			],
+		};
+
+		const res = await authFetch('/api/guest/import-terms', {
+			method: 'POST',
+			cookie: authCookie,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(payload),
+		});
+		expect(res.status).toBe(201);
+		const body = (await res.json()) as any;
+		expect(body.createdTermCount).toBe(1);
+		expect(body.createdSenseCount).toBe(1);
+		expect(body.skippedExistingCount).toBe(1);
+
+		const terms = await db.select().from(term);
+		expect(terms.length).toBe(1);
+		const senses = await db.select().from(termSense);
+		expect(senses.length).toBe(1);
+	});
+
+	it('skips import when the canonical already exists', async () => {
+		const first = await authFetch('/api/guest/import-terms', {
+			method: 'POST',
+			cookie: authCookie,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				clientRequestId: generateUUID(),
+				items: [
+					{
+						clientTermId: generateUUID(),
+						term: 'Outbox pattern',
+						definition: 'Queue writes locally',
+						bucketSlug: 'dx-tooling',
+						createdAtMs: Date.now() - 60_000,
+					},
+				],
+			}),
+		});
+		expect(first.status).toBe(201);
+
+		const second = await authFetch('/api/guest/import-terms', {
+			method: 'POST',
+			cookie: authCookie,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				clientRequestId: generateUUID(),
+				items: [
+					{
+						clientTermId: generateUUID(),
+						term: 'outbox   pattern',
+						definition: 'Should be skipped (already exists)',
+						bucketSlug: 'dx-tooling',
+						createdAtMs: Date.now() - 30_000,
+					},
+				],
+			}),
+		});
+		expect(second.status).toBe(201);
+		const body = (await second.json()) as any;
+		expect(body.createdTermCount).toBe(0);
+		expect(body.createdSenseCount).toBe(0);
+		expect(body.skippedExistingCount).toBe(1);
+
+		const terms = await db.select().from(term);
+		expect(terms.length).toBe(1);
+		const senses = await db.select().from(termSense);
+		expect(senses.length).toBe(1);
+	});
+
 	it('replays successfully with same clientRequestId', async () => {
 		const clientRequestId = generateUUID();
 		const payload = {

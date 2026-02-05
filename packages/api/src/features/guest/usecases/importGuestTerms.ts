@@ -1,6 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { bucket, type schema, term, termSense } from '../../../db';
+import { bucket, type schema, term } from '../../../db';
 import { generateUUID, sha256Hex } from '../../../shared/crypto';
 import { checkIdempotencyKey, createIdempotencyKeyStatement } from '../../../shared/idempotency/keys';
 import { decodeJsonResultRef, encodeJsonResultRef } from '../../../shared/idempotency/result-ref';
@@ -104,6 +104,10 @@ export async function importGuestTerms(
 			continue;
 		}
 
+		// Prevent duplicates within the same request from attempting to create the same term twice.
+		// This also ensures our counters don't over-report due to in-request duplicates.
+		existingCanonicalSet.add(item.canonical);
+
 		const termId = generateUUID();
 		const senseId = generateUUID();
 		const createdAt = new Date(item.createdAtMs);
@@ -126,22 +130,26 @@ export async function importGuestTerms(
 			.onConflictDoNothing()
 			.toSQL();
 		statements.push(rawDb.prepare(termStmt.sql).bind(...termStmt.params));
-		createdTermCount += 1;
 
-		const senseStmt = db
-			.insert(termSense)
-			.values({
-				id: senseId,
-				termId,
-				bucket: item.bucketSlug,
-				bucketId,
-				text: item.definition,
-				source: 'import',
-				createdAt,
-			})
-			.onConflictDoNothing()
-			.toSQL();
-		statements.push(rawDb.prepare(senseStmt.sql).bind(...senseStmt.params));
+		// If the term insert is skipped due to a (userId, canonical) uniqueness conflict, `termId` won't exist.
+		// Make the sense insert conditional on the generated `termId` existing to avoid FK failures.
+		//
+		// This handles both:
+		// - duplicate canonicals within a request (second insert conflicts and is skipped)
+		// - concurrent races (another request inserts the term between pre-query and insert)
+		statements.push(
+			rawDb
+				.prepare(
+					`
+					INSERT INTO "term_sense" ("id", "term_id", "bucket", "bucket_id", "text", "source", "created_at")
+					SELECT ?, ?, ?, ?, ?, 'import', ?
+					WHERE EXISTS (SELECT 1 FROM "term" WHERE "id" = ?)
+				`
+				)
+				.bind(senseId, termId, item.bucketSlug, bucketId, item.definition, createdAt.getTime(), termId)
+		);
+
+		createdTermCount += 1;
 		createdSenseCount += 1;
 	}
 
