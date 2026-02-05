@@ -172,7 +172,12 @@ export async function importGuestTerms(
 		return { success: true, result, isReplay: false };
 	} catch (error) {
 		// If the idempotency insert raced, caller retry would hit replay.
-		console.error('Guest import failed', error);
+		console.error('[importGuestTerms] Import failed', {
+			userId,
+			clientRequestId: input.clientRequestId,
+			itemCount: input.items.length,
+			error,
+		});
 		return { success: false, error: { type: 'internal_error', message: 'Import failed' } };
 	}
 }
