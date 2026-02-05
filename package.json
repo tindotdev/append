@@ -59,8 +59,9 @@
 			"vitest": "~3.2.4",
 			"@vitest/runner": "~3.2.4",
 			"@vitest/snapshot": "~3.2.4",
-			"seroval": ">=1.4.1",
-			"esbuild": ">=0.25.0"
+			"seroval": "^1.4.1",
+			"esbuild": ">=0.25.0 <1.0.0",
+			"miniflare": "4.20260107.0"
 		}
 	},
 	"devDependencies": {
