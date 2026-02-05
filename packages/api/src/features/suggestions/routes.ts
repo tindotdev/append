@@ -112,7 +112,9 @@ export const suggestionsRoutes = app.post('/batch/:id/suggest', vValidator('quer
 		return apiError(c, 400, 'VALIDATION_ERROR', 'No buckets configured. Please add at least one bucket.');
 	}
 
-	// 7. Atomically consume quota (global budget + user quota)
+	// 7. Consume quota: global budget first, then user quota.
+	// Note: These are separate operations - if user quota fails after global budget
+	// succeeds, the global budget is NOT refunded (per ADR 0026: no refunds policy).
 	// Do this BEFORE starting the LLM calls to prevent races
 	const budgetConsume = await consumeGlobalBudget(db, isAdmin);
 	if (!budgetConsume.ok) {
