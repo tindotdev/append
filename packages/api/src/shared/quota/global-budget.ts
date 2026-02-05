@@ -165,7 +165,7 @@ export async function checkGlobalBudget(db: DrizzleD1Database<typeof schema>, is
  */
 export async function consumeGlobalBudget(db: DrizzleD1Database<typeof schema>, isAdmin: boolean): Promise<BudgetConsumeResult> {
 	const nowMs = Date.now();
-	const budget = await ensureBudgetRow(db, nowMs);
+	let budget = await ensureBudgetRow(db, nowMs);
 	let status = buildStatus(budget, nowMs);
 
 	// Check circuit breaker
@@ -173,49 +173,26 @@ export async function consumeGlobalBudget(db: DrizzleD1Database<typeof schema>, 
 		return { ok: false, error: 'circuit_breaker_open', status };
 	}
 
-	// Try shared pool first
-	const sharedResult = await db
-		.update(llmBudget)
-		.set({
-			sharedUsedCount: sql`${llmBudget.sharedUsedCount} + 1`,
-			updatedAtMs: nowMs,
-		})
-		.where(
-			and(
-				eq(llmBudget.feature, FEATURE_TERM_SUGGESTION),
-				eq(llmBudget.windowStartMs, budget.windowStartMs),
-				lt(llmBudget.sharedUsedCount, llmBudget.sharedLimitCount)
-			)
-		)
-		.returning({
-			sharedUsedCount: llmBudget.sharedUsedCount,
-			reservedUsedCount: llmBudget.reservedUsedCount,
-		});
+	const tryConsumeOnce = async (row: typeof llmBudget.$inferSelect): Promise<BudgetConsumeResult | null> => {
+		let attemptStatus = buildStatus(row, nowMs);
 
-	if (sharedResult.length > 0) {
-		// Shared pool consumption succeeded
-		const updated = sharedResult[0];
-		status = {
-			...status,
-			sharedUsed: updated.sharedUsedCount,
-			sharedRemaining: Math.max(0, budget.sharedLimitCount - updated.sharedUsedCount),
-		};
-		return { ok: true, pool: 'shared', status };
-	}
+		// Circuit breaker may have changed since initial read (rare, but cheap to check)
+		if (attemptStatus.disabled) {
+			return { ok: false, error: 'circuit_breaker_open', status: attemptStatus };
+		}
 
-	// Shared pool exhausted - try reserved if admin
-	if (isAdmin) {
-		const reservedResult = await db
+		// Try shared pool first
+		const sharedResult = await db
 			.update(llmBudget)
 			.set({
-				reservedUsedCount: sql`${llmBudget.reservedUsedCount} + 1`,
+				sharedUsedCount: sql`${llmBudget.sharedUsedCount} + 1`,
 				updatedAtMs: nowMs,
 			})
 			.where(
 				and(
 					eq(llmBudget.feature, FEATURE_TERM_SUGGESTION),
-					eq(llmBudget.windowStartMs, budget.windowStartMs),
-					lt(llmBudget.reservedUsedCount, llmBudget.reservedLimitCount)
+					eq(llmBudget.windowStartMs, row.windowStartMs),
+					lt(llmBudget.sharedUsedCount, llmBudget.sharedLimitCount)
 				)
 			)
 			.returning({
@@ -223,26 +200,83 @@ export async function consumeGlobalBudget(db: DrizzleD1Database<typeof schema>, 
 				reservedUsedCount: llmBudget.reservedUsedCount,
 			});
 
-		if (reservedResult.length > 0) {
-			// Reserved pool consumption succeeded
-			const updated = reservedResult[0];
-			status = {
-				...status,
-				reservedUsed: updated.reservedUsedCount,
-				reservedRemaining: Math.max(0, budget.reservedLimitCount - updated.reservedUsedCount),
+		if (sharedResult.length > 0) {
+			// Shared pool consumption succeeded
+			const updated = sharedResult[0];
+			attemptStatus = {
+				...attemptStatus,
+				sharedUsed: updated.sharedUsedCount,
+				sharedRemaining: Math.max(0, row.sharedLimitCount - updated.sharedUsedCount),
 			};
-			return { ok: true, pool: 'reserved', status };
+			return { ok: true, pool: 'shared', status: attemptStatus };
 		}
+
+		// Shared pool exhausted - try reserved if admin
+		if (isAdmin) {
+			const reservedResult = await db
+				.update(llmBudget)
+				.set({
+					reservedUsedCount: sql`${llmBudget.reservedUsedCount} + 1`,
+					updatedAtMs: nowMs,
+				})
+				.where(
+					and(
+						eq(llmBudget.feature, FEATURE_TERM_SUGGESTION),
+						eq(llmBudget.windowStartMs, row.windowStartMs),
+						lt(llmBudget.reservedUsedCount, llmBudget.reservedLimitCount)
+					)
+				)
+				.returning({
+					sharedUsedCount: llmBudget.sharedUsedCount,
+					reservedUsedCount: llmBudget.reservedUsedCount,
+				});
+
+			if (reservedResult.length > 0) {
+				// Reserved pool consumption succeeded
+				const updated = reservedResult[0];
+				attemptStatus = {
+					...attemptStatus,
+					reservedUsed: updated.reservedUsedCount,
+					reservedRemaining: Math.max(0, row.reservedLimitCount - updated.reservedUsedCount),
+				};
+				return { ok: true, pool: 'reserved', status: attemptStatus };
+			}
+		}
+
+		return null;
+	};
+
+	const firstAttempt = await tryConsumeOnce(budget);
+	if (firstAttempt) {
+		return firstAttempt;
+	}
+
+	// Rollover edge: another request may have rotated the month window between our read and guarded UPDATE.
+	// If windowStart changed, retry once against the current row to avoid spurious 429s during rollover.
+	const currentBudget = await db.query.llmBudget.findFirst({
+		where: eq(llmBudget.feature, FEATURE_TERM_SUGGESTION),
+	});
+
+	if (currentBudget && currentBudget.windowStartMs !== budget.windowStartMs) {
+		budget = currentBudget;
+		const retryAttempt = await tryConsumeOnce(currentBudget);
+		if (retryAttempt) {
+			return retryAttempt;
+		}
+		status = buildStatus(currentBudget, nowMs);
+	} else if (currentBudget) {
+		status = buildStatus(currentBudget, nowMs);
 	}
 
 	// Both pools exhausted (or user is not admin and shared is exhausted)
 	// Re-fetch to get accurate status
-	const finalBudget = await db.query.llmBudget.findFirst({
-		where: eq(llmBudget.feature, FEATURE_TERM_SUGGESTION),
-	});
-
-	if (finalBudget) {
-		status = buildStatus(finalBudget, nowMs);
+	if (!currentBudget) {
+		const finalBudget = await db.query.llmBudget.findFirst({
+			where: eq(llmBudget.feature, FEATURE_TERM_SUGGESTION),
+		});
+		if (finalBudget) {
+			status = buildStatus(finalBudget, nowMs);
+		}
 	}
 
 	console.warn('[quota] Global budget exhausted', {

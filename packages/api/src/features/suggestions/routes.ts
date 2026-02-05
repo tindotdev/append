@@ -21,6 +21,7 @@ import {
 	consumeGlobalBudget,
 	consumeUserQuota,
 	isUserAdmin,
+	refundUserQuota,
 	tripCircuitBreaker,
 } from '../../shared/quota';
 import { createLlmClient } from './adapters';
@@ -112,13 +113,33 @@ export const suggestionsRoutes = app.post('/batch/:id/suggest', vValidator('quer
 		return apiError(c, 400, 'VALIDATION_ERROR', 'No buckets configured. Please add at least one bucket.');
 	}
 
-	// 7. Consume quota: global budget first, then user quota.
-	// Note: These are separate operations - if user quota fails after global budget
-	// succeeds, the global budget is NOT refunded (per ADR 0026: no refunds policy).
-	// Do this BEFORE starting the LLM calls to prevent races
+	// 7. Consume quota: user quota first, then global budget.
+	// This avoids burning the shared global pool on per-user quota failures under concurrency.
+	// If global budget fails after user quota succeeds, refund the user quota (preflight only).
+	const userQuotaConsume = await consumeUserQuota(db, userId);
+	if (!userQuotaConsume.ok) {
+		// Race condition: user quota was exhausted between check and consume
+		return apiError(
+			c,
+			429,
+			'SUGGESTIONS_QUOTA_EXCEEDED',
+			`You have used all ${userQuotaConsume.status.limit} lifetime suggestions for your account`,
+			{
+				quota: userQuotaConsume.status,
+			}
+		);
+	}
+
 	const budgetConsume = await consumeGlobalBudget(db, isAdmin);
 	if (!budgetConsume.ok) {
-		// Race condition: budget was exhausted between check and consume
+		// Best-effort refund of user quota since we couldn't proceed to call the LLM.
+		try {
+			await refundUserQuota(db, userId);
+		} catch (error) {
+			console.error('Failed to refund user quota after budget failure:', error);
+		}
+
+		// Race condition: budget was exhausted between check and consume (or circuit breaker opened)
 		if (budgetConsume.error === 'circuit_breaker_open') {
 			return apiError(c, 503, 'SERVICE_UNAVAILABLE', 'Suggestions are temporarily unavailable', {
 				retry_after: budgetConsume.status.disabledUntil,
@@ -131,21 +152,6 @@ export const suggestionsRoutes = app.post('/batch/:id/suggest', vValidator('quer
 			'Suggestion budget temporarily exhausted. Try again after the next monthly reset.',
 			{
 				reset_at: budgetConsume.status.resetAt,
-			}
-		);
-	}
-
-	const userQuotaConsume = await consumeUserQuota(db, userId);
-	if (!userQuotaConsume.ok) {
-		// Race condition: user quota was exhausted between check and consume
-		// Note: Global budget was already consumed - no refunds per ADR 0026
-		return apiError(
-			c,
-			429,
-			'SUGGESTIONS_QUOTA_EXCEEDED',
-			`You have used all ${userQuotaConsume.status.limit} lifetime suggestions for your account`,
-			{
-				quota: userQuotaConsume.status,
 			}
 		);
 	}
