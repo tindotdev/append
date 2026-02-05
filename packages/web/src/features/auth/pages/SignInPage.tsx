@@ -63,6 +63,15 @@ export function SignInPage() {
 					Try without account
 				</Link>
 			</p>
+			<p className="mt-2 text-xs text-muted-foreground/70">
+				<Link to="/privacy" className="hover:text-muted-foreground">
+					Privacy
+				</Link>
+				<span className="mx-2 text-border/70">•</span>
+				<Link to="/terms" className="hover:text-muted-foreground">
+					Terms
+				</Link>
+			</p>
 		</div>
 	);
 }
