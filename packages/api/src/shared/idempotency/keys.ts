@@ -9,7 +9,7 @@ import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { idempotencyKey, type schema } from '../../db';
 
-export type IdempotencyScope = 'capture_terms' | 'accept_all' | 'accept_candidate' | 'import_commit';
+export type IdempotencyScope = 'capture_terms' | 'accept_all' | 'accept_candidate' | 'import_commit' | 'guest_import_terms';
 
 export interface IdempotencyKeyRecord {
 	userId: string;
