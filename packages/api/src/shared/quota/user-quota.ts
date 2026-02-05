@@ -101,6 +101,11 @@ export async function consumeUserQuota(db: DrizzleD1Database<typeof schema>, use
 		});
 
 		const used = quota?.lifetimeUsedCount ?? USER_SUGGESTION_LIMIT;
+		console.warn('[quota] User suggestion quota exhausted', {
+			userId,
+			used,
+			limit: USER_SUGGESTION_LIMIT,
+		});
 		return {
 			ok: false,
 			error: 'quota_exceeded',
@@ -113,13 +118,20 @@ export async function consumeUserQuota(db: DrizzleD1Database<typeof schema>, use
 	}
 
 	const newCount = result[0].newCount;
+	const status = {
+		used: newCount,
+		limit: USER_SUGGESTION_LIMIT,
+		remaining: Math.max(0, USER_SUGGESTION_LIMIT - newCount),
+	};
+	console.log('[quota] User quota consumed', {
+		userId,
+		newUsed: status.used,
+		limit: status.limit,
+		remaining: status.remaining,
+	});
 	return {
 		ok: true,
-		status: {
-			used: newCount,
-			limit: USER_SUGGESTION_LIMIT,
-			remaining: Math.max(0, USER_SUGGESTION_LIMIT - newCount),
-		},
+		status,
 	};
 }
 
