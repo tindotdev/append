@@ -2,7 +2,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { bucket, type schema, term } from '../../../db';
 import { generateUUID, sha256Hex } from '../../../shared/crypto';
-import { checkIdempotencyKey, createIdempotencyKeyStatement } from '../../../shared/idempotency/keys';
+import { checkIdempotencyKey, createIdempotencyKeyStatement, findIdempotencyKey } from '../../../shared/idempotency/keys';
 import { decodeJsonResultRef, encodeJsonResultRef } from '../../../shared/idempotency/result-ref';
 import type { ImportGuestTermsInput } from '../validation/importGuestTerms.schema';
 
@@ -171,7 +171,24 @@ export async function importGuestTerms(
 		await rawDb.batch(statements);
 		return { success: true, result, isReplay: false };
 	} catch (error) {
-		// If the idempotency insert raced, caller retry would hit replay.
+		// Handle race condition: idempotency key insert can fail due to PK conflict.
+		if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+			const racedKey = await findIdempotencyKey(db, userId, IDEMPOTENCY_SCOPE, input.clientRequestId);
+			if (racedKey) {
+				if (racedKey.requestHash !== requestHash) {
+					return {
+						success: false,
+						error: { type: 'idempotency_conflict', message: 'clientRequestId was used with different request body' },
+					};
+				}
+
+				const decoded = decodeJsonResultRef<ImportGuestTermsResult>('guest_import_terms', racedKey.resultRef);
+				if (decoded) {
+					return { success: true, result: decoded, isReplay: true };
+				}
+			}
+		}
+
 		console.error('[importGuestTerms] Import failed', {
 			userId,
 			clientRequestId: input.clientRequestId,
