@@ -11,7 +11,7 @@
 import { env, SELF } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { account, batch, candidate, idempotencyKey, llmBudget, schema, suggestionCache, userSuggestionQuota } from '../src/db';
 import { FEATURE_TERM_SUGGESTION, getUtcMonthWindow } from '../src/shared/quota';
 import { generateTerms, generateUUID, getAuthCookie, getAuthCookieAndUserId } from './helpers';
@@ -407,48 +407,62 @@ describe('global budget pool', () => {
 			where: eq(userSuggestionQuota.userId, userId),
 		});
 		expect(quota?.lifetimeUsedCount).toBe(3);
-	});
 
-	it('resets budget counters when monthly window rotates', async () => {
-		// Set window to last month (January 2026)
-		const jan1_2026 = Date.UTC(2026, 0, 1, 0, 0, 0, 0);
-		const jan_windowMs = 31 * 24 * 60 * 60 * 1000; // January has 31 days
-
-		// Set budget with old window and exhausted shared pool
-		await db
-			.update(llmBudget)
-			.set({
-				windowStartMs: jan1_2026,
-				windowMs: jan_windowMs,
-				sharedUsedCount: 100, // Exhausted
-				reservedUsedCount: 50,
-			})
-			.where(eq(llmBudget.feature, FEATURE_TERM_SUGGESTION));
-
-		// Make a request in current month (February 2026)
-		const authCookie = await getAuthCookie('window-test@example.com', 'test-pass', 'Window Test');
-		const batchId = await createBatch(authCookie);
-
-		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
-			method: 'POST',
-			headers: { cookie: authCookie },
-		});
-
-		expect(res.status).toBe(200);
-		await res.text(); // Consume response
-
-		// Verify window was rotated and counter reset
+		// Global budget should only be consumed for the single successful request
 		const budget = await db.query.llmBudget.findFirst({
 			where: eq(llmBudget.feature, FEATURE_TERM_SUGGESTION),
 		});
+		expect(budget?.sharedUsedCount).toBe(1);
+	});
 
-		// Window should be updated to February 2026
-		const feb1_2026 = Date.UTC(2026, 1, 1, 0, 0, 0, 0);
-		expect(budget?.windowStartMs).toBe(feb1_2026);
+	it('resets budget counters when monthly window rotates', async () => {
+		vi.useFakeTimers();
+		// Freeze time in a deterministic "current month" so the window rotation is stable.
+		vi.setSystemTime(Date.UTC(2026, 1, 15, 12, 0, 0, 0)); // 2026-02-15 12:00:00 UTC
 
-		// Counters should be reset and new request should be counted
-		expect(budget?.sharedUsedCount).toBe(1); // Not 101!
-		expect(budget?.reservedUsedCount).toBe(0); // Reset
+		try {
+			// Set window to last month (January 2026)
+			const jan1_2026 = Date.UTC(2026, 0, 1, 0, 0, 0, 0);
+			const jan_windowMs = 31 * 24 * 60 * 60 * 1000; // January has 31 days
+
+			// Set budget with old window and exhausted shared pool
+			await db
+				.update(llmBudget)
+				.set({
+					windowStartMs: jan1_2026,
+					windowMs: jan_windowMs,
+					sharedUsedCount: 100, // Exhausted
+					reservedUsedCount: 50,
+				})
+				.where(eq(llmBudget.feature, FEATURE_TERM_SUGGESTION));
+
+			// Make a request in current month (February 2026)
+			const authCookie = await getAuthCookie('window-test@example.com', 'test-pass', 'Window Test');
+			const batchId = await createBatch(authCookie);
+
+			const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
+				method: 'POST',
+				headers: { cookie: authCookie },
+			});
+
+			expect(res.status).toBe(200);
+			await res.text(); // Consume response
+
+			// Verify window was rotated and counter reset
+			const budget = await db.query.llmBudget.findFirst({
+				where: eq(llmBudget.feature, FEATURE_TERM_SUGGESTION),
+			});
+
+			// Window should be updated to the current (frozen) month window start
+			const expected = getUtcMonthWindow(Date.now());
+			expect(budget?.windowStartMs).toBe(expected.windowStartMs);
+
+			// Counters should be reset and new request should be counted
+			expect(budget?.sharedUsedCount).toBe(1); // Not 101!
+			expect(budget?.reservedUsedCount).toBe(0); // Reset
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });
 

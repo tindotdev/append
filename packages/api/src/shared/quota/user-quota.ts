@@ -5,7 +5,7 @@
  * Quota is enforced via atomic D1 UPDATE with WHERE guard.
  */
 
-import { and, eq, lt, sql } from 'drizzle-orm';
+import { and, eq, gt, lt, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type schema, userSuggestionQuota } from '../../db';
 
@@ -149,4 +149,32 @@ export async function getUserQuotaStatus(db: DrizzleD1Database<typeof schema>, u
 		limit: USER_SUGGESTION_LIMIT,
 		remaining: Math.max(0, USER_SUGGESTION_LIMIT - used),
 	};
+}
+
+/**
+ * Best-effort refund of one consumed suggestion from a user's lifetime quota.
+ *
+ * This should only be used to undo a preflight consumption when the request cannot proceed
+ * (e.g. global budget consume fails after a successful user quota consume).
+ *
+ * Not intended to refund after an LLM call attempt (ADR 0026: no refunds for provider failures).
+ */
+export async function refundUserQuota(db: DrizzleD1Database<typeof schema>, userId: string): Promise<void> {
+	const nowMs = Date.now();
+
+	const result = await db
+		.update(userSuggestionQuota)
+		.set({
+			lifetimeUsedCount: sql`${userSuggestionQuota.lifetimeUsedCount} - 1`,
+			updatedAtMs: nowMs,
+		})
+		.where(and(eq(userSuggestionQuota.userId, userId), gt(userSuggestionQuota.lifetimeUsedCount, 0)))
+		.returning({ newCount: userSuggestionQuota.lifetimeUsedCount });
+
+	if (result.length === 0) {
+		console.warn('[quota] User quota refund noop', { userId });
+		return;
+	}
+
+	console.log('[quota] User quota refunded', { userId, newUsed: result[0].newCount });
 }
