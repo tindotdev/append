@@ -85,6 +85,13 @@
       "when": 1769699916117,
       "tag": "0011_quiet_paladin",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1770268975727,
+      "tag": "0012_quota-tables",
+      "breakpoints": true
     }
   ]
 }
