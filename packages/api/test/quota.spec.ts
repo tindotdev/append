@@ -317,11 +317,12 @@ describe('global budget pool', () => {
 			.set({ sharedUsedCount: 100 }) // Max shared limit
 			.where(eq(llmBudget.feature, FEATURE_TERM_SUGGESTION));
 
-		// Create admin user with Google account
+		// Create admin user with Google account linked
+		// ADMIN_SUB is pre-configured in vitest-shared.mts as 'test-admin-google-sub-123'
 		const adminSub = 'test-admin-google-sub-123';
 		const { cookie: authCookie, userId } = await getAuthCookieAndUserId('admin-test@example.com', 'test-pass', 'Admin Test');
 
-		// Link Google account to user
+		// Link Google account to user with matching adminSub
 		await db.insert(account).values({
 			id: generateUUID(),
 			accountId: adminSub,
@@ -336,32 +337,23 @@ describe('global budget pool', () => {
 			updatedAt: new Date(),
 		});
 
-		// Set ADMIN_SUB env var (mock it by patching env object)
-		const originalAdminSub = env.ADMIN_SUB;
-		env.ADMIN_SUB = adminSub;
+		const batchId = await createBatch(authCookie);
 
-		try {
-			const batchId = await createBatch(authCookie);
+		const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
+			method: 'POST',
+			headers: { cookie: authCookie },
+		});
 
-			const res = await SELF.fetch(`https://example.com/api/batch/${batchId}/suggest`, {
-				method: 'POST',
-				headers: { cookie: authCookie },
-			});
+		expect(res.status).toBe(200);
+		await res.text(); // Consume response
 
-			expect(res.status).toBe(200);
-			await res.text(); // Consume response
+		// Verify reserved pool was used
+		const budget = await db.query.llmBudget.findFirst({
+			where: eq(llmBudget.feature, FEATURE_TERM_SUGGESTION),
+		});
 
-			// Verify reserved pool was used
-			const budget = await db.query.llmBudget.findFirst({
-				where: eq(llmBudget.feature, FEATURE_TERM_SUGGESTION),
-			});
-
-			expect(budget?.sharedUsedCount).toBe(100); // Should remain at max
-			expect(budget?.reservedUsedCount).toBe(1); // Should increment
-		} finally {
-			// Restore original value
-			env.ADMIN_SUB = originalAdminSub;
-		}
+		expect(budget?.sharedUsedCount).toBe(100); // Should remain at max
+		expect(budget?.reservedUsedCount).toBe(1); // Should increment
 	});
 
 	it('handles concurrent requests without bypassing quota limit', async () => {
