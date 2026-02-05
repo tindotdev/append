@@ -31,7 +31,7 @@ export function sseEvent(event: string, data: unknown): string {
  * @returns Response object with SSE stream
  */
 export type SseResponseOptions = {
-	onError?: (error: unknown) => string | null;
+	onError?: (error: unknown) => string | null | Promise<string | null>;
 };
 
 export function sseResponse(generator: () => AsyncGenerator<string, void, unknown>, options: SseResponseOptions = {}): Response {
@@ -45,7 +45,7 @@ export function sseResponse(generator: () => AsyncGenerator<string, void, unknow
 					controller.enqueue(encoder.encode(chunk));
 				}
 			} catch (error) {
-				const errorChunk = onError?.(error);
+				const errorChunk = await onError?.(error);
 				if (errorChunk) {
 					controller.enqueue(encoder.encode(errorChunk));
 				}

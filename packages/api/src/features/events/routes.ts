@@ -320,6 +320,11 @@ async function streamExportNdjson(opts: {
 
 export const eventsRoutes = app
 	.post('/ingest', async (c) => {
+		// Kill switch for telemetry ingest
+		if (c.env.INGEST_ENABLED === '0') {
+			return apiError(c, 503, 'INGEST_DISABLED', 'Telemetry ingest is temporarily disabled');
+		}
+
 		const userId = c.get('userId');
 		const db = c.get('db');
 		const rawDb = c.env.DB;
