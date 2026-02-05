@@ -16,7 +16,7 @@ importers:
   .:
     devDependencies:
       '@biomejs/biome':
-        specifier: ^2.3.10
+        specifier: ^2.3.13
         version: 2.3.14
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.50.1
