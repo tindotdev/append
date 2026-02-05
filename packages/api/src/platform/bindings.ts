@@ -30,6 +30,12 @@ export type Bindings = {
 	/** Suggestion provider: 'openai' | 'stub' | 'disabled' */
 	SUGGESTIONS_PROVIDER?: string;
 
+	/** Kill switch for suggestions feature ('0' = disabled, '1' or undefined = enabled) */
+	SUGGESTIONS_ENABLED?: string;
+
+	/** Kill switch for telemetry ingest ('0' = disabled, '1' or undefined = enabled) */
+	INGEST_ENABLED?: string;
+
 	// Auth
 	AUTH_MODE?: string; // 'restricted' | 'public'
 	PUBLIC_SIGNUP_ENABLED?: string; // kill switch ('0' = disabled)
@@ -50,6 +56,9 @@ export type Bindings = {
 	// Telemetry pairing (ADR 0025)
 	TELEMETRY_PAIRING_ENABLED?: string; // '1' = enable device-token minting for all public users
 	ALLOWED_TELEMETRY_SUBS?: string; // Comma-separated Google sub values
+
+	// Admin identity (ADR 0026)
+	ADMIN_SUB?: string; // Google sub of admin user (reserved pool access)
 
 	// Extension Security - Allowlist of Chrome extension IDs that can access /events/* endpoints
 	ALLOWED_EXTENSION_IDS?: string; // Comma-separated list of 32-char extension IDs

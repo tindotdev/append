@@ -317,3 +317,42 @@ export const exportLog = sqliteTable(
 	},
 	(table) => [index('export_log_user_created_idx').on(table.userId, table.createdAt)]
 );
+
+// =============================================================================
+// Quota & Budget Tables (ADR 0026)
+// =============================================================================
+
+/**
+ * UserSuggestionQuota: tracks per-user lifetime suggestion usage.
+ * Each user gets 3 term suggestions for their account lifetime.
+ * Enforced via atomic UPDATE with WHERE guard (ADR 0026).
+ */
+export const userSuggestionQuota = sqliteTable('user_suggestion_quota', {
+	userId: text('user_id')
+		.primaryKey()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	lifetimeUsedCount: integer('lifetime_used_count').default(0).notNull(),
+	lastUsedAtMs: integer('last_used_at_ms'),
+	createdAtMs: integer('created_at_ms').default(sql`(cast(unixepoch('subsec') * 1000 as integer))`).notNull(),
+	updatedAtMs: integer('updated_at_ms').default(sql`(cast(unixepoch('subsec') * 1000 as integer))`).notNull(),
+});
+
+/**
+ * LlmBudget: global budget pool for LLM-powered features.
+ * Implements monthly shared + reserved pools (ADR 0026).
+ *
+ * - shared pool: usable by all users (including admin)
+ * - reserved pool: usable only by admin when shared is exhausted
+ * - circuit breaker: disabledUntilMs for provider outages
+ */
+export const llmBudget = sqliteTable('llm_budget', {
+	feature: text('feature').primaryKey(), // e.g., 'term_suggestion'
+	windowStartMs: integer('window_start_ms').notNull(),
+	windowMs: integer('window_ms').notNull(), // Length of current window (monthly)
+	sharedUsedCount: integer('shared_used_count').default(0).notNull(),
+	sharedLimitCount: integer('shared_limit_count').notNull(),
+	reservedUsedCount: integer('reserved_used_count').default(0).notNull(),
+	reservedLimitCount: integer('reserved_limit_count').notNull(),
+	disabledUntilMs: integer('disabled_until_ms'), // Circuit breaker timestamp
+	updatedAtMs: integer('updated_at_ms').default(sql`(cast(unixepoch('subsec') * 1000 as integer))`).notNull(),
+});

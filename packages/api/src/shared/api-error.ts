@@ -22,6 +22,10 @@ export type ApiErrorCode =
 	| 'IDEMPOTENCY_CONFLICT'
 	| 'TELEMETRY_PAIRING_DISABLED'
 	| 'RATE_LIMIT_EXCEEDED'
+	| 'SUGGESTIONS_DISABLED' // Suggestions feature kill switch is off
+	| 'SUGGESTIONS_BUDGET_EXHAUSTED' // Global LLM budget pool exhausted
+	| 'SUGGESTIONS_QUOTA_EXCEEDED' // Per-user lifetime suggestion quota exceeded
+	| 'INGEST_DISABLED' // Telemetry ingest kill switch is off
 	| 'SERVICE_UNAVAILABLE'
 	| 'CONFIGURATION_ERROR'
 	| 'INTERNAL_ERROR';
