@@ -7,6 +7,7 @@
 
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { schema } from '../../../db';
+import { mapBulkOperationError } from '../../../shared/bulk-error-map';
 import type { BulkBatchIdsInput, BulkDeleteSummary } from '../validation/bulkBatch.schema';
 import { deleteBatch } from './deleteBatch';
 
@@ -40,7 +41,7 @@ export async function bulkDeleteBatches(
 			});
 		} else {
 			failureCount++;
-			const errorInfo = mapDeleteError(result.error);
+			const errorInfo = mapBulkOperationError(result.error);
 			results.push({
 				batchId,
 				success: false,
@@ -54,18 +55,4 @@ export async function bulkDeleteBatches(
 		failureCount,
 		results,
 	};
-}
-
-/**
- * Map delete error to a client-friendly error object.
- */
-function mapDeleteError(error: { type: string }): { code: string; message: string } {
-	switch (error.type) {
-		case 'not_found':
-			return { code: 'NOT_FOUND', message: 'Batch not found' };
-		case 'forbidden':
-			return { code: 'FORBIDDEN', message: 'Access denied' };
-		default:
-			return { code: 'UNKNOWN_ERROR', message: 'An unexpected error occurred' };
-	}
 }
