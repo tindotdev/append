@@ -34,11 +34,23 @@ export function getTodayKey(timezone: string, nowMs = Date.now()): string {
 }
 
 /**
+ * Parse and validate a day key (YYYY-MM-DD).
+ * Throws if the day key is invalid.
+ */
+function parseDayKey(dayKey: string): { year: number; month: number; day: number } {
+	if (!isValidDayKey(dayKey)) {
+		throw new Error(`Invalid day key: ${dayKey}`);
+	}
+	const [y, m, d] = dayKey.split('-').map((n) => Number(n));
+	return { year: y, month: m, day: d };
+}
+
+/**
  * Get short weekday label (Mon, Tue, etc.) for a day key.
  */
 export function weekdayLabel(dayKey: string, timezone: string): string {
-	const [y, m, d] = dayKey.split('-').map((n) => Number(n));
-	const date = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+	const { year, month, day } = parseDayKey(dayKey);
+	const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 	return new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'short' }).format(date);
 }
 
@@ -56,9 +68,9 @@ export function daysInYear(year: number): number {
  * Used for export where from/to are interpreted as UTC dates.
  */
 export function parseDayKeyToUtcRange(dayKey: string): { startMs: number; endMs: number } {
-	const [y, m, d] = dayKey.split('-').map((n) => Number(n));
-	const startMs = Date.UTC(y, m - 1, d, 0, 0, 0, 0);
-	const endMs = Date.UTC(y, m - 1, d, 23, 59, 59, 999);
+	const { year, month, day } = parseDayKey(dayKey);
+	const startMs = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+	const endMs = Date.UTC(year, month - 1, day, 23, 59, 59, 999);
 	return { startMs, endMs };
 }
 
@@ -70,7 +82,7 @@ export function parseDayKeyToUtcRange(dayKey: string): { startMs: number; endMs:
  * local date components to UTC timestamps.
  */
 export function parseDayKeyToTzRange(dayKey: string, timezone: string): { startMs: number; endMs: number } {
-	const [y, m, d] = dayKey.split('-').map((n) => Number(n));
+	const { year: y, month: m, day: d } = parseDayKey(dayKey);
 
 	// Helper to convert local date components (at midnight) in the given timezone to UTC milliseconds.
 	// We use an iterative approach: start with a guess (the UTC date), then format it in the target
