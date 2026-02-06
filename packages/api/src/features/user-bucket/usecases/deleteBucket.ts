@@ -6,8 +6,8 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { bucket, type schema, term, termSense } from '../../../db';
+import { ownershipError } from '../../../shared/api-error';
 import { requireBucketOwned } from '../../../shared/queries';
-import { bucketOwnershipError } from './ownership';
 
 export type DeleteBucketError =
 	| { type: 'not_found'; message: string }
@@ -22,7 +22,7 @@ export async function deleteBucket(db: DrizzleD1Database<typeof schema>, userId:
 	if (!ownership.ok) {
 		return {
 			success: false,
-			error: bucketOwnershipError(ownership.error),
+			error: ownershipError('Bucket', ownership.error),
 		};
 	}
 

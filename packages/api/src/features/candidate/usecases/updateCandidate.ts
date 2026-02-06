@@ -5,7 +5,7 @@
 import { eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { candidate, type schema } from '../../../db';
-import { resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
+import { incrementVersion, resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
 import { findUserBucketBySlug, requireBatchOwned } from '../../../shared/queries';
 import type { UpdateCandidateInput } from '../validation/updateCandidate.schema';
 
@@ -77,7 +77,7 @@ export async function updateCandidate(
 
 	// 4. Build update set (partial update semantics)
 	const updateSet: Record<string, unknown> = {
-		version: sql`${candidate.version} + 1`,
+		version: incrementVersion(candidate),
 		updatedAt: new Date(),
 	};
 

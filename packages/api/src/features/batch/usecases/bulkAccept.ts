@@ -7,6 +7,7 @@
 
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { schema } from '../../../db';
+import { mapBulkOperationError } from '../../../shared/bulk-error-map';
 import type { BulkAcceptSummary, BulkBatchIdsInput } from '../validation/bulkBatch.schema';
 import { acceptAll } from './acceptAll';
 
@@ -46,7 +47,21 @@ export async function bulkAccept(
 			});
 		} else {
 			failureCount++;
-			const errorInfo = mapAcceptError(result.error);
+			const errorInfo = mapBulkOperationError(result.error, {
+				suggestions_in_progress: {
+					code: 'SUGGESTIONS_IN_PROGRESS',
+					message: 'Some candidates have suggestions in progress',
+				},
+				missing_effective_fields: {
+					code: 'MISSING_EFFECTIVE_FIELDS',
+					message: 'Some candidates are missing bucket or text',
+				},
+				idempotency_conflict: { code: 'IDEMPOTENCY_CONFLICT', message: 'Duplicate request' },
+				internal_error: {
+					code: 'INTERNAL_ERROR',
+					message: result.error.type === 'internal_error' ? result.error.message : 'Internal error',
+				},
+			});
 			results.push({
 				batchId,
 				success: false,
@@ -60,29 +75,4 @@ export async function bulkAccept(
 		failureCount,
 		results,
 	};
-}
-
-/**
- * Map accept error to a client-friendly error object.
- */
-function mapAcceptError(error: { type: string; candidateIds?: string[]; originalBatchId?: string; message?: string }): {
-	code: string;
-	message: string;
-} {
-	switch (error.type) {
-		case 'not_found':
-			return { code: 'NOT_FOUND', message: 'Batch not found' };
-		case 'forbidden':
-			return { code: 'FORBIDDEN', message: 'Access denied' };
-		case 'suggestions_in_progress':
-			return { code: 'SUGGESTIONS_IN_PROGRESS', message: 'Some candidates have suggestions in progress' };
-		case 'missing_effective_fields':
-			return { code: 'MISSING_EFFECTIVE_FIELDS', message: 'Some candidates are missing bucket or text' };
-		case 'idempotency_conflict':
-			return { code: 'IDEMPOTENCY_CONFLICT', message: 'Duplicate request' };
-		case 'internal_error':
-			return { code: 'INTERNAL_ERROR', message: error.message ?? 'Internal error' };
-		default:
-			return { code: 'UNKNOWN_ERROR', message: 'An unexpected error occurred' };
-	}
 }

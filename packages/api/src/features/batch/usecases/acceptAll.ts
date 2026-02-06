@@ -9,7 +9,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type BatchStatus, batch, bucket, candidate, normalize, type schema, type TermSenseSource, term, termSense } from '../../../db';
 import { sha256Hex } from '../../../shared/crypto';
 import { checkIdempotencyKey, createIdempotencyKeyStatement, findIdempotencyKey } from '../../../shared/idempotency/keys';
-import { decodeJsonResultRef, encodeJsonResultRef } from '../../../shared/idempotency/result-ref';
+import { decodeJsonResultRef, encodeJsonResultRef, extractIdempotencyResult } from '../../../shared/idempotency/result-ref';
 import { requireBatchOwned } from '../../../shared/queries';
 import type { AcceptAllInput, AcceptSummary } from '../validation/acceptAll.schema';
 
@@ -79,12 +79,7 @@ export async function acceptAll(
 	const idempotencyCheck = await checkIdempotencyKey(db, userId, ACCEPT_ALL_SCOPE, clientRequestId, requestHash);
 
 	if (idempotencyCheck.status === 'replay') {
-		const cachedSummary = decodeJsonResultRef<AcceptSummary>('accept_summary', idempotencyCheck.resultRef);
-		if (!cachedSummary) {
-			return { success: false, error: { type: 'internal_error', message: 'Invalid idempotency result reference' } };
-		}
-
-		return { success: true, result: cachedSummary, isReplay: true };
+		return extractIdempotencyResult<AcceptSummary>('accept_summary', idempotencyCheck.resultRef);
 	}
 
 	if (idempotencyCheck.status === 'conflict') {

@@ -6,9 +6,9 @@
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { bucket, type schema } from '../../../db';
+import { ownershipError } from '../../../shared/api-error';
 import { requireBucketOwned } from '../../../shared/queries';
 import type { UpdateBucketInput } from '../validation/bucket.schema';
-import { bucketOwnershipError } from './ownership';
 
 export type UpdateBucketError = { type: 'not_found'; message: string } | { type: 'forbidden'; message: string };
 
@@ -25,7 +25,7 @@ export async function updateBucket(
 	if (!ownership.ok) {
 		return {
 			success: false,
-			error: bucketOwnershipError(ownership.error),
+			error: ownershipError('Bucket', ownership.error),
 		};
 	}
 

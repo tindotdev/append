@@ -5,7 +5,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type schema, termSense } from '../../../db';
-import { resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
+import { incrementVersion, resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
 import { findUserBucketBySlug, requireTermOwned } from '../../../shared/queries';
 import type { UpdateTermSenseInput } from '../validation/updateTermSense.schema';
 
@@ -71,7 +71,7 @@ export async function updateTermSense(
 
 	// 4. Build update set (partial update semantics)
 	const updateSet: Record<string, unknown> = {
-		version: sql`${termSense.version} + 1`,
+		version: incrementVersion(termSense),
 	};
 
 	if (text !== undefined) {

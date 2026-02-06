@@ -137,3 +137,17 @@ export function ownershipErrorMapFromMessage(): ErrorMapping<OwnershipErrorWithM
 		},
 	} as const;
 }
+
+/**
+ * Create a standardized ownership error with appropriate message.
+ * Use this for not_found/forbidden errors across different resources.
+ */
+export function ownershipError(
+	resource: string,
+	errorType: 'not_found' | 'forbidden'
+): { type: 'not_found' | 'forbidden'; message: string } {
+	return {
+		type: errorType,
+		message: errorType === 'not_found' ? `${resource} not found` : 'Access denied',
+	};
+}

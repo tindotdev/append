@@ -5,7 +5,7 @@
 import { eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type schema, term, termSense } from '../../../db';
-import { resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
+import { incrementVersion, resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
 import { requireTermOwnedIncludingArchived } from '../../../shared/queries';
 import type { RestoreTermInput } from '../validation/restoreTerm.schema';
 
@@ -70,7 +70,7 @@ export async function restoreTerm(
 		.update(term)
 		.set({
 			archivedAt: null,
-			version: sql`${term.version} + 1`,
+			version: incrementVersion(term),
 		})
 		.where(sql`${term.id} = ${termId} AND ${term.version} = ${expectedVersion}`)
 		.returning({
@@ -96,7 +96,7 @@ export async function restoreTerm(
 		.update(termSense)
 		.set({
 			archivedAt: null,
-			version: sql`${termSense.version} + 1`,
+			version: incrementVersion(termSense),
 		})
 		.where(eq(termSense.termId, termId));
 
