@@ -118,7 +118,13 @@ export function BatchDetailPage() {
 
 	// Candidate and sheet actions
 	const candidateActions = useCandidateActions(batch, setBatch, fetchBatch);
+	const {
+		handleAcceptCandidate: rawHandleAcceptCandidate,
+		handleBulkAccept: rawHandleBulkAccept,
+		handleEditCandidate: rawHandleEditCandidate,
+	} = candidateActions;
 	const sheetActions = useSheetActions(batch, setBatch, fetchBatch);
+	const { setSelectedCandidate } = sheetActions;
 
 	// Filter candidates by search query and status
 	const filteredCandidates = useMemo(() => {
@@ -142,26 +148,23 @@ export function BatchDetailPage() {
 
 	// Wrapper handlers that pass row selection state
 	const handleAcceptCandidate = useCallback(
-		(candidate: Candidate) => candidateActions.handleAcceptCandidate(candidate, setRowSelection),
-		[candidateActions.handleAcceptCandidate]
+		(candidate: Candidate) => rawHandleAcceptCandidate(candidate, setRowSelection),
+		[rawHandleAcceptCandidate]
 	);
 
-	const handleBulkAccept = useCallback(
-		() => candidateActions.handleBulkAccept(rowSelection, setRowSelection),
-		[candidateActions.handleBulkAccept, rowSelection]
-	);
+	const handleBulkAccept = useCallback(() => rawHandleBulkAccept(rowSelection, setRowSelection), [rawHandleBulkAccept, rowSelection]);
 
 	const handleEditCandidate = useCallback(
-		(candidate: Candidate) => candidateActions.handleEditCandidate(candidate, sheetActions.setSelectedCandidate),
-		[candidateActions.handleEditCandidate, sheetActions.setSelectedCandidate]
+		(candidate: Candidate) => rawHandleEditCandidate(candidate, setSelectedCandidate),
+		[rawHandleEditCandidate, setSelectedCandidate]
 	);
 
 	// Handle row click to open sheet
 	const handleRowClick = useCallback(
 		(candidate: Candidate) => {
-			sheetActions.setSelectedCandidate(candidate);
+			setSelectedCandidate(candidate);
 		},
-		[sheetActions.setSelectedCandidate]
+		[setSelectedCandidate]
 	);
 
 	// Generate suggestions
