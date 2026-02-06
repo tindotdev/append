@@ -5,7 +5,7 @@
 import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type schema, term, termSense } from '../../../db';
-import { resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
+import { incrementVersion, resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
 import { requireTermOwnedIncludingArchived } from '../../../shared/queries';
 import type { ArchiveTermSenseInput } from '../validation/archiveTermSense.schema';
 
@@ -117,7 +117,7 @@ async function tryUpdateTermPrimarySense(
 		.update(term)
 		.set({
 			primarySenseId: replacementSenseId,
-			version: sql`${term.version} + 1`,
+			version: incrementVersion(term),
 		})
 		.where(
 			sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${archivedSenseId} AND ${term.version} = ${termRow.version} AND EXISTS (SELECT 1 FROM ${termSense} WHERE ${termSense.id} = ${replacementSenseId} AND ${termSense.archivedAt} IS NULL)`
@@ -142,7 +142,7 @@ async function archiveParentTerm(
 		.update(term)
 		.set({
 			archivedAt: now,
-			version: sql`${term.version} + 1`,
+			version: incrementVersion(term),
 		})
 		.where(sql`${term.id} = ${termRow.id} AND ${term.primarySenseId} = ${archivedSenseId} AND ${term.version} = ${termRow.version}`)
 		.returning({
@@ -264,7 +264,7 @@ export async function archiveTermSense(
 		.update(termSense)
 		.set({
 			archivedAt: now,
-			version: sql`${termSense.version} + 1`,
+			version: incrementVersion(termSense),
 		})
 		.where(sql`${termSense.id} = ${senseId} AND ${termSense.version} = ${expectedVersion}`)
 		.returning({

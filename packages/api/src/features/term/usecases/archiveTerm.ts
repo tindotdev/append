@@ -5,7 +5,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type schema, term, termSense } from '../../../db';
-import { resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
+import { incrementVersion, resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
 import { requireTermOwnedIncludingArchived } from '../../../shared/queries';
 import type { ArchiveTermInput } from '../validation/archiveTerm.schema';
 
@@ -72,7 +72,7 @@ export async function archiveTerm(
 		.update(term)
 		.set({
 			archivedAt: now,
-			version: sql`${term.version} + 1`,
+			version: incrementVersion(term),
 		})
 		.where(sql`${term.id} = ${termId} AND ${term.version} = ${expectedVersion}`)
 		.returning({
@@ -98,7 +98,7 @@ export async function archiveTerm(
 		.update(termSense)
 		.set({
 			archivedAt: now,
-			version: sql`${termSense.version} + 1`,
+			version: incrementVersion(termSense),
 		})
 		.where(and(eq(termSense.termId, termId), isNull(termSense.archivedAt)));
 

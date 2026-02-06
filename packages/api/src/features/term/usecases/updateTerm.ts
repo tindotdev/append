@@ -5,7 +5,7 @@
 import { eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type schema, term } from '../../../db';
-import { resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
+import { incrementVersion, resolveOptimisticConflict, toOptimisticError } from '../../../shared/optimistic';
 import { requireTermOwned } from '../../../shared/queries';
 import type { UpdateTermInput } from '../validation/updateTerm.schema';
 
@@ -47,7 +47,7 @@ export async function updateTerm(
 		.update(term)
 		.set({
 			displayTerm,
-			version: sql`${term.version} + 1`,
+			version: incrementVersion(term),
 		})
 		.where(sql`${term.id} = ${termId} AND ${term.version} = ${expectedVersion}`)
 		.returning({
