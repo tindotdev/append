@@ -29,6 +29,7 @@ export function BatchNewPage() {
 
 	// Term composer hook
 	const composer = useTermComposer();
+	const { justSubmitted, setJustSubmitted } = composer;
 
 	// Real-time batch status updates via SSE
 	const { trackBatch, progress: batchProgress } = useBatchStatusUpdates({
@@ -38,6 +39,12 @@ export function BatchNewPage() {
 
 	// Batch action handlers
 	const actions = useBatchActions(queryClient, trackBatch);
+	const {
+		handleBulkAcceptAllReady: rawHandleBulkAcceptAllReady,
+		handleBulkRetry: rawHandleBulkRetry,
+		handleBulkDeleteRequest: rawHandleBulkDeleteRequest,
+		handleBulkDeleteConfirm: rawHandleBulkDeleteConfirm,
+	} = actions;
 
 	// Table state
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -82,7 +89,7 @@ export function BatchNewPage() {
 
 	// Auto-expand and scroll to newly created batch
 	useEffect(() => {
-		if (!composer.justSubmitted || !batches.length) return;
+		if (!justSubmitted || !batches.length) return;
 
 		const currentBatchIds = new Set(batches.map((b) => b.id));
 		const newBatches = batches.filter((b) => !previousBatchIds.has(b.id));
@@ -101,11 +108,11 @@ export function BatchNewPage() {
 				});
 			}
 
-			composer.setJustSubmitted(false);
+			setJustSubmitted(false);
 		}
 
 		setPreviousBatchIds(currentBatchIds);
-	}, [batches, composer.justSubmitted, previousBatchIds, composer.setJustSubmitted]);
+	}, [batches, justSubmitted, previousBatchIds, setJustSubmitted]);
 
 	// Batch table action handlers
 	const handleViewDetails = useCallback(
@@ -127,23 +134,23 @@ export function BatchNewPage() {
 
 	// Bulk action wrappers that clear selection on success
 	const handleBulkAcceptAllReady = useCallback(async () => {
-		const shouldClear = await actions.handleBulkAcceptAllReady(selectedBatchIds);
+		const shouldClear = await rawHandleBulkAcceptAllReady(selectedBatchIds);
 		if (shouldClear) setRowSelection({});
-	}, [selectedBatchIds, actions.handleBulkAcceptAllReady]);
+	}, [selectedBatchIds, rawHandleBulkAcceptAllReady]);
 
 	const handleBulkRetry = useCallback(async () => {
-		const shouldClear = await actions.handleBulkRetry(selectedBatchIds);
+		const shouldClear = await rawHandleBulkRetry(selectedBatchIds);
 		if (shouldClear) setRowSelection({});
-	}, [selectedBatchIds, actions.handleBulkRetry]);
+	}, [selectedBatchIds, rawHandleBulkRetry]);
 
 	const handleBulkDeleteRequest = useCallback(() => {
-		actions.handleBulkDeleteRequest(selectedBatchIds);
-	}, [selectedBatchIds, actions.handleBulkDeleteRequest]);
+		rawHandleBulkDeleteRequest(selectedBatchIds);
+	}, [selectedBatchIds, rawHandleBulkDeleteRequest]);
 
 	const handleBulkDeleteConfirm = useCallback(async () => {
-		const shouldClear = await actions.handleBulkDeleteConfirm(selectedBatchIds);
+		const shouldClear = await rawHandleBulkDeleteConfirm(selectedBatchIds);
 		if (shouldClear) setRowSelection({});
-	}, [selectedBatchIds, actions.handleBulkDeleteConfirm]);
+	}, [selectedBatchIds, rawHandleBulkDeleteConfirm]);
 
 	const handleClearSelection = useCallback(() => {
 		setRowSelection({});
