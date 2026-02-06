@@ -9,6 +9,24 @@ import { deleteBatch } from '../api/delete-batch';
 import { batchKeys } from '../api/get-batch';
 import type { BatchListItem } from '../types';
 
+/**
+ * Helper to add a value to a Set state.
+ */
+function addToSet<T>(setter: React.Dispatch<React.SetStateAction<Set<T>>>, value: T): void {
+	setter((prev) => new Set(prev).add(value));
+}
+
+/**
+ * Helper to remove a value from a Set state.
+ */
+function removeFromSet<T>(setter: React.Dispatch<React.SetStateAction<Set<T>>>, value: T): void {
+	setter((prev) => {
+		const next = new Set(prev);
+		next.delete(value);
+		return next;
+	});
+}
+
 export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: string) => Promise<void>) {
 	const [acceptingBatches, setAcceptingBatches] = useState<Set<string>>(new Set());
 	const [retryingBatches, setRetryingBatches] = useState<Set<string>>(new Set());
@@ -31,7 +49,7 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 			if (acceptingBatchesRef.current.has(batch.id)) return;
 
 			acceptingBatchesRef.current.add(batch.id);
-			setAcceptingBatches((prev) => new Set(prev).add(batch.id));
+			addToSet(setAcceptingBatches, batch.id);
 
 			try {
 				const summary = await acceptBatch(batch.id);
@@ -53,11 +71,7 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 				});
 			} finally {
 				acceptingBatchesRef.current.delete(batch.id);
-				setAcceptingBatches((prev) => {
-					const next = new Set(prev);
-					next.delete(batch.id);
-					return next;
-				});
+				removeFromSet(setAcceptingBatches, batch.id);
 			}
 		},
 		[queryClient]
@@ -68,7 +82,7 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 			if (retryingBatchesRef.current.has(batch.id)) return;
 
 			retryingBatchesRef.current.add(batch.id);
-			setRetryingBatches((prev) => new Set(prev).add(batch.id));
+			addToSet(setRetryingBatches, batch.id);
 
 			try {
 				await trackBatch(batch.id);
@@ -76,11 +90,7 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 				// Error handling is done in the hook
 			} finally {
 				retryingBatchesRef.current.delete(batch.id);
-				setRetryingBatches((prev) => {
-					const next = new Set(prev);
-					next.delete(batch.id);
-					return next;
-				});
+				removeFromSet(setRetryingBatches, batch.id);
 			}
 		},
 		[trackBatch]
@@ -97,7 +107,7 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 		const batch = batchToDelete;
 		setBatchToDelete(null);
 		deletingBatchesRef.current.add(batch.id);
-		setDeletingBatches((prev) => new Set(prev).add(batch.id));
+		addToSet(setDeletingBatches, batch.id);
 
 		try {
 			await deleteBatch(batch.id);
@@ -113,11 +123,7 @@ export function useBatchActions(queryClient: QueryClient, trackBatch: (batchId: 
 			});
 		} finally {
 			deletingBatchesRef.current.delete(batch.id);
-			setDeletingBatches((prev) => {
-				const next = new Set(prev);
-				next.delete(batch.id);
-				return next;
-			});
+			removeFromSet(setDeletingBatches, batch.id);
 		}
 	}, [batchToDelete, queryClient]);
 

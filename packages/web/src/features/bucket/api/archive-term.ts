@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { bucketKeys } from './get-bucket-feed';
-import { termKeys } from './get-term';
+import { invalidateTermAndBuckets } from './query-invalidation';
 import { postJsonWithVersion } from './request';
 
 // Response types
@@ -49,9 +48,7 @@ export function useArchiveTerm() {
 	return useMutation({
 		mutationFn: ({ termId, expectedVersion }: { termId: string; expectedVersion: number }) => archiveTerm(termId, { expectedVersion }),
 		onSuccess: (_, { termId }) => {
-			// Invalidate the specific term and all bucket feeds
-			queryClient.invalidateQueries({ queryKey: termKeys.detail(termId) });
-			queryClient.invalidateQueries({ queryKey: bucketKeys.all });
+			invalidateTermAndBuckets(queryClient, termId);
 		},
 	});
 }
@@ -65,9 +62,7 @@ export function useRestoreTerm() {
 	return useMutation({
 		mutationFn: ({ termId, expectedVersion }: { termId: string; expectedVersion: number }) => restoreTerm(termId, { expectedVersion }),
 		onSuccess: (_, { termId }) => {
-			// Invalidate the specific term and all bucket feeds
-			queryClient.invalidateQueries({ queryKey: termKeys.detail(termId) });
-			queryClient.invalidateQueries({ queryKey: bucketKeys.all });
+			invalidateTermAndBuckets(queryClient, termId);
 		},
 	});
 }
