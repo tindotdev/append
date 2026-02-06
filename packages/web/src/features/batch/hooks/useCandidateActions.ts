@@ -6,14 +6,7 @@ import { acceptCandidate } from '../api/accept-candidate';
 import { updateCandidate } from '../api/update-candidate';
 import { getCandidateStatus } from '../components';
 import type { BatchResponse, Candidate } from '../types';
-
-function updateBatchCandidate(batch: BatchResponse | null, candidate: Candidate): BatchResponse | null {
-	if (!batch) return batch;
-	return {
-		...batch,
-		candidates: batch.candidates.map((item) => (item.id === candidate.id ? candidate : item)),
-	};
-}
+import { updateBatchCandidate } from './batch-utils';
 
 type BulkAcceptCounts = {
 	successCount: number;
