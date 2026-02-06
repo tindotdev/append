@@ -23,3 +23,18 @@ export function decodeJsonResultRef<T>(prefix: string, ref: string): T | null {
 		return null;
 	}
 }
+
+/**
+ * Extract and decode idempotency result with type safety.
+ * Returns success with decoded result or error with internal_error.
+ */
+export function extractIdempotencyResult<T>(
+	tag: string,
+	resultRef: string
+): { success: true; result: T; isReplay: true } | { success: false; error: { type: 'internal_error'; message: string } } {
+	const cached = decodeJsonResultRef<T>(tag, resultRef);
+	if (!cached) {
+		return { success: false, error: { type: 'internal_error', message: 'Invalid idempotency result reference' } };
+	}
+	return { success: true, result: cached, isReplay: true };
+}

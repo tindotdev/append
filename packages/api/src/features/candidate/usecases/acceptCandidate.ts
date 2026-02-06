@@ -10,7 +10,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { type BatchStatus, bucket, candidate, normalize, type schema, type TermSenseSource, term, termSense } from '../../../db';
 import { sha256Hex } from '../../../shared/crypto';
 import { checkIdempotencyKey, createIdempotencyKeyStatement, findIdempotencyKey } from '../../../shared/idempotency/keys';
-import { decodeJsonResultRef, encodeJsonResultRef } from '../../../shared/idempotency/result-ref';
+import { decodeJsonResultRef, encodeJsonResultRef, extractIdempotencyResult } from '../../../shared/idempotency/result-ref';
 import { requireCandidateOwned } from '../../../shared/queries';
 import type { AcceptCandidateInput, AcceptCandidateResult } from '../validation/acceptCandidate.schema';
 
@@ -57,11 +57,7 @@ export async function acceptCandidate(
 	const idempotencyCheck = await checkIdempotencyKey(db, userId, ACCEPT_CANDIDATE_SCOPE, clientRequestId, requestHash);
 
 	if (idempotencyCheck.status === 'replay') {
-		const cachedResult = decodeJsonResultRef<AcceptCandidateResult>('accept_candidate_result', idempotencyCheck.resultRef);
-		if (!cachedResult) {
-			return { success: false, error: { type: 'internal_error', message: 'Invalid idempotency result reference' } };
-		}
-		return { success: true, result: cachedResult, isReplay: true };
+		return extractIdempotencyResult<AcceptCandidateResult>('accept_candidate_result', idempotencyCheck.resultRef);
 	}
 
 	if (idempotencyCheck.status === 'conflict') {
@@ -251,10 +247,7 @@ export async function acceptCandidate(
 			if (racedKey) {
 				if (racedKey.requestHash === requestHash) {
 					// Replay
-					const cachedResult = decodeJsonResultRef<AcceptCandidateResult>('accept_candidate_result', racedKey.resultRef);
-					if (cachedResult) {
-						return { success: true, result: cachedResult, isReplay: true };
-					}
+					return extractIdempotencyResult<AcceptCandidateResult>('accept_candidate_result', racedKey.resultRef);
 				} else {
 					// Conflict
 					let originalCandidateId = 'unknown';
