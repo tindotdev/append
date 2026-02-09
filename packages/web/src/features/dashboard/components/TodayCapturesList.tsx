@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router';
 import { Bookmark } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -69,6 +70,7 @@ function TodayCapturesListSkeleton() {
 }
 
 export function TodayCapturesList() {
+	const navigate = useNavigate();
 	const [drawerOpen, setDrawerOpen] = useState(false);
 	const { data, isLoading, isEmpty } = useTodayCapturesData();
 
@@ -87,7 +89,7 @@ export function TodayCapturesList() {
 						<EmptyTitle className="text-sm">No captures today</EmptyTitle>
 						<EmptyDescription className="text-xs">Capture terms, questions, and notes as you learn</EmptyDescription>
 					</EmptyHeader>
-					<Button variant="outline" size="sm" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+					<Button variant="outline" size="sm" onClick={() => navigate({ to: '/try' })}>
 						Add a capture
 					</Button>
 				</Empty>

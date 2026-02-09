@@ -19,11 +19,11 @@ sync-secrets:
   @echo '# See ADR 0022 for exceptions to Doppler-canonical-secrets policy.' >> packages/api/.dev.vars
   @echo 'APP_ENV="local"' >> packages/api/.dev.vars
   @echo 'BETTER_AUTH_URL="http://localhost:8787"' >> packages/api/.dev.vars
-  @echo 'ALLOWED_EMAIL="tindejphachon@gmail.com"' >> packages/api/.dev.vars
-  @echo 'ALLOWED_EXTENSION_IDS="nnhipglpoenbcdonkbnfdcmfcfaggjle"' >> packages/api/.dev.vars
+  @echo 'ALLOWED_EMAIL="your-email@example.com"  # TODO: Update to your Google account email' >> packages/api/.dev.vars
+  @echo 'ALLOWED_EXTENSION_IDS="your-extension-id"  # TODO: Update to your Chrome extension ID' >> packages/api/.dev.vars
   @echo 'ENABLE_TEST_EMAIL_PASSWORD_AUTH="1"' >> packages/api/.dev.vars
-  @echo 'E2E_AUTH_EMAIL="tindejphachon@gmail.com"' >> packages/api/.dev.vars
-  @echo 'GOOGLE_CLIENT_ID="888108815812-edd7uq5bo4isrl7uuh4dhsbr7df4jtl5.apps.googleusercontent.com"' >> packages/api/.dev.vars
+  @echo 'E2E_AUTH_EMAIL="your-email@example.com"  # TODO: Update to match ALLOWED_EMAIL' >> packages/api/.dev.vars
+  @echo 'GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"  # TODO: Create OAuth 2.0 credentials in Google Cloud Console' >> packages/api/.dev.vars
   @echo 'AUTH_MODE="public"' >> packages/api/.dev.vars
   @echo "✓ Secrets synced and local dev config applied"
 

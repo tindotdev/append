@@ -51,7 +51,6 @@ export function toOptimisticError(conflict: OptimisticConflictResult): Optimisti
  *   .where(eq(term.id, termId));
  * ```
  */
-// biome-ignore lint/suspicious/noExplicitAny: Table types from drizzle-orm are complex
 export function incrementVersion(table: any) {
 	return sql`${table.version} + 1`;
 }

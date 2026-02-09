@@ -1,6 +1,56 @@
 # Append
 
-`append` is the concept that builds on top of eng-log.
+WakaTime for learning — a privacy-first telemetry dashboard that tracks where your learning time goes.
+
+[append.tindev.dev](https://append.tindev.dev)
+
+---
+
+## Overview
+
+- **Automatic time tracking** via Chrome extension (heartbeat-based telemetry)
+- **Visual dashboards** — Today, Week, and Heatmap views with streaks
+- **Topic categorization** — Backend, Frontend, DX Tooling, Deep Concepts, Foundations
+- **Privacy-first** — URL hashing client-side, optional hints only, no page content collected
+- **User-owned data** — full export in NDJSON format, self-serve account deletion
+- **AI suggestions** — term suggestions with per-user quotas and global budget controls
+
+![Dashboard](docs/dashboard.png)
+
+---
+
+## Stack
+
+**Frontend** — React 19, TanStack Router, TanStack Query, TanStack Form, Tailwind CSS, shadcn/ui, Vite
+
+**Backend** — Hono on Cloudflare Workers, Drizzle ORM, D1, R2, Valibot
+
+**Extension** — Chrome MV3, Vite
+
+**Auth** — better-auth
+
+**AI** — Vercel AI SDK, Cloudflare AI Gateway, OpenAI
+
+**Testing** — Vitest, Playwright, @cloudflare/vitest-pool-workers
+
+**Infrastructure** — Cloudflare Pages + Workers, Wrangler, Doppler, Just
+
+**Code Quality** — TypeScript, Biome, ESLint, eslint-plugin-boundaries
+
+**Runtime** — Node.js 24.13+ (Volta), pnpm
+
+## Architecture
+
+Chrome extension emits `artifact_active` heartbeats during active learning. The API ingests events idempotently into an append-only store. Server derives sessions and daily rollups on-read. Dashboard renders views from rollups.
+
+Key decisions:
+
+- Events are append-only — corrections are new events, not rewrites
+- Privacy-first defaults — URL hashing, minimal data collection
+- Dashboard-first UX — if it doesn't improve Today/Week/Heatmap, it's not MVP
+- Public auth with kill switches — configurable modes and safety gates
+
+---
 
 ## Quick Start
 
@@ -10,94 +60,56 @@ just dev    # Start development servers
 just help   # Show all available commands
 ```
 
-See `docs/runbook.md` for detailed setup and operations.
-
-## Development Setup (CI/No Secrets)
-
-For CI or when secrets are already configured:
+For CI or environments with secrets already configured:
 
 ```bash
-pnpm setup:deps  # Install deps + run migrations (no secrets sync)
-pnpm dev:nosecrets  # Start servers without Doppler wrapper
+pnpm setup:deps      # Install deps + run migrations (no secrets sync)
+pnpm dev:nosecrets   # Start servers without Doppler wrapper
 ```
 
-Note: Local development should use `just setup` and `just dev` instead (handles secrets via Doppler).
+## Documentation
 
-## Deployment (Cloudflare)
+- [docs/design.md](docs/design.md) — product vision, architecture, domain glossary, event taxonomy
+- [docs/adr/](docs/adr/) — 19 active architectural decision records on auth, telemetry, AI quotas, data retention, UI patterns, and more
+- [docs/runbook.md](docs/runbook.md) — setup, secrets management, operations
 
-- API (Workers): `pnpm deploy:api`
-- Web (SPA): deploy `packages/web` to Cloudflare Pages (ADR `docs/adr/0004-spa-hono-workers.md`)
-  - Git-based Pages build: build output is `packages/web/dist`
-  - CLI upload: `pnpm --filter @append/web build` then `wrangler pages deploy packages/web/dist --project-name @append/web`
+---
 
-## Secrets management
+## Development
 
-Secrets are managed via Cloudflare's native tooling:
+### Deployment
 
-- **Local dev**: `.dev.vars` in `packages/api/` (gitignored)
-- **Production**: `wrangler secret put <NAME>` (stored in Cloudflare)
-
-Required secrets for auth:
-
-## Status
-
-Canonical docs live in `docs/`:
-
-- `docs/design.md`
-- `docs/adr/README.md`
-
-Supporting docs:
-- `docs/runbook.md`
-
-## Usecases
-
-### Case1: Off-load the brain
-
-"There're so many jargon technical terms. I couldn't keep up with it."
-
-1. Add words (lots of them!)
-2. Click a button
-3. Get suggested descriptions and its category (bucket) for all of them
-4. Accept/ Accept all
-5. Done
-
-### Case2: I'll explain this myself (if it is wrong)
-
-"Here's what I learn. Let me condense my brain and understanding to explain it"
-
-1. Add words
-2. Go learn it
-3. Comeback trying to explain it (aka. add descriptions)
-   Note: the descriptions could be either of all of these five forms
-   1. AHA one-liner
-   2. Analogy
-   3. Pseudocode
-   4. Actual code (this one tricky. request for further discussion)
-   5. Vocal explanation (require transcription)
-4. See feedback by checking if the explanation is correct or not
-
-## Reference
-
-- eng-log (legacy format contract): https://github.com/tindotdev/eng-log
-
-## Case3: Open in ChatGpt or Claude
-
-Please educate me and explain what does {term} mean in simple terms with real-world examples.
-Please add a funny memorable anology if that helps.
-
-### Example from Prisma documentation
-
-Intent question:
-
-```
-Read https://prisma.io/docs/getting-started/ so I can ask questions about it.
+```bash
+pnpm deploy:api   # Deploy API to Cloudflare Workers
+pnpm deploy:web   # Deploy Web to Cloudflare Pages
+pnpm deploy       # Deploy both
 ```
 
-Claude Example:
-<https://claude.ai/new?q=Read%20https://prisma.io/docs/getting-started/%20so%20I%20can%20ask%20questions%20about%20it>.
+Secrets managed via Doppler (canonical) and synced to Cloudflare.
 
-Open AI Example:
-<https://chatgpt.com/?q=Read+https%3A%2F%2Fprisma.io%2Fdocs%2Fgetting-started%2F+so+I+can+ask+questions+about+it>.
-<https://chatgpt.com/?prompt=Read+https%3A%2F%2Fprisma.io%2Fdocs%2Fgetting-started%2F+so+I+can+ask+questions+about+it>.
+### Testing
 
-Note: the `q` is changed to `prompt` in the OpenAI example
+```bash
+pnpm test          # Run all tests
+pnpm test:api      # Run API tests
+pnpm test:watch    # Watch mode
+pnpm ci            # Full CI (lint + typecheck + test + boundaries)
+```
+
+Unit tests (Vitest), integration tests (Vitest + Cloudflare Workers pool), extension tests (Vitest), E2E tests (Playwright).
+
+### Code Quality
+
+```bash
+pnpm check             # Biome format + lint
+pnpm typecheck         # TypeScript check
+pnpm lint:boundaries   # Module boundary checks
+```
+
+Pre-commit hooks enforce formatting, linting, boundary checks, and docs policy. Full CI on pre-push.
+
+---
+
+## License
+
+MIT © 2025 tindotdev — see [LICENSE](LICENSE).

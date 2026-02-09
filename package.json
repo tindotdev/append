@@ -1,6 +1,7 @@
 {
 	"name": "append",
 	"version": "1.0.0",
+	"description": "WakaTime for learning - Privacy-first learning telemetry dashboard",
 	"private": true,
 	"type": "module",
 	"scripts": {

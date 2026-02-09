@@ -9,6 +9,13 @@ dist/
 # Local secrets (Cloudflare Workers)
 .dev.vars
 
+# Doppler CLI configuration (developer-specific)
+.doppler.yaml
+
+# Local Wrangler configuration (contains personal identifiers)
+packages/api/wrangler.jsonc
+packages/api/worker-configuration.d.ts
+
 # Temporary dir
 tmp/
 TMP_pull-*.md

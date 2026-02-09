@@ -1,6 +1,6 @@
 # ADR 0010 — OpenAI API key via Cloudflare Secrets Store
 
-Status: Superseded by ADR 0022
+Status: Superseded by ADR 0028
 Date: 2025-12-28
 
 Supersedes: ADR 0009 (secret management) and ADR 0006 (secret management)
