@@ -33,7 +33,7 @@
 		"cf-typegen": "pnpm -r --if-present cf-typegen"
 	},
 	"license": "MIT",
-	"packageManager": "pnpm@10.28.2",
+	"packageManager": "pnpm@11.22.0",
 	"volta": {
 		"node": "24.13.0"
 	},
