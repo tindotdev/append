@@ -33,9 +33,9 @@
 		"cf-typegen": "pnpm -r --if-present cf-typegen"
 	},
 	"license": "MIT",
-	"packageManager": "pnpm@10.28.2",
+	"packageManager": "pnpm@10.34.5",
 	"volta": {
-		"node": "24.13.0"
+		"node": "24.19.0"
 	},
 	"engines": {
 		"node": ">=20",
@@ -62,7 +62,7 @@
 			"@vitest/snapshot": "~3.2.4",
 			"seroval": "^1.4.1",
 			"esbuild": ">=0.25.0 <1.0.0",
-			"miniflare": "4.20260107.0"
+			"miniflare": "4.20260730.0"
 		}
 	},
 	"devDependencies": {
