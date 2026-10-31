@@ -63,7 +63,7 @@
 		"valibot": "^1.2.0"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20251219.0",
+		"@cloudflare/workers-types": "^5.0.0",
 		"@playwright/test": "^1.57.0",
 		"@tailwindcss/vite": "^4.1.18",
 		"@tanstack/devtools-vite": "^0.5.0",
